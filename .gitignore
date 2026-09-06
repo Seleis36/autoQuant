@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Cached market data (regenerable: yfinance auto-fetches; run code/fetch_intraday.py for hourly)
+data/
