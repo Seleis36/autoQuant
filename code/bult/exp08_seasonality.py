@@ -1,7 +1,7 @@
 """Exp 08 - Hunt for a THIRD orthogonal alpha source: calendar seasonality,
 intrabar (OHLC) microstructure, flow, and cross-crypto risk appetite."""
 import sys, os, numpy as np, pandas as pd
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "shared"))
 from research_lib import *
 pd.set_option("display.width", 250); pd.set_option("display.max_columns", 60)
 

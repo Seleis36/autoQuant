@@ -2,7 +2,7 @@
 Daily close-to-close vol is a noisy estimator; realized vol from 24 hourly returns is
 far more efficient. Test whether it improves the risk-managed daily strategy."""
 import sys, os, numpy as np, pandas as pd
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "shared"))
 from research_lib import *
 pd.set_option("display.width", 260); pd.set_option("display.max_columns", 60)
 

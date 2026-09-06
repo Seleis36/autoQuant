@@ -9,7 +9,7 @@ Hourly backtest, full turnover-based cost accounting, no lookahead.
 Timing: daily regime score uses data through 00:00 UTC of day D (i.e. the previous
 UTC day's close) and is applied to hours of day D. Session weight is clock-only."""
 import sys, os, numpy as np, pandas as pd
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "shared"))
 from research_lib import *
 pd.set_option("display.width", 260); pd.set_option("display.max_columns", 60)
 

@@ -1,6 +1,6 @@
 """Exp 20 - Final performance summary + chart for BULT."""
 import sys, os, numpy as np, pandas as pd
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "shared"))
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from research_lib import *

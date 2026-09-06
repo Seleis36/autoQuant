@@ -63,5 +63,5 @@ Newey-West t = 3.66. Bootstrap 5–95% CI on Sharpe **[0.90, 2.13]**.
 
 ## Code
 
-`code/strategy.py` — `build_signals()`, `backtest_hourly()`, `stats()`.
-Research trail: `past_research/2026-09-06_btc_us_close_liquidity_timer.md`.
+`code/bult/strategy.py` — `build_signals()`, `backtest_hourly()`, `stats()`.
+Research trail: `past_research/bult/2026-09-06_btc_us_close_liquidity_timer.md`.

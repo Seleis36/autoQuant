@@ -3,7 +3,7 @@ its own price history is mined out, so test EXOGENOUS state variables.
 Alignment: exogenous close on date D is known ~20:00 UTC D; harness shifts weights 1 day,
 so the signal is applied to BTC's D+1 bar. No lookahead."""
 import sys, os, numpy as np, pandas as pd
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "shared"))
 from research_lib import *
 pd.set_option("display.width", 250); pd.set_option("display.max_columns", 60)
 

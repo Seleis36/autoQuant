@@ -1,7 +1,7 @@
 """Exp 19 - (a) vectorbt cross-check of the custom engine, (b) independent-venue
 replication on Bitstamp, (c) component ablation."""
 import sys, os, json, time, urllib.request, numpy as np, pandas as pd
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "shared"))
 from research_lib import *
 from strategy import *
 import vectorbt as vbt

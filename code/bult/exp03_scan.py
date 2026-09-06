@@ -2,7 +2,7 @@
 For each feature we bucket days by the feature value KNOWN AT t-1 close and
 measure the Sharpe of holding BTC on day t. IS and OOS reported separately."""
 import sys, os, numpy as np, pandas as pd
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "shared"))
 from research_lib import *
 pd.set_option("display.width", 250); pd.set_option("display.max_columns", 60)
 

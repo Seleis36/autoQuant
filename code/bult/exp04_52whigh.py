@@ -1,7 +1,7 @@
 """Exp 04 - The 52-week-high proximity signal (George & Hwang 2004, applied time-series to BTC).
 Long/flat: hold BTC when price is within `thr` of its rolling N-day high."""
 import sys, os, numpy as np, pandas as pd
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "shared"))
 from research_lib import *
 pd.set_option("display.width", 250); pd.set_option("display.max_columns", 60)
 

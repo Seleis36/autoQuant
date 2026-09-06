@@ -19,6 +19,7 @@ data/<short-name>/            # cached data pulls specific to this idea
 The only files allowed outside a `<short-name>/` subfolder are:
 - `past_research/all_ideas.md` — the global index across all ideas
 - genuinely shared, idea-agnostic tooling (e.g. a common research harness), which goes in `code/shared/`
+- the shared market-data cache written by that harness, which stays at the root of `data/` so every idea reuses the same pulls (it is gitignored and regenerable); `data/<short-name>/` is for pulls only that idea needs
 
 Create the subfolders as your first action in Phase 3, and keep using them for the whole cycle, including throwaway scripts and plots.
 

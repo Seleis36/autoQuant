@@ -244,11 +244,11 @@ A real effect must fail its own mirror images. It does:
 ## 7. Reproduction
 
 ```
-code/research_lib.py      shared harness: data, metrics, NW t-stat, deflated Sharpe, backtester
-code/fetch_intraday.py    Binance hourly downloader (79,248 bars)
-code/strategy.py          BULT: build_signals() / backtest_hourly() / stats()
-code/exp01..exp20_*.py    every experiment in this report, in order
-alphas/BULT.md            deployable specification
+code/shared/research_lib.py   shared harness: data, metrics, NW t-stat, deflated Sharpe, backtester
+code/bult/fetch_intraday.py   Binance hourly downloader (79,248 bars)
+code/bult/strategy.py         BULT: build_signals() / backtest_hourly() / stats()
+code/bult/exp01..exp21_*.py   every experiment in this report, in order
+alphas/bult/BULT.md           deployable specification
 ```
 
 `exp01`–`exp04` are the failures (§1.1), `exp05`–`exp07` the macro discovery, `exp10`–`exp12` the

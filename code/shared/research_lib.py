@@ -9,7 +9,8 @@ import os
 import numpy as np
 import pandas as pd
 
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DATA_DIR = os.path.join(_ROOT, "data")
 ANN = 365.0  # crypto trades every day
 
 # ---------------------------------------------------------------- data

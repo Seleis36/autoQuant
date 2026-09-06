@@ -21,7 +21,8 @@ Alignment / lookahead policy
   * every daily input is lagged one full day + one hour.
   * the overlay gate uses the 00:00->20:00 UTC return, known exactly at 20:00.
 """
-import os, numpy as np, pandas as pd
+import sys, os, numpy as np, pandas as pd
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "shared"))
 from research_lib import DATA_DIR, load_series, vol_target_scalar, ewm_vol, newey_west_t
 
 HANN = 24 * 365.0

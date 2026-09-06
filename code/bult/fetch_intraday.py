@@ -1,7 +1,7 @@
 """Download full hourly BTCUSDT history from Binance (public, no key) -> parquet cache."""
 import json, time, os, sys, urllib.request
 import pandas as pd, numpy as np
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "shared"))
 from research_lib import DATA_DIR
 
 def fetch(symbol="BTCUSDT", interval="1h", start="2017-08-17", host="api.binance.com"):

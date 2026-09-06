@@ -1,6 +1,6 @@
 """Exp 09 - Four orthogonal sleeves -> combined spot-BTC long/flat timer."""
 import sys, os, numpy as np, pandas as pd
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "shared"))
 from research_lib import *
 pd.set_option("display.width", 260); pd.set_option("display.max_columns", 60)
 

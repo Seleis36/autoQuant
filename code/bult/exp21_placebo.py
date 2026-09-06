@@ -1,6 +1,6 @@
 """Exp 21 - Placebo / integrity tests. A real effect must FAIL these mirrors."""
 import sys, os, numpy as np, pandas as pd
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "shared"))
 from research_lib import *
 from strategy import *
 pd.set_option("display.width", 240)

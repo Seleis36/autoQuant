@@ -4,7 +4,7 @@ IG credit/duration (LQD) and the dollar (DXY) describe the liquidity regime that
 levers. Build a long/flat spot BTC timer from EXOGENOUS macro state only, then test
 whether it adds to (or replaces) BTC's own trend."""
 import sys, os, numpy as np, pandas as pd
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "shared"))
 from research_lib import *
 pd.set_option("display.width", 250); pd.set_option("display.max_columns", 60)
 
