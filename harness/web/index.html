@@ -1,0 +1,368 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>autoQuant</title>
+<style>
+:root{
+  --bg:#0f1115; --panel:#161a21; --panel2:#1c2029; --line:#262c37;
+  --fg:#e6e9ef; --dim:#8d97a8; --dim2:#5e6878;
+  --up:#3fb950; --down:#f85149; --warn:#d29922; --accent:#58a6ff; --shadow:#a371f7;
+}
+@media (prefers-color-scheme:light){
+  :root{--bg:#f6f7f9;--panel:#fff;--panel2:#f0f2f5;--line:#e1e4e8;--fg:#1a1f27;
+        --dim:#5b6472;--dim2:#8b95a4;--accent:#0969da;--shadow:#8250df}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font:13px/1.5 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+header{position:sticky;top:0;z-index:10;background:var(--panel);
+  border-bottom:1px solid var(--line);padding:10px 16px;
+  display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+h1{font-size:15px;margin:0;font-weight:650;letter-spacing:-.01em}
+h1 span{color:var(--dim);font-weight:400}
+.grow{flex:1}
+.chip{background:var(--panel2);border:1px solid var(--line);border-radius:6px;
+  padding:3px 9px;font-size:11.5px;color:var(--dim);white-space:nowrap}
+.chip b{color:var(--fg);font-weight:600}
+main{padding:16px;max-width:1500px;margin:0 auto}
+section{margin-bottom:22px}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);
+  margin:0 0 10px;font-weight:600}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(390px,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+.card h3{margin:0;font-size:14px;font-weight:640}
+.card .desc{color:var(--dim);font-size:12px;margin:6px 0 10px}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.badge{font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:2px 7px;
+  border-radius:999px;text-transform:uppercase}
+.b-run{background:rgba(63,185,80,.15);color:var(--up)}
+.b-dead{background:rgba(248,81,73,.15);color:var(--down)}
+.b-stale{background:rgba(210,153,34,.18);color:var(--warn)}
+.b-stop{background:var(--panel2);color:var(--dim)}
+.b-shadow{background:rgba(163,113,247,.15);color:var(--shadow)}
+.b-paper{background:rgba(88,166,255,.13);color:var(--accent)}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{text-align:right;padding:3px 0;font-size:12px}
+th:first-child,td:first-child{text-align:left;color:var(--dim)}
+thead th{color:var(--dim2);font-weight:600;font-size:10.5px;text-transform:uppercase;
+  letter-spacing:.05em;border-bottom:1px solid var(--line);padding-bottom:5px}
+.note{background:var(--panel2);border-left:2px solid var(--warn);padding:7px 10px;
+  border-radius:0 6px 6px 0;color:var(--dim);font-size:11.5px;margin:10px 0}
+button{background:var(--panel2);color:var(--fg);border:1px solid var(--line);
+  border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;font-family:inherit}
+button:hover{border-color:var(--accent);color:var(--accent)}
+button:disabled{opacity:.45;cursor:default}
+button.danger:hover{border-color:var(--down);color:var(--down)}
+select,input[type=text]{background:var(--panel2);color:var(--fg);border:1px solid var(--line);
+  border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit}
+input[type=text]{min-width:220px}
+.spark{display:block;width:100%;height:56px;margin:10px 0 4px}
+pre{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px;
+  overflow:auto;max-height:340px;font-size:11.5px;line-height:1.45;margin:0;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-word}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px}
+.up{color:var(--up)} .down{color:var(--down)} .dim{color:var(--dim)}
+dialog{background:var(--panel);color:var(--fg);border:1px solid var(--line);
+  border-radius:12px;padding:16px;max-width:min(900px,94vw);width:100%}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+.pr{display:flex;gap:9px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.pr:last-child{border-bottom:0}
+.lab{font-size:10px;padding:1px 6px;border-radius:999px;background:var(--panel2);color:var(--dim)}
+.lab.invalid{background:rgba(228,230,105,.16);color:#c9c34a}
+.lab.deployed{background:rgba(63,185,80,.15);color:var(--up)}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--panel);
+  border:1px solid var(--line);border-radius:8px;padding:9px 14px;font-size:12px;
+  box-shadow:0 6px 24px rgba(0,0,0,.35);opacity:0;transition:opacity .2s;pointer-events:none;z-index:50;
+  max-width:90vw;white-space:pre-wrap}
+#toast.on{opacity:1}
+@media (max-width:560px){main{padding:10px}.grid{grid-template-columns:1fr}header{gap:8px}}
+</style>
+
+<header>
+  <h1>autoQuant <span id="clock"></span></h1>
+  <span class="chip" id="c-poller">poller —</span>
+  <span class="chip" id="c-strats">—</span>
+  <span class="chip" id="c-account">—</span>
+  <span class="chip" id="c-usage" title="">claude —</span>
+  <span class="grow"></span>
+  <a class="chip" id="c-git" href="#" target="_blank" rel="noopener">github</a>
+  <a class="chip" href="https://testnet.binance.vision" target="_blank" rel="noopener">binance testnet</a>
+  <button class="danger" id="killall">Kill all</button>
+</header>
+
+<main>
+  <section>
+    <h2>Strategies</h2>
+    <div class="grid" id="strategies"></div>
+  </section>
+
+  <section>
+    <h2>Control</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>PR queue</h3>
+        <div class="row" style="margin:8px 0">
+          <button id="poller-toggle">—</button>
+          <button id="poller-sweep">Sweep now</button>
+        </div>
+        <div id="prs" class="dim">—</div>
+      </div>
+      <div class="card">
+        <h3>Launch research agent</h3>
+        <p class="desc">Runs <span class="mono">/&lt;asset-class&gt;-quant-research</span> headlessly,
+           capped at $10. It opens a PR; the poller does the rest.</p>
+        <div class="row">
+          <select id="ac"></select>
+          <input type="text" id="seed" placeholder="optional seed idea or paper">
+          <button id="go-research">Launch</button>
+        </div>
+        <div id="agents" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <h3>Health</h3>
+        <div id="health"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<dialog id="modal"><div class="row" style="justify-content:space-between;margin-bottom:10px">
+  <h3 id="modal-title" style="margin:0"></h3><button id="modal-close">Close</button></div>
+  <div id="modal-body"></div></dialog>
+<div id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const fmt = (v,d=2) => (v===null||v===undefined||Number.isNaN(v)) ? '—' : Number(v).toFixed(d);
+const pct = (v,d=2) => v===null||v===undefined ? '—' : (v>=0?'+':'')+Number(v).toFixed(d)+'%';
+const sgn = v => v===null||v===undefined ? '' : (v>0?'up':v<0?'down':'');
+const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const dur = s => { if(s==null) return '—'; s=Math.floor(s);
+  const d=Math.floor(s/86400), h=Math.floor(s%86400/3600), m=Math.floor(s%3600/60);
+  return d?`${d}d ${h}h`: h?`${h}h ${m}m`: `${m}m`; };
+const tok = n => n>=1e6 ? (n/1e6).toFixed(1)+'M' : n>=1e3 ? (n/1e3).toFixed(0)+'k' : String(n||0);
+
+let STATE = null, busy = false;
+
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('on');
+  clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('on'),4200); }
+
+async function act(body, label){
+  if(busy) return; busy=true;
+  toast((label||body.action)+'…');
+  try{
+    const r = await fetch('/api/action',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body)});
+    const j = await r.json();
+    toast((j.ok?'✓ ':'✗ ')+(j.output||j.error||'done').slice(0,400));
+  }catch(e){ toast('✗ '+e); }
+  busy=false; refresh();
+}
+
+function sparkline(series, bench){
+  if(!series || series.length<2) return '<div class="dim" style="height:56px;display:flex;align-items:center">no history yet</div>';
+  const all = series.concat(bench&&bench.length?bench:[]);
+  const lo = Math.min(...all), hi = Math.max(...all), rng = (hi-lo)||1;
+  const W=100, H=100;
+  const path = a => a.map((v,i)=>`${(i/(a.length-1)*W).toFixed(2)},${(H-(v-lo)/rng*H).toFixed(2)}`).join(' ');
+  const last = series[series.length-1], first = series[0];
+  const col = last>=first ? 'var(--up)' : 'var(--down)';
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    ${bench&&bench.length?`<polyline points="${path(bench)}" fill="none" stroke="var(--dim2)"
+        stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke"/>`:''}
+    <polyline points="${path(series)}" fill="none" stroke="${col}" stroke-width="1.6"
+      vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
+}
+
+function card(s){
+  const m = s.meta||{}, bt = m.backtest||{}, lv = s.live||{}, st = s.state||{};
+  const badge = {RUNNING:'b-run',DEAD:'b-dead',STALE:'b-stale',STOPPED:'b-stop'}[s.status]||'b-stop';
+  const mode = s.shadow ? '<span class="badge b-shadow">shadow</span>'
+                        : '<span class="badge b-paper">live paper</span>';
+  const prov = m.provenance||{};
+  const gh = (STATE.git&&STATE.git.url)||'';
+  const links = [
+    prov.pr && gh ? `<a href="${gh}/pull/${prov.pr}" target="_blank" rel="noopener">PR #${prov.pr}</a>` : '',
+    prov.spec && gh ? `<a href="${gh}/blob/main/${prov.spec}" target="_blank" rel="noopener">spec</a>` : '',
+    prov.report && gh ? `<a href="${gh}/blob/main/${prov.report}" target="_blank" rel="noopener">report</a>` : '',
+  ].filter(Boolean).join(' · ');
+
+  const cmp = (label, live, back, d=2, suffix='') => `<tr><td>${label}</td>
+    <td class="${sgn(live)}">${live==null?'—':fmt(live,d)+suffix}</td>
+    <td class="dim">${back==null?'—':fmt(back,d)+suffix}</td></tr>`;
+
+  return `<div class="card" data-name="${esc(s.name)}">
+    <div class="row" style="justify-content:space-between">
+      <h3>${esc(m.title||s.name)}</h3>
+      <div class="row"><span class="badge ${badge}">${s.status}</span>${mode}</div>
+    </div>
+    <div class="desc">${esc(m.description||'No meta.json — deploy agent did not write one.')}</div>
+    <div class="row" style="gap:14px;font-size:11.5px" class="dim">
+      <span class="dim mono">${esc(s.symbol||'?')} · ${esc(s.schedule)}</span>
+      <span class="dim">pid ${s.pid||'—'}</span>
+      <span class="dim">up ${dur(s.uptime_s)}</span>
+      <span class="dim">cap $${fmt(m.capital_usdt||st.capital_usdt,0)}</span>
+      ${links?`<span>${links}</span>`:''}
+    </div>
+    ${s.stale?`<div class="note">Stale: last rebalance ${dur(s.last_run_age_s)} ago, longer than
+       two ${esc(s.schedule)} bars. The process is up but not working.</div>`:''}
+    ${sparkline(s._series&&s._series.equity, s._series&&s._series.benchmark)}
+    <div class="row dim" style="font-size:11px;justify-content:space-between;margin-bottom:8px">
+      <span>strategy</span><span>— — buy &amp; hold</span></div>
+    <table><thead><tr><th></th><th>live</th><th>backtest</th></tr></thead><tbody>
+      ${cmp('Sharpe', lv.sufficient?lv.sharpe:null, bt.sharpe)}
+      ${cmp('Return', lv.total_return_pct, null, 2, '%')}
+      ${cmp('CAGR', lv.sufficient?lv.cagr_pct:null, bt.cagr_pct, 1, '%')}
+      ${cmp('Max DD', lv.maxdd_pct, bt.maxdd_pct, 1, '%')}
+      ${cmp('Vol', lv.sufficient?lv.vol_pct:null, bt.vol_pct, 1, '%')}
+      ${cmp('Avg exposure', lv.avg_exposure, bt.avg_exposure, 2)}
+      ${cmp('RT / year', lv.round_trips_per_year, bt.round_trips_per_year, 0)}
+      <tr><td>Weight now</td><td colspan="2" style="text-align:right">
+        <b>${fmt(lv.current_weight ?? st.last_weight, 3)}</b>
+        <span class="dim">· ${fmt(st.position,5)} ${esc((s.symbol||'').replace('USDT',''))}
+        · $${fmt(st.equity,2)}</span></td></tr>
+      <tr><td>Fees paid</td><td colspan="2" style="text-align:right" class="dim">
+        $${fmt(lv.fees_paid,2)} over ${lv.trades||0} trade(s)
+        · assumed ${bt.cost_bps_per_side??'?'}bp ${esc(bt.cost_type||'')}</td></tr>
+    </tbody></table>
+    ${!lv.sufficient&&lv.reason?`<div class="note">${esc(lv.reason)}. Backtest CI on Sharpe:
+       ${bt.sharpe_ci?`[${bt.sharpe_ci[0]}, ${bt.sharpe_ci[1]}]`:'n/a'}.</div>`:''}
+    <div class="row" style="margin-top:10px">
+      <button data-act="restart">Restart</button>
+      <button data-act="stop">Stop</button>
+      <button data-act="start">Start</button>
+      <button data-act="flatten" class="danger">Flatten</button>
+      <button data-act="log">Log</button>
+      <button data-act="journal">Trades</button>
+    </div></div>`;
+}
+
+function renderPRs(){
+  const prs = STATE.prs||[];
+  if(!prs.length){ $('#prs').innerHTML = '<span class="dim">no open PRs</span>'; return; }
+  $('#prs').innerHTML = prs.map(p=>{
+    const labs = (p.labelNames||[]).map(l=>`<span class="lab ${esc(l)}">${esc(l)}</span>`).join(' ');
+    const blocked = (p.labelNames||[]).some(l=>['invalid','harness:failed'].includes(l));
+    return `<div class="pr"><a href="${esc(p.url)}" target="_blank" rel="noopener">#${p.number}</a>
+      <span class="grow">${esc(p.title)}</span>${labs}
+      ${blocked?`<button data-requeue="${p.number}">Requeue</button>`:''}</div>`;
+  }).join('');
+}
+
+function renderHealth(){
+  const a = STATE.account||{}, corr = STATE.correlation||{}, data = STATE.data||[];
+  const alloc = a.allocations||{};
+  const committed = Object.values(alloc.strategies||{}).reduce((s,v)=>s+(v.capital_usdt||0),0);
+  const stale = data.filter(d=>d.age_h>36).slice(0,4);
+  const corrRows = Object.entries(corr).map(([k,v])=>
+    `<tr><td>${esc(k.replace('|',' ↔ '))}</td><td>${fmt(v.corr,2)}</td><td class="dim">n=${v.n}</td></tr>`).join('');
+  $('#health').innerHTML = `
+    <table><tbody>
+      <tr><td>Venue</td><td colspan="2" style="text-align:right">
+        ${a.ok?'<span class="up">reachable</span>':'<span class="down">'+esc(a.error||'unreachable')+'</span>'}</td></tr>
+      <tr><td>Capital pool</td><td colspan="2" style="text-align:right">
+        $${fmt(committed,0)} of $${fmt(alloc.pool_usdt,0)} committed
+        <span class="dim">· ${Object.keys(alloc.strategies||{}).length} strategy(ies)</span></td></tr>
+      <tr><td>Account free</td><td colspan="2" style="text-align:right">
+        ${fmt(a.usdt_free,2)} USDT · ${fmt(a.btc_total,5)} BTC</td></tr>
+    </tbody></table>
+    ${corrRows?`<h3 style="font-size:12px;margin:12px 0 4px">Strategy correlation</h3>
+      <table><tbody>${corrRows}</tbody></table>
+      <div class="note">Everything this venue hosts is a long-only crypto book. High
+        correlation means the portfolio is one bet, not several.</div>`:''}
+    ${stale.length?`<div class="note">Stale market data:
+      ${stale.map(d=>esc(d.file)+' ('+fmt(d.age_h,0)+'h)').join(', ')}</div>`:''}`;
+}
+
+function renderHeader(){
+  const p = STATE.poller||{}, a = STATE.account||{}, u = STATE.usage||{}, g = STATE.git||{};
+  $('#clock').textContent = new Date(STATE.now).toISOString().replace('T',' ').slice(0,19)+' UTC';
+  $('#c-poller').innerHTML = `poller <b class="${p.running?'up':'down'}">${p.running?'on':'off'}</b>`;
+  const run = (STATE.strategies||[]).filter(s=>s.status==='RUNNING').length;
+  $('#c-strats').innerHTML = `<b>${run}</b>/${(STATE.strategies||[]).length} running`;
+  $('#c-account').innerHTML = a.ok ? `binance <b>${fmt(a.usdt_free,0)}</b> USDT free`
+                                   : `binance <b class="down">down</b>`;
+  const h5 = u['5h']&&u['5h'].tokens;
+  $('#c-usage').innerHTML = h5
+    ? `claude 5h <b>$${fmt(u['5h'].cost_usd,2)}</b> <span class="dim">${tok(h5.out)} out</span>`
+    : 'claude —';
+  $('#c-usage').title = (u.disclaimer||'') +
+    (u['7d'] ? `\n7d: $${fmt(u['7d'].cost_usd,2)}, ${u['7d'].tokens.msgs} messages` : '');
+  $('#poller-toggle').textContent = p.running ? 'Stop poller' : 'Start poller';
+  if(g.url){ $('#c-git').href = g.url; $('#c-git').textContent = 'github · '+(g.branch||''); }
+}
+
+function renderAgents(){
+  const rows = (STATE.agents||[]).slice(0,6);
+  $('#agents').innerHTML = rows.length ? `<table><tbody>${rows.map(r=>
+    `<tr><td><a href="#" data-log="${esc(r.log)}">${esc(r.log)}</a></td>
+     <td class="dim">${esc(r.kind)}</td>
+     <td class="dim">${dur((Date.now()/1000)-r.mtime)} ago</td></tr>`).join('')}</tbody></table>`
+    : '<span class="dim">no agent runs yet</span>';
+}
+
+async function refresh(){
+  try{
+    const r = await fetch('/api/state'); STATE = await r.json();
+  }catch(e){ return; }
+  await Promise.all((STATE.strategies||[]).map(async s=>{
+    try{ s._series = await (await fetch('/api/series?strategy='+encodeURIComponent(s.name))).json(); }
+    catch(e){ s._series = null; }
+  }));
+  $('#strategies').innerHTML = (STATE.strategies||[]).map(card).join('')
+    || '<div class="card dim">Nothing deployed yet. Merge a research PR and the deployment agent will put it here.</div>';
+  renderHeader(); renderPRs(); renderHealth(); renderAgents();
+  const sel = $('#ac');
+  if(!sel.options.length) sel.innerHTML = (STATE.asset_classes||[]).map(a=>`<option>${a}</option>`).join('');
+}
+
+async function showModal(title, url, render){
+  $('#modal-title').textContent = title;
+  $('#modal-body').innerHTML = '<div class="dim">loading…</div>';
+  $('#modal').showModal();
+  try{ $('#modal-body').innerHTML = render(await (await fetch(url)).json()); }
+  catch(e){ $('#modal-body').innerHTML = '<div class="down">'+esc(e)+'</div>'; }
+}
+
+document.addEventListener('click', e=>{
+  const b = e.target.closest('button[data-act]');
+  if(b){
+    const name = b.closest('.card').dataset.name, a = b.dataset.act;
+    if(a==='log') return showModal(name+' — runner.log',
+      '/api/log?strategy='+encodeURIComponent(name)+'&n=400', j=>`<pre>${esc(j.text||j.error)}</pre>`);
+    if(a==='journal') return showModal(name+' — trades',
+      '/api/journal?strategy='+encodeURIComponent(name), rows=>{
+        const t = rows.filter(r=>r.traded).reverse().slice(0,80);
+        if(!t.length) return '<div class="dim">no fills yet</div>';
+        return `<table><thead><tr><th>time</th><th>side</th><th>qty</th><th>price</th>
+          <th>weight</th><th>equity</th></tr></thead><tbody>${t.map(r=>
+          `<tr><td class="mono">${esc(String(r.ts).slice(0,19).replace('T',' '))}</td>
+           <td class="${r.side==='BUY'?'up':'down'}">${esc(r.side||'')}</td>
+           <td>${fmt(r.filled_qty??r.delta_qty,6)}</td><td>${fmt(r.fill_price??r.price,2)}</td>
+           <td>${fmt(r.weight,3)}</td><td>${fmt(r.equity,2)}</td></tr>`).join('')}</tbody></table>`;
+      });
+    if(a==='flatten' && !confirm('Sell '+name+' down to flat?')) return;
+    return act({action:a, strategy:name}, a+' '+name);
+  }
+  const rq = e.target.closest('button[data-requeue]');
+  if(rq) return act({action:'requeue_pr', pr:rq.dataset.requeue}, 'requeue PR');
+  const lg = e.target.closest('a[data-log]');
+  if(lg){ e.preventDefault();
+    return showModal(lg.dataset.log, '/api/log?file='+encodeURIComponent(lg.dataset.log)+'&n=500',
+      j=>`<pre>${esc(j.text||j.error)}</pre>`); }
+});
+
+$('#modal-close').onclick = ()=>$('#modal').close();
+$('#poller-toggle').onclick = ()=>act({action: STATE.poller.running?'poller_stop':'poller_start'});
+$('#poller-sweep').onclick  = ()=>act({action:'poller_sweep'}, 'sweeping (may take a while)');
+$('#go-research').onclick   = ()=>act({action:'launch_research', asset_class:$('#ac').value,
+                                       seed:$('#seed').value}, 'launch research');
+$('#killall').onclick = ()=>{
+  if(!confirm('Stop every strategy daemon?\n\nPositions are LEFT OPEN — use Flatten first if you want out of the market.')) return;
+  act({action:'kill_all'}, 'kill all');
+};
+
+refresh(); setInterval(refresh, 10000);
+</script>

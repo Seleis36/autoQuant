@@ -219,3 +219,20 @@ __marimo__/
 
 # Cached market data (regenerable: yfinance auto-fetches; run code/spot-btc/bult/fetch_intraday.py for hourly)
 data/
+
+# --- autoQuant live harness -------------------------------------------------
+# Poller/agent bookkeeping and headless-session logs.
+harness/state/
+harness/logs/
+# Live-daemon runtime state. runner.py IS tracked; everything it writes is not,
+# so `git pull` can never conflict with a running strategy.
+live/**/runner.log
+live/**/journal.jsonl
+live/**/state.json
+live/**/state.json.tmp
+live/**/ledger.json
+live/**/ledger.json.tmp
+# Market-data caches the live runners refresh.
+data/*_live.parquet
+live/**/meta.json.tmp
+harness/web/*.local.html

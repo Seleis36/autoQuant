@@ -1,0 +1,42 @@
+{
+  "name": "spot-btc/bult",
+  "title": "BULT — BTC US-Close Liquidity Timer",
+  "asset_class": "spot-btc",
+  "short_name": "bult",
+  "description": "Daily credit/dollar liquidity regime (HYG, LQD, DXY, SPX) sets a base long/flat weight, plus a dip-buy overlay gated to the 20:00–23:00 UTC US-close / ETF-NAV window on days BTC sold off beforehand.",
+  "symbol": "BTCUSDT",
+  "schedule": "1h",
+  "capital_usdt": 2500.0,
+  "direction": "long/flat",
+  "deployed_at": "2026-09-07T19:31:44Z",
+  "provenance": {
+    "pr": 1,
+    "commit": null,
+    "branch": "research/btc-us-close-liquidity-timer",
+    "spec": "alphas/spot-btc/bult/BULT.md",
+    "report": "past_research/spot-btc/bult/2026-09-06_btc_us_close_liquidity_timer.md",
+    "strategy_code": "code/spot-btc/bult/strategy.py"
+  },
+  "backtest": {
+    "period": "2017-08 → 2026-09",
+    "bars": "hourly",
+    "cost_bps_per_side": 3.0,
+    "cost_type": "maker",
+    "sharpe": 1.48,
+    "sharpe_oos": 1.20,
+    "sharpe_walkforward": 1.41,
+    "sharpe_ci": [0.90, 2.13],
+    "cagr_pct": 32.4,
+    "vol_pct": 20.4,
+    "maxdd_pct": -25.3,
+    "sortino": 1.50,
+    "calmar": 1.28,
+    "avg_exposure": 0.26,
+    "round_trips_per_year": 55,
+    "benchmark": {"name": "BTC buy & hold", "sharpe": 0.81, "cagr_pct": 38.1, "maxdd_pct": -83.9}
+  },
+  "live_notes": [
+    "Market orders pay the ~10 bp taker fee; the backtest assumed 3 bp maker. The report's own cost ladder puts 10 bp at Sharpe ~1.10 vs 1.48.",
+    "Health check from the spec: monitor the rolling 20:00–23:00 UTC window Sharpe. If it decays toward the rest-of-day level, cut the overlay to 0 and fall back to the base (~1.33)."
+  ]
+}

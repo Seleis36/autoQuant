@@ -1,0 +1,207 @@
+"""Turn a deployed strategy's journal into live performance metrics.
+
+The journal (`live/<name>/journal.jsonl`) records one `rebalance` event per bar with
+the strategy's own mark-to-market equity, so the equity curve is already there --
+this module reads it, segments it, and computes the same statistics the research
+reports quote, so live and backtest can be put side by side honestly.
+
+Two things it deliberately refuses to do:
+
+  * **Chart across a mode switch.** A shadow book and a funded account are different
+    books; splicing them produces a curve that never existed. Segments are split on
+    `shadow` and only the current one is reported.
+  * **Quote a Sharpe from a handful of bars.** Live Sharpe over days is noise --
+    BULT's own bootstrap CI is [0.90, 2.13] over nine years. Every result carries
+    `sufficient`, false until `MIN_DAYS_FOR_SHARPE` of history exists, and callers
+    are expected to show "too early to judge" rather than the number.
+"""
+from __future__ import annotations
+
+import json
+import math
+import os
+from datetime import datetime, timezone
+from typing import Optional
+
+HARNESS_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(HARNESS_DIR)
+LIVE_DIR = os.path.join(REPO_ROOT, "live")
+
+BARS_PER_YEAR = {"1m": 525_600, "5m": 105_120, "15m": 35_040, "30m": 17_520,
+                 "1h": 8_760, "2h": 4_380, "4h": 2_190, "6h": 1_460,
+                 "12h": 730, "1d": 365}
+MIN_DAYS_FOR_SHARPE = 30.0
+
+
+def read_journal(name: str, limit: Optional[int] = None) -> list:
+    path = os.path.join(LIVE_DIR, name, "journal.jsonl")
+    if not os.path.exists(path):
+        return []
+    rows = []
+    with open(path) as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rows.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue          # a torn last line during a write is expected
+    return rows[-limit:] if limit else rows
+
+
+def _ts(row) -> datetime:
+    return datetime.fromisoformat(row["ts"].replace("Z", "+00:00"))
+
+
+def current_segment(rows: list) -> list:
+    """Rebalance events since the last shadow/live mode change."""
+    rb = [r for r in rows if r.get("event") == "rebalance" and r.get("equity")]
+    if not rb:
+        return []
+    mode = rb[-1].get("shadow", False)
+    seg = []
+    for r in reversed(rb):
+        if r.get("shadow", False) != mode:
+            break
+        seg.append(r)
+    return list(reversed(seg))
+
+
+def _drawdown(equity: list) -> float:
+    peak, mdd = equity[0], 0.0
+    for v in equity:
+        peak = max(peak, v)
+        if peak > 0:
+            mdd = min(mdd, v / peak - 1.0)
+    return mdd
+
+
+def compute(name: str, schedule: str = "1h") -> dict:
+    """Live statistics for one strategy, plus a buy-&-hold benchmark on the same bars."""
+    rows = read_journal(name)
+    seg = current_segment(rows)
+    out = {"strategy": name, "bars": len(seg), "sufficient": False,
+           "shadow": seg[-1].get("shadow", False) if seg else None}
+    if len(seg) < 2:
+        out["reason"] = "not enough history yet"
+        return out
+
+    t0, t1 = _ts(seg[0]), _ts(seg[-1])
+    days = (t1 - t0).total_seconds() / 86400.0
+    eq = [float(r["equity"]) for r in seg]
+    px = [float(r["price"]) for r in seg if r.get("price")]
+    ann = BARS_PER_YEAR.get(schedule, 8_760)
+
+    rets = [eq[i] / eq[i - 1] - 1.0 for i in range(1, len(eq)) if eq[i - 1] > 0]
+    out.update({
+        "start": t0.isoformat(), "end": t1.isoformat(), "days": round(days, 2),
+        "equity_start": eq[0], "equity_now": eq[-1],
+        "total_return_pct": (eq[-1] / eq[0] - 1.0) * 100 if eq[0] else None,
+        "maxdd_pct": _drawdown(eq) * 100,
+        "avg_exposure": sum(float(r.get("weight") or 0) for r in seg) / len(seg),
+        "current_weight": float(seg[-1].get("weight") or 0),
+        "fees_paid": sum(float(r.get("fee") or 0) for r in seg),
+        "trades": sum(1 for r in seg if r.get("traded")),
+        "errors": sum(1 for r in rows if r.get("event") == "error"),
+    })
+
+    turnover_usdt = sum(abs(float(r.get("delta_qty") or 0)) * float(r.get("price") or 0)
+                        for r in seg if r.get("traded"))
+    out["turnover_usdt"] = turnover_usdt
+    # Annualising a sub-day span produces theatre, not information.
+    if eq[0] and days >= 1.0:
+        out["round_trips_per_year"] = turnover_usdt / eq[0] / 2 * (365.0 / days)
+
+    if len(rets) >= 2:
+        mean = sum(rets) / len(rets)
+        var = sum((r - mean) ** 2 for r in rets) / (len(rets) - 1)
+        sd = math.sqrt(var)
+        out["vol_pct"] = sd * math.sqrt(ann) * 100
+        if sd > 0:
+            out["sharpe"] = mean / sd * math.sqrt(ann)
+        if days >= 1.0 and eq[0] > 0 and eq[-1] > 0:
+            out["cagr_pct"] = ((eq[-1] / eq[0]) ** (365.0 / days) - 1.0) * 100
+
+    # Buy & hold on the same bars, so the comparison is apples to apples.
+    if len(px) >= 2 and px[0] > 0:
+        bh = [p / px[0] for p in px]
+        bh_rets = [bh[i] / bh[i - 1] - 1.0 for i in range(1, len(bh))]
+        bench = {"total_return_pct": (bh[-1] - 1.0) * 100, "maxdd_pct": _drawdown(bh) * 100}
+        if len(bh_rets) >= 2:
+            m = sum(bh_rets) / len(bh_rets)
+            v = math.sqrt(sum((r - m) ** 2 for r in bh_rets) / (len(bh_rets) - 1))
+            if v > 0:
+                bench["sharpe"] = m / v * math.sqrt(ann)
+        out["benchmark"] = bench
+
+    out["sufficient"] = days >= MIN_DAYS_FOR_SHARPE
+    if not out["sufficient"]:
+        out["reason"] = (f"only {days:.1f} days live; a live Sharpe needs at least "
+                         f"{MIN_DAYS_FOR_SHARPE:.0f} days before it means anything")
+    return out
+
+
+def equity_series(name: str, max_points: int = 600) -> dict:
+    """Downsampled equity + benchmark series for charting."""
+    seg = current_segment(read_journal(name))
+    if len(seg) < 2:
+        return {"t": [], "equity": [], "benchmark": []}
+    step = max(1, len(seg) // max_points)
+    pts = seg[::step]
+    if pts[-1] is not seg[-1]:
+        pts.append(seg[-1])
+    p0 = float(pts[0].get("price") or 0) or None
+    e0 = float(pts[0]["equity"])
+    return {
+        "t": [_ts(r).isoformat() for r in pts],
+        "equity": [round(float(r["equity"]) / e0 * 100, 4) for r in pts],
+        "benchmark": ([round(float(r.get("price") or p0) / p0 * 100, 4) for r in pts]
+                      if p0 else []),
+        "weight": [round(float(r.get("weight") or 0), 4) for r in pts],
+    }
+
+
+def correlation(names: list, schedule_by_name: dict) -> dict:
+    """Pairwise correlation of hourly strategy returns.
+
+    Every strategy this venue can host is a long-only crypto book, so a wall of
+    0.9s is the expected -- and the point: it says the book is one bet, not five.
+    """
+    series = {}
+    for n in names:
+        seg = current_segment(read_journal(n))
+        if len(seg) < 3:
+            continue
+        by_ts = {}
+        prev = None
+        for r in seg:
+            e = float(r["equity"])
+            if prev is not None and prev > 0:
+                by_ts[_ts(r).replace(minute=0, second=0, microsecond=0)] = e / prev - 1.0
+            prev = e
+        if by_ts:
+            series[n] = by_ts
+    out = {}
+    for a in series:
+        for b in series:
+            if a >= b:
+                continue
+            shared = sorted(set(series[a]) & set(series[b]))
+            if len(shared) < 10:
+                continue
+            xs = [series[a][t] for t in shared]
+            ys = [series[b][t] for t in shared]
+            mx, my = sum(xs) / len(xs), sum(ys) / len(ys)
+            cov = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+            vx = math.sqrt(sum((x - mx) ** 2 for x in xs))
+            vy = math.sqrt(sum((y - my) ** 2 for y in ys))
+            if vx > 0 and vy > 0:
+                out[f"{a}|{b}"] = {"corr": cov / (vx * vy), "n": len(shared)}
+    return out
+
+
+if __name__ == "__main__":
+    import sys
+    for n in (sys.argv[1:] or ["spot-btc/bult"]):
+        print(json.dumps(compute(n), indent=2, default=str))
