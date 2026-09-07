@@ -40,12 +40,18 @@ watchdog() {
     pid="$(cat "$pidfile" 2>/dev/null)"
     if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then continue; fi
     name="$(find "$REPO/live" -mindepth 2 -maxdepth 2 -type d 2>/dev/null | while read -r d; do
-              n="${d#"$REPO/live/"}"; [ "$(echo "$n" | tr '/' '_')" = "$slug" ] && echo "$n"; done | head -1)"
+              n="${d#"$REPO/live/"}"; [ "$(echo "$n" | tr '/' '_')" = "$slug" ] && echo "$n" ; done | head -1)"
     [ -z "$name" ] && continue
+    # systemd restarts its own units in seconds; stepping in here would just race it.
+    if systemctl --user is-enabled "autoquant-strategy@$(systemd-escape "$name").service" >/dev/null 2>&1; then
+      continue
+    fi
     say "WATCHDOG: $name is dead, restarting"
     "$REPO/harness/launch_live.sh" start "$name"
   done
-  if [ -f "$STATE/dashboard.pid" ] && ! kill -0 "$(cat "$STATE/dashboard.pid" 2>/dev/null)" 2>/dev/null; then
+  if systemctl --user is-enabled autoquant-dashboard.service >/dev/null 2>&1; then
+    : # systemd owns the dashboard
+  elif [ -f "$STATE/dashboard.pid" ] && ! kill -0 "$(cat "$STATE/dashboard.pid" 2>/dev/null)" 2>/dev/null; then
     say "WATCHDOG: dashboard is dead, restarting"
     "$REPO/harness/dashboard.sh" start
   fi

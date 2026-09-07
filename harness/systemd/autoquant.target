@@ -1,0 +1,7 @@
+[Unit]
+Description=autoQuant (dashboard, poller, every live strategy)
+Requires=default.target
+After=default.target
+
+[Install]
+WantedBy=default.target

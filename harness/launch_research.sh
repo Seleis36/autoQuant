@@ -17,7 +17,8 @@ mkdir -p "$LOGS" "$STATE/run"
 AC="${1:?usage: launch_research.sh <asset-class> [seed idea]}"
 SEED="${2:-}"
 MODEL="${RESEARCH_AGENT_MODEL:-opus}"
-BUDGET="${RESEARCH_AGENT_MAX_BUDGET_USD:-10}"
+# Deliberately uncapped: this runs on a Claude subscription, not metered API credit.
+# The timeout below is the safety net -- it reaps a hung agent, not an expensive one.
 TIMEOUT="${RESEARCH_AGENT_TIMEOUT:-14400}"
 MAX_CONCURRENT="${RESEARCH_MAX_CONCURRENT:-2}"
 
@@ -37,14 +38,13 @@ PIDFILE="$STATE/run/research-${AC}-${TS}.pid"
 cd "$REPO" || exit 1
 {
   echo "[$(date -u +%FT%TZ)] research agent: /$AC-quant-research ${SEED:-(no seed)}"
-  echo "[$(date -u +%FT%TZ)] model=$MODEL budget=\$$BUDGET timeout=${TIMEOUT}s"
+  echo "[$(date -u +%FT%TZ)] model=$MODEL timeout=${TIMEOUT}s (no spend cap)"
 } >> "$LOG"
 
 setsid nohup timeout --signal=TERM --kill-after=60 "$TIMEOUT" \
   claude -p "/${AC}-quant-research ${SEED}" \
     --model "$MODEL" \
     --permission-mode bypassPermissions \
-    --max-budget-usd "$BUDGET" \
     --output-format text \
   >> "$LOG" 2>&1 < /dev/null &
 pid=$!

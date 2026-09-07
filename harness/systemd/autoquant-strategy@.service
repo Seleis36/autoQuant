@@ -1,0 +1,22 @@
+[Unit]
+# Instance name is the strategy, systemd-escaped: autoquant-strategy@spot\x2dbtc-bult
+# %I unescapes it back to "spot-btc/bult".
+Description=autoQuant live strategy %I
+After=network-online.target
+Wants=network-online.target
+PartOf=autoquant.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/autoQuant/live/%I
+ExecStart=%h/autoQuant/.venv/bin/python -u runner.py
+Restart=always
+RestartSec=15
+# A strategy that cannot start is a bug to fix, not something to hammer the venue with.
+StartLimitIntervalSec=300
+StartLimitBurst=5
+StandardOutput=append:%h/autoQuant/live/%I/runner.log
+StandardError=append:%h/autoQuant/live/%I/runner.log
+
+[Install]
+WantedBy=autoquant.target

@@ -126,7 +126,23 @@ def _read_json(path, default=None):
         return default
 
 
+def systemd_unit(name: str) -> str:
+    rc, out, _ = sh(["systemd-escape", name], 10)
+    return f"autoquant-strategy@{out}.service" if rc == 0 else ""
+
+
 def pid_of(name: str):
+    """Live pid, asking systemd first -- a supervised strategy has no pidfile of
+    its own, so the pidfile alone would report everything as stopped."""
+    unit = systemd_unit(name)
+    if unit:
+        rc, out, _ = sh(["systemctl", "--user", "show", unit, "-p", "MainPID",
+                         "--value"], 10)
+        if rc == 0 and out.isdigit() and out != "0":
+            return int(out)
+        rc, out, _ = sh(["systemctl", "--user", "is-enabled", unit], 10)
+        if rc == 0:
+            return None          # systemd owns it and says it is not up
     pf = os.path.join(RUN_DIR, name.replace("/", "_") + ".pid")
     if not os.path.exists(pf):
         return None
@@ -174,8 +190,7 @@ def build_strategies() -> list:
             except Exception:  # noqa: BLE001
                 pass
 
-        status = "RUNNING" if pid else ("DEAD" if os.path.exists(
-            os.path.join(RUN_DIR, name.replace("/", "_") + ".pid")) else "STOPPED")
+        status = "RUNNING" if pid else "STOPPED"
         if pid and stale:
             status = "STALE"
 
@@ -184,6 +199,8 @@ def build_strategies() -> list:
             "name": name, "meta": meta, "state": state, "ledger": ledger,
             "schedule": sched, "symbol": meta.get("symbol") or state.get("symbol"),
             "pid": pid, "status": status, "stale": stale,
+            "supervised": bool(systemd_unit(name)) and sh(
+                ["systemctl", "--user", "is-enabled", systemd_unit(name)], 10)[0] == 0,
             "last_run_age_s": last_run_age,
             "uptime_s": (time.time() - started) if started else None,
             "shadow": state.get("shadow", ledger.get("shadow")),

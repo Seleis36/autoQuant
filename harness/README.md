@@ -24,15 +24,11 @@ stop, restart, flatten and requeue are all driven from the page.
 
 **Reaching it from your phone.** The dashboard binds loopback plus this host's tailnet
 address, and nothing else — the API can place orders and spend money, so it must never land
-on a public Wi-Fi interface. Under WSL's default NAT the Tailscale address belongs to
-Windows and is not bindable from inside WSL, so `.wslconfig` has been set to
-`networkingMode=mirrored`. Apply it once from PowerShell:
+on a public Wi-Fi interface (verified: it answers on `100.x`, refuses on the LAN address).
+This works because `.wslconfig` sets `networkingMode=mirrored`; under WSL's default NAT the
+Tailscale address belongs to Windows and is not bindable from inside WSL.
 
-```powershell
-wsl --shutdown          # stops every WSL process; restart the daemons afterwards
-```
-
-After that, with Tailscale connected on the phone:
+With Tailscale connected on the phone:
 
 ```
 http://desktop-h0g6rel.taila3b4ab.ts.net:8787      (MagicDNS)
@@ -41,6 +37,34 @@ http://100.77.199.114:8787                          (tailnet IP)
 
 Verify the bind took with `./harness/dashboard.sh restart` — it prints every address it
 listened on, and warns if no tailnet address was bindable.
+
+## Surviving a reboot
+
+```bash
+./harness/install_autostart.sh              # systemd units + Windows logon hook
+./harness/install_autostart.sh --uninstall
+```
+
+Two halves, because neither works alone:
+
+1. **systemd user units** supervise the dashboard, the poller and every strategy with
+   `Restart=always`, and `loginctl enable-linger` lets them run with no login session open.
+   systemd notices a crash in seconds; the poller's watchdog would take up to 30 minutes, so
+   the watchdog now skips anything systemd owns rather than racing it.
+2. **A `.vbs` in the Windows Startup folder** boots the WSL distro at logon — WSL does not
+   start when Windows boots, so without this nothing comes up until you open a terminal.
+
+`launch_live.sh` and the dashboard buttons keep working unchanged: they detect a systemd unit
+and delegate `start`/`stop`/`restart` to `systemctl --user`.
+
+This starts at **logon**, not at boot. If you want the harness running while the machine sits
+at the lock screen, `harness/windows_autostart_task.ps1` registers a real at-startup task —
+it needs an elevated PowerShell, which is why the installer cannot do it for you.
+
+```bash
+systemctl --user status 'autoquant*'
+journalctl --user -u autoquant-poller -f
+```
 
 ## Running it
 
@@ -65,6 +89,9 @@ Research agents can be launched directly (the dashboard does this for you):
 ./harness/launch_research.sh fx-majors "carry around NFP"   # with a seed
 ```
 
+There is no spend cap — this runs on a Claude subscription, not metered API credit. The
+4-hour timeout is a hang reaper, not a budget, and at most 2 agents run at once.
+
 Live strategies are managed independently of the poller:
 
 ```bash
@@ -85,9 +112,9 @@ then either:
 * **flags it invalid** — labels the PR `invalid`, comments with the blocking reasons, and
   leaves it open for the researcher to fix. Nothing is merged.
 
-Every sweep also runs a **watchdog** that restarts any strategy registered but dead, and the
-dashboard if it died. Nothing restarts the poller itself — that is systemd's job, and until
-those units exist a dead poller stays dead.
+Every sweep also runs a **watchdog** for anything *not* under systemd. Once
+`install_autostart.sh` has run, systemd is the supervisor — including of the poller itself —
+and the watchdog stands down for those units.
 
 Labels are the state machine, so a PR is never processed twice and the poller survives
 restarts. `harness:processing` marks an in-flight PR, `harness:failed` a PR the agent could
@@ -148,7 +175,9 @@ mode produced it.
 | `check_credentials.py` | Which Binance account do `.env`'s keys belong to? |
 | `dashboard.py`, `dashboard.sh`, `web/` | The control dashboard |
 | `metrics.py` | Journal → live Sharpe/CAGR/MaxDD/turnover, and the equity series |
-| `launch_research.sh` | Start a quant-research agent, detached, capped at $10 |
+| `launch_research.sh` | Start a quant-research agent, detached and uncapped |
+| `install_autostart.sh`, `systemd/` | Reboot survival: systemd units + Windows logon hook |
+| `windows_autostart_task.ps1` | Optional true at-boot task (needs elevation) |
 | `state/`, `logs/` | Bookkeeping and session logs (gitignored) |
 
 ## Capital

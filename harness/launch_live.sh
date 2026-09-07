@@ -20,21 +20,71 @@ mkdir -p "$RUN"
 
 slug() { echo "${1%/}" | tr '/' '_'; }
 
+# When a strategy is under a systemd unit, systemd is the supervisor: starting or
+# stopping it any other way just races Restart=always. These helpers let the same
+# commands (and the dashboard buttons that call them) keep working either way.
+unit_for() { echo "autoquant-strategy@$(systemd-escape "${1%/}").service"; }
+
+systemd_managed() {
+  command -v systemctl >/dev/null 2>&1 || return 1
+  systemctl --user is-enabled "$(unit_for "$1")" >/dev/null 2>&1
+}
+
+sync_pidfile_from_systemd() {  # $1 = name -- keeps status/watchdog agreeing with systemd
+  local pid; pid="$(systemctl --user show "$(unit_for "$1")" -p MainPID --value 2>/dev/null)"
+  if [ -n "$pid" ] && [ "$pid" != "0" ]; then echo "$pid" > "$RUN/$(slug "${1%/}").pid"
+  else rm -f "$RUN/$(slug "${1%/}").pid"; fi
+}
+
 is_running() {  # $1 = pidfile
   [ -f "$1" ] || return 1
   local pid; pid="$(cat "$1" 2>/dev/null)"
   [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null
 }
 
+# The pidfile alone is not proof: after a WSL restart it holds a dead pid, and two
+# starts racing between the spawn and the pidfile write both saw "not running" and
+# both spawned -- two daemons trading one ledger. This asks the process table
+# instead, matching on the runner's working directory.
+running_pids_for() {  # $1 = strategy dir
+  local dir; dir="$(readlink -f "$1")"
+  local p c
+  for p in /proc/[0-9]*; do
+    # A process can exit between the glob and the read; that is normal, not an error.
+    [ -r "$p/cmdline" ] || continue
+    c="$( { tr '\0' ' ' < "$p/cmdline"; } 2>/dev/null )" || continue
+    case "$c" in *runner.py*) ;; *) continue ;; esac
+    [ "$(readlink -f "/proc/${p#/proc/}/cwd" 2>/dev/null)" = "$dir" ] && echo "${p#/proc/}"
+  done
+}
+
 cmd_start() {
+  if systemd_managed "$1"; then
+    systemctl --user start "$(unit_for "$1")" && sleep 2
+    sync_pidfile_from_systemd "$1"
+    echo "started ${1%/} via systemd ($(unit_for "$1"))"
+    return 0
+  fi
+  # Serialise start for this strategy: check-then-spawn must be atomic.
+  local lock="$RUN/$(slug "${1%/}").lock"
+  exec 8>"$lock"
+  if ! flock -w 30 8; then
+    echo "ERROR: another start for ${1%/} is in progress" >&2; return 1
+  fi
+  _cmd_start_locked "$@"
+}
+
+_cmd_start_locked() {
   local name="${1%/}" dir pidfile logfile
   dir="$LIVE/$name"
   [ -f "$dir/runner.py" ] || { echo "ERROR: $dir/runner.py not found" >&2; return 1; }
   pidfile="$RUN/$(slug "$name").pid"
   logfile="$dir/runner.log"
 
-  if is_running "$pidfile"; then
-    echo "already running: $name (pid $(cat "$pidfile"))"
+  local existing; existing="$(running_pids_for "$dir" | tr '\n' ' ')"
+  if [ -n "${existing// /}" ]; then
+    echo "already running: $name (pid ${existing% })"
+    echo "${existing%% *}" > "$pidfile"      # re-adopt, so status and the watchdog agree
     return 0
   fi
 
@@ -60,44 +110,64 @@ cmd_start() {
 }
 
 cmd_stop() {
+  if systemd_managed "$1"; then
+    systemctl --user stop "$(unit_for "$1")"
+    rm -f "$RUN/$(slug "${1%/}").pid"
+    echo "stopped ${1%/} via systemd"
+    return 0
+  fi
   local name="${1%/}" pidfile; pidfile="$RUN/$(slug "$name").pid"
-  if ! is_running "$pidfile"; then echo "not running: $name"; rm -f "$pidfile"; return 0; fi
-  local pid; pid="$(cat "$pidfile")"
-  kill -TERM "$pid" 2>/dev/null
-  for _ in $(seq 1 20); do kill -0 "$pid" 2>/dev/null || break; sleep 1; done
-  kill -0 "$pid" 2>/dev/null && kill -KILL "$pid" 2>/dev/null
+  # Stop every process for this strategy, not just whichever the pidfile names --
+  # an orphan left by a past race must not survive a stop.
+  local pids; pids="$(running_pids_for "$LIVE/$name")"
+  if [ -z "$pids" ]; then echo "not running: $name"; rm -f "$pidfile"; return 0; fi
+  local pid
+  for pid in $pids; do kill -TERM "$pid" 2>/dev/null; done
+  for _ in $(seq 1 20); do
+    [ -z "$(running_pids_for "$LIVE/$name")" ] && break
+    sleep 1
+  done
+  for pid in $(running_pids_for "$LIVE/$name"); do kill -KILL "$pid" 2>/dev/null; done
   rm -f "$pidfile"
-  echo "stopped $name"
+  echo "stopped $name ($(echo "$pids" | tr '\n' ' '))"
 }
 
 cmd_status() {
   local filter="${1:-}"
-  shopt -s nullglob
-  local any=0
-  for pidfile in "$RUN"/*.pid; do
-    local slug name; slug="$(basename "$pidfile" .pid)"
-    name="$(find "$LIVE" -mindepth 2 -maxdepth 2 -type d 2>/dev/null | while read -r d; do
-              n="${d#"$LIVE"/}"; [ "$(echo "$n" | tr '/' '_')" = "$slug" ] && echo "$n"; done | head -1)"
-    name="${name:-$slug}"
+  local any=0 name pid
+  # Enumerate deployments, not pidfiles: a systemd-supervised strategy has no
+  # pidfile of its own until we sync one, so pidfiles alone would show nothing.
+  while read -r name; do
+    [ -z "$name" ] && continue
     [ -n "$filter" ] && [ "$name" != "${filter%/}" ] && continue
     any=1
-    if is_running "$pidfile"; then
-      printf 'RUNNING  %-32s pid %-8s ' "$name" "$(cat "$pidfile")"
+    local managed="" ; pid=""
+    if systemd_managed "$name"; then
+      managed=" [systemd]"
+      sync_pidfile_from_systemd "$name"
+      pid="$(systemctl --user show "$(unit_for "$name")" -p MainPID --value 2>/dev/null)"
+      [ "$pid" = "0" ] && pid=""
     else
-      printf 'DEAD     %-32s %-12s ' "$name" "-"
+      pid="$(running_pids_for "$LIVE/$name" | head -1)"
+      if [ -n "$pid" ]; then echo "$pid" > "$RUN/$(slug "$name").pid"; fi
     fi
+
+    if [ -n "$pid" ]; then printf 'RUNNING  %-32s pid %-8s ' "$name" "$pid"
+    else printf 'STOPPED  %-32s %-12s ' "$name" "-"; fi
+
     local st="$LIVE/$name/state.json"
     if [ -f "$st" ]; then
       "$PY" -c "
-import json,sys
+import json
 s=json.load(open('$st'))
-print('w=%-7s eq=%-11s %s %s' % (s.get('last_weight'), round(s.get('equity') or 0,2),
-      'SHADOW' if s.get('shadow') else 'PAPER', s.get('updated','')))" 2>/dev/null || echo
+print('w=%-7s eq=%-11s %s %s%s' % (round(s.get('last_weight') or 0,4), round(s.get('equity') or 0,2),
+      'SHADOW' if s.get('shadow') else 'PAPER', s.get('updated',''), '$managed'))" 2>/dev/null         || echo "$managed"
     else
-      echo "(no state.json yet)"
+      echo "(no state.json yet)$managed"
     fi
-  done
-  [ "$any" = 0 ] && echo "no strategies registered"
+  done < <(find "$LIVE" -mindepth 3 -maxdepth 3 -name runner.py -printf '%h\n' 2>/dev/null \
+             | sed "s|^$LIVE/||" | sort)
+  [ "$any" = 0 ] && echo "no strategies deployed"
   return 0
 }
 
@@ -108,6 +178,14 @@ case "${1:-status}" in
   stop)   shift; cmd_stop "$@" ;;
   status) shift; cmd_status "$@" ;;
   logs)   shift; cmd_logs "$@" ;;
-  restart) shift; cmd_stop "$1"; cmd_start "$1" ;;
+  restart)
+    shift
+    if systemd_managed "$1"; then
+      systemctl --user restart "$(unit_for "$1")" && sleep 2
+      sync_pidfile_from_systemd "$1"
+      echo "restarted ${1%/} via systemd"
+    else
+      cmd_stop "$1"; cmd_start "$1"
+    fi ;;
   *) echo "usage: $0 {start|stop|restart|status|logs} <asset-class>/<short-name>" >&2; exit 2 ;;
 esac

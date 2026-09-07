@@ -1,0 +1,17 @@
+[Unit]
+Description=autoQuant control dashboard
+After=network-online.target
+Wants=network-online.target
+PartOf=autoquant.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/autoQuant
+ExecStart=%h/autoQuant/.venv/bin/python -u harness/dashboard.py --bind auto --port 8787
+Restart=always
+RestartSec=10
+StandardOutput=append:%h/autoQuant/harness/logs/dashboard.log
+StandardError=append:%h/autoQuant/harness/logs/dashboard.log
+
+[Install]
+WantedBy=autoquant.target
