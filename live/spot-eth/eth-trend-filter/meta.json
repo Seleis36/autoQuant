@@ -1,0 +1,48 @@
+{
+  "name": "spot-eth/eth-trend-filter",
+  "title": "ETH trend filter (SMA40 + inverse-vol)",
+  "asset_class": "spot-eth",
+  "short_name": "eth-trend-filter",
+  "description": "Long/flat spot ETH gated by a 40-day SMA trend filter and sized by inverse EWM realised vol (halflife 20, target 0.5 annualised, hard-capped at 1.0). One decision per day at the 23:59 UTC close print.",
+  "symbol": "ETHUSDT",
+  "schedule": "1d",
+  "capital_usdt": 2500.0,
+  "direction": "long/flat",
+  "deployed_at": "2026-09-08T17:15:00Z",
+  "provenance": {
+    "pr": 2,
+    "commit": null,
+    "branch": "research/spot-eth-eth-trend-filter",
+    "spec": "alphas/spot-eth/eth-trend-filter/spec.md",
+    "report": "past_research/spot-eth/eth-trend-filter/2026-09-07_eth_trend_filter.md",
+    "strategy_code": "code/spot-eth/eth-trend-filter/05_final.py"
+  },
+  "backtest": {
+    "period": "2017-11-09 → 2026-09-06",
+    "bars": "daily",
+    "cost_bps_per_side": 10.0,
+    "cost_type": "taker",
+    "sharpe": 1.16,
+    "sharpe_is": 1.18,
+    "sharpe_oos": 1.12,
+    "sharpe_walkforward": 1.18,
+    "sharpe_walkforward_oos": 1.19,
+    "sharpe_ci": [0.55, 1.71],
+    "t_newey_west": 2.99,
+    "cagr_pct": 42.7,
+    "vol_pct": 36.9,
+    "maxdd_pct": -45.6,
+    "sortino": 1.32,
+    "calmar": 0.94,
+    "hit_rate_pct": 55.5,
+    "avg_exposure": 0.341,
+    "round_trips_per_year": 16.9,
+    "benchmark": {"name": "ETH buy & hold", "sharpe": 0.70, "cagr_pct": 26.2, "maxdd_pct": -94.0}
+  },
+  "live_notes": [
+    "Cost assumption in the report matches the venue's taker fee (10 bp/side); no known gap.",
+    "backtest_series.parquet's weight column is pre-shifted: row t holds the weight decided at the close of t-1. The runner's --check weight for today corresponds to tomorrow's row in that file, not the last row.",
+    "Recommended kill switch from the spec (not part of the alpha): if trailing 90-day realised Sharpe drops below -0.5, halve exposure until it recovers above 0.",
+    "Signal is computed from real Binance spot ETHUSDT daily klines; the yfinance ETH-USD daily close the research used differs by <2 bp of weight (both are faithful to the spec)."
+  ]
+}
