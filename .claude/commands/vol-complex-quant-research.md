@@ -1,5 +1,5 @@
 ---
-description: Full quant research cycle on the equity volatility complex — review past ideas, pick one, backtest it with vectorbt, report the result.
+description: Full quant research cycle on the equity volatility complex — review past ideas, pick one, backtest it with vectorbt, report the result and open a pull request.
 argument-hint: [optional idea, theme or paper to start from]
 ---
 
@@ -43,9 +43,44 @@ Create the subfolders as your first action in Phase 3, and keep using them for t
 
 **Phase 3 — Code.** Create `code/vol-complex/<short-name>/` and write everything there. Using python and vectorbt, pull the data described above and test your idea. If it seems profitable, make sure it is free of lookahead bias, and of course test it out of sample. If it doesn't seem profitable, try to fine-tune it. If it's still not profitable, think creatively about how to change the setup context to make it profitable (maybe the time horizon is not adapted? maybe it needs another indicator to clean the entry points? maybe it only works in one regime?). This is an art as much as a science.
 
-**Phase 4 — Report.** Write a thorough, rigorous research report as a md file in `past_research/vol-complex/<short-name>/`, covering the idea and every variation you tried — including the ones that failed. If it works, write the deployable spec and its figures to `alphas/vol-complex/<short-name>/`. Then sum up your work in one line in `past_research/vol-complex/all_ideas.md` with its status: **Failed** for an unprofitable idea, **Working** for a profitable one. That line must link to the report.
+**Phase 4 — Report.** Write a thorough, rigorous research report as a md file in `past_research/vol-complex/<short-name>/`, covering the idea and every variation you tried — including the ones that failed. If it works, write the deployable spec and its figures to `alphas/vol-complex/<short-name>/`. Alongside it, write `code/vol-complex/<short-name>/strategy.py` exposing one reusable function that turns raw market data into the target weight series, with every parameter defaulted to the value in the spec — the deployment agent imports that function instead of reimplementing your signal. Then sum up your work in one line in `past_research/vol-complex/all_ideas.md` with its status: **Failed** for an unprofitable idea, **Working** for a profitable one. That line must link to the report.
 
-**Phase 5 (optional) — Repeat.** If the idea is unprofitable and you have tried EVERYTHING you could, restart from Phase 2 with a new short name, and therefore a new set of subfolders.
+**Phase 5 (optional) — Repeat.** If the idea is unprofitable and you have tried EVERYTHING you could, restart from Phase 2 with a new short name, and therefore a new set of subfolders. Everything you worked on in this session — every short name, working or failed — goes into the single pull request of Phase 6.
+
+**Phase 6 — Pull request (mandatory).** Your cycle is not finished until your work is on a branch and a pull request is open against `main`. The deployment agent only ever looks at pull requests: work left sitting in the working tree is invisible to it and will eventually be wiped.
+
+```bash
+cd /home/seleis/autoQuant
+git fetch origin
+git checkout -b research/vol-complex-<short-name>        # branching keeps your files exactly where they are
+git add past_research/vol-complex/<short-name> \
+        code/vol-complex/<short-name> \
+        alphas/vol-complex/<short-name> \
+        past_research/vol-complex/all_ideas.md
+git status --short                                 # verify nothing outside those paths is staged
+git commit -m "vol-complex: <short-name> — <one-line result>"
+git push -u origin research/vol-complex-<short-name>
+gh pr create --base main --title "..." --body-file <a file you write outside the repo, e.g. /tmp/pr-body.md>
+git checkout main                                  # leave the tree on main for the next agent
+```
+
+Rules for this phase, none of them optional:
+
+- **Live paper-trading daemons run out of this working tree.** Creating your own branch and returning to `main` is the only history operation you may perform. Never check out an existing branch, never `git reset --hard`, `git clean`, `git stash`, `git rebase main` or `git merge`, and never modify `live/`, `harness/`, `.claude/`, or another asset class's files — a stray checkout deletes a running strategy's directory out from under its process.
+- **Stage your own paths only.** Never `git add -A`, `git add .` or `git commit -a`: up to two research agents share this tree and you would sweep up someone else's half-finished work. Repeat the `git add` block once per short name if you ran several cycles.
+- Market-data caches under `data/`, `__pycache__/` and `.pyc` files stay out of the commit.
+- If the push is rejected because `main` moved on, rebase **your own branch** onto `origin/main` (`git rebase origin/main` while on your branch) and push again. If that conflicts in a file you did not write, leave the branch alone and say so in the PR.
+- Never merge your own PR and never apply labels to it. Review and deployment are someone else's job.
+
+The PR body is the first thing the deployment agent reads, so make it self-contained:
+
+- short name, asset class, and status — **Working** or **Failed**;
+- for each working idea: the exact traded instrument, direction (long/flat vs long/short), maximum leverage, rebalance frequency, position sizing rule, and the bar/timezone convention;
+- headline numbers: full-sample and out-of-sample (or walk-forward) Sharpe, CAGR, max drawdown, annual turnover, average exposure, and the assumed cost in bp per side;
+- repo paths to the report, the alpha spec and `strategy.py`;
+- what you tried that did not work, in one or two lines.
+
+A session that only produced failures still opens a PR — a documented negative result keeps the next researcher from repeating it. Title it so nothing looks deployable, e.g. `vol-complex: <short-name> — Failed (Sharpe 0.3)`.
 
 ## This invocation
 

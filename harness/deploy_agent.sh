@@ -26,12 +26,29 @@ ATTEMPT_FILE="$STATE/attempts-${PR}"
 
 say() { echo "[$(date -u +%FT%TZ)] $*" | tee -a "$LOG"; }
 
+# Labels go through the REST API, not `gh pr edit`. Older gh builds (2.4.0 ships
+# with Ubuntu) resolve a PR through a GraphQL query that still asks for
+# projectCards, which GitHub now rejects outright -- every `gh pr edit` fails with
+# "Projects (classic) is being deprecated". Silently losing the label would leave
+# an invalid PR without a terminal state, so the poller would hand it back every
+# 30 minutes forever. The issues API has no such problem.
+SLUG="$(git -C "$REPO" remote get-url origin 2>/dev/null \
+        | sed -E 's#(git@github.com:|https://github.com/)##; s#\.git$##')"
+add_label() {
+  printf '{"labels":["%s"]}' "$1" \
+    | gh api -X POST "repos/$SLUG/issues/$PR/labels" --input - >/dev/null 2>&1
+}
+remove_label() { gh api -X DELETE "repos/$SLUG/issues/$PR/labels/$1" >/dev/null 2>&1; }
+
 attempts="$(cat "$ATTEMPT_FILE" 2>/dev/null || echo 0)"
 if [ "$attempts" -ge "$MAX_ATTEMPTS" ]; then
   say "PR #$PR: $attempts attempts already made (max $MAX_ATTEMPTS), giving up"
   gh label create "harness:failed" --color B60205 \
      --description "Deployment agent could not complete" >/dev/null 2>&1
-  gh pr edit "$PR" --add-label "harness:failed" >/dev/null 2>&1
+  add_label "harness:failed"
+  if ! gh pr view "$PR" --json labels --jq '[.labels[].name]' 2>/dev/null | grep -q "harness:failed"; then
+    say "PR #$PR: WARNING could not apply harness:failed -- the poller will keep retrying it"
+  fi
   exit 3
 fi
 echo $((attempts + 1)) > "$ATTEMPT_FILE"
@@ -41,9 +58,9 @@ cd "$REPO" || exit 1
 # --- claim ------------------------------------------------------------------
 gh label create "harness:processing" --color FBCA04 \
    --description "Deployment agent is reviewing this PR" >/dev/null 2>&1
-gh pr edit "$PR" --add-label "harness:processing" >/dev/null 2>&1
+add_label "harness:processing"
 
-release() { gh pr edit "$PR" --remove-label "harness:processing" >/dev/null 2>&1; }
+release() { remove_label "harness:processing"; }
 trap release EXIT
 
 say "PR #$PR: launching deployment agent (attempt $((attempts + 1))/$MAX_ATTEMPTS, model=$MODEL, budget=\$$MAX_BUDGET)"

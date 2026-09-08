@@ -102,8 +102,11 @@ under a running process. Always use a worktree:
 gh pr view $ARGUMENTS --json number,title,body,state,isDraft,headRefName,labels,files
 gh pr diff $ARGUMENTS --name-only
 BR=$(gh pr view $ARGUMENTS --json headRefName --jq .headRefName)
+SLUG=$(gh repo view --json nameWithOwner --jq .nameWithOwner)   # used by the label calls later
 git fetch origin "$BR"
 WT=/tmp/deploy-pr-$ARGUMENTS
+git worktree remove "$WT" --force 2>/dev/null; rm -rf "$WT"   # an earlier attempt may have left one
+git worktree prune
 git worktree add "$WT" "origin/$BR"
 ```
 
@@ -174,18 +177,42 @@ If more than one strategy in the PR is deployable, deploy each of them.
 
 ```bash
 gh label create invalid --color E4E669 --description "Cannot be deployed as submitted" 2>/dev/null
-gh pr edit $ARGUMENTS --add-label invalid
+echo '{"labels":["invalid"]}' | gh api -X POST "repos/$SLUG/issues/$ARGUMENTS/labels" --input -
 gh pr comment $ARGUMENTS --body-file <a file you write>
+gh pr view $ARGUMENTS --json labels --jq '[.labels[].name]'    # confirm it stuck
 ```
+
+**Label through the REST API, never `gh pr edit`.** The `gh` on this machine is old enough that
+`gh pr edit` resolves the PR with a GraphQL query asking for `projectCards`, which GitHub now
+refuses outright: every `gh pr edit` fails with *"Projects (classic) is being deprecated"*.
+`gh pr view`, `gh pr comment`, `gh pr diff` and `gh api` are all fine. The label is the PR's
+terminal state — if it does not stick, the poller hands this PR back every 30 minutes forever,
+so verify it and say so in your final report if it failed.
 
 The comment must state: which strategy you assessed, the specific blocking reasons (quote the
 file and line that shows each one), and what the researcher would have to change for the PR to
 pass. Be concrete and brief. **Do not merge. Do not close the PR** — leave it open so the
 researcher can fix it. Then remove the worktree and stop.
 
-## Phase 5 — If deployable: write the runner
+## Phase 5 — If deployable: reserve capital, then write the runner
 
-Create `live/<asset-class>/<short-name>/runner.py` in the worktree. It must:
+**Reserve the capital first**, before you write a line of the runner — the size you get back is
+the number the runner must use, and a refusal here is a blocker you report rather than work
+around:
+
+```bash
+.venv/bin/python -c "import sys; sys.path.insert(0,'harness'); \
+  from live_lib import allocate; print(allocate('<asset-class>/<short-name>', 2500.0))"
+```
+
+Run it from `/home/seleis/autoQuant`, not the worktree: `harness/state/allocations.json` is
+shared, untracked live state and there is only one of it. 2500 USDT is the default ticket; ask
+for less if the pool is tight. If `allocate` raises `ValueError`, the pool is oversubscribed —
+go to Phase 4 and flag the PR invalid with the shortfall quoted. Whatever number it accepts
+becomes `CAPITAL_USDT` in the runner, the `capital_usdt` argument to `PaperBroker`, and the
+`capital_usdt` field in `meta.json`; all three must agree.
+
+Then create `live/<asset-class>/<short-name>/runner.py` in the worktree. It must:
 
 * Import the research code from `code/<asset-class>/<short-name>/` rather than restating the
   signal. Reimplement only if there is no reusable function, and then follow the spec exactly.
@@ -227,6 +254,25 @@ recompute the weight for the most recent closed bar using the backtest function 
 history and check it matches the runner's `--check` weight. If they differ, fix the runner —
 never the research. Record both numbers; they go in your PR comment.
 
+**Establish the weight column's time convention before you trust a comparison.** A saved
+weight series (`backtest_series.parquet` and friends) is very often *already shifted*: the value
+on row *t* is the weight that earned row *t*'s return, i.e. the one decided at the close of
+*t−1*. Comparing your runner's weight for today against the last row of such a file will show a
+mismatch that is not a bug — and "fixing" it puts the live strategy a full bar behind the
+research, which is the worst outcome in this whole procedure. Resolve it empirically rather
+than by reading the column name:
+
+```python
+for lag in (0, 1, 2):
+    d = (recomputed.shift(lag).reindex(saved.index) - saved).abs().dropna()
+    print(lag, d.max(), d.mean())
+```
+
+Exactly one lag should give `max|diff| ≈ 0` over the whole sample; that is the file's
+convention, and it tells you which row corresponds to your runner's "today". A comparison that
+matches on no lag means the runner really does disagree with the research — that is the bug you
+were looking for. Put the lag you established, and the matched max-diff, in your PR comment.
+
 Sanity-check the result too: a weight of exactly 0 may be correct, but confirm it is what the
 signal genuinely says today rather than the symptom of an all-NaN input.
 
@@ -236,23 +282,68 @@ Only after `--check` passes:
 
 ```bash
 cd "$WT"
-git add live/<asset-class>/<short-name>/runner.py
+git add live/<asset-class>/<short-name>/runner.py live/<asset-class>/<short-name>/meta.json
+git status --short          # both files staged; runner.log / state.json / ledger.json are gitignored
 git commit -m "Deploy <SHORT-NAME> to live paper trading"
 git push origin HEAD:"$BR"
 cd /home/seleis/autoQuant
 gh pr merge $ARGUMENTS --merge --delete-branch
 git worktree remove "$WT" --force
-git checkout main && git pull --ff-only
+```
+
+If `gh pr merge` fails the same way the label call does (a `projectCards` GraphQL error), fall
+back to REST and delete the branch yourself:
+
+```bash
+echo '{"merge_method":"merge"}' | gh api -X PUT "repos/$SLUG/pulls/$ARGUMENTS/merge" --input -
+gh api -X DELETE "repos/$SLUG/git/refs/heads/$BR"
+```
+
+**`meta.json` must be in that commit.** It is a tracked file, and the worktree is deleted on the
+next line — anything you left unstaged is gone, and the strategy shows up on the dashboard
+unlabelled with no backtest column.
+
+Now bring the merged files into the main working tree. A research agent may be running here
+and sitting on its own branch, so check before you check out — never yank the tree out from
+under it:
+
+```bash
+cd /home/seleis/autoQuant
+git rev-parse --abbrev-ref HEAD          # expect "main"
+```
+
+* On `main`: `git pull --ff-only`.
+* On anything else (a research agent is mid-cycle): leave the tree alone. Move the ref forward
+  without touching the checkout and place the two files yourself —
+  `git fetch origin main:main`, then `mkdir -p live/<asset-class>/<short-name>` and copy
+  `runner.py` and `meta.json` out of the merge commit
+  (`git show main:live/<asset-class>/<short-name>/runner.py > live/<asset-class>/<short-name>/runner.py`,
+  same for `meta.json`). The content matches what `main` tracks, so that agent's own
+  `git checkout main` later stays clean.
+
+Then label, register and launch:
+
+```bash
 gh label create deployed --color 0E8A16 --description "Strategy is running live (paper)" 2>/dev/null
-gh pr edit $ARGUMENTS --add-label deployed
+echo '{"labels":["deployed"]}' | gh api -X POST "repos/$SLUG/issues/$ARGUMENTS/labels" --input -
+
+# Reboot survival: if the systemd autostart is installed, this strategy needs its own unit
+# enabled, or it runs as a bare setsid process and dies at the next reboot.
+if systemctl --user is-enabled autoquant.target >/dev/null 2>&1; then
+  systemctl --user enable "autoquant-strategy@$(systemd-escape '<asset-class>/<short-name>').service"
+fi
+
 ./harness/launch_live.sh start <asset-class>/<short-name>
 sleep 20 && ./harness/launch_live.sh status <asset-class>/<short-name>
 tail -n 30 live/<asset-class>/<short-name>/runner.log
 ```
 
-`gh pr merge` closes the PR. The daemon is detached with `setsid`, so it keeps running after
-this session ends. Confirm from `status` and the log that it is RUNNING and has completed a
-rebalance — if it died, fix it and restart before you report success.
+`gh pr merge` closes the PR. `launch_live.sh start` hands the strategy to systemd when the unit
+is enabled and otherwise detaches it with `setsid`; either way it keeps running after this
+session ends. Confirm from `status` and the log that it is RUNNING and has completed a
+rebalance — if it died, fix it and restart before you report success. `status` shows `[systemd]`
+when the unit is supervising it; if it does not and the target is enabled, the `enable` above
+did not take.
 
 Finally comment on the PR with: the strategy deployed, the venue and symbol used, the
 schedule, the `--check` weight and its agreement with the backtest, the fee assumption and
@@ -271,6 +362,8 @@ shadow book, and where the log and journal live.
 * **Never `git checkout` in the main working tree** while daemons are running — use the worktree.
 * Do not touch, restart or stop strategies deployed by earlier PRs.
 * Do not commit `.env` or any key. Secrets are read at runtime by `load_env()`.
+* **`gh pr edit` is broken on this machine** — use the `gh api` label calls above. Always
+  read the labels back afterwards; an unlabelled PR is an unfinished job.
 * If you genuinely cannot decide between deploy and invalid, flag invalid and explain the
   ambiguity. A PR left open is cheap; a broken strategy trading unattended is not.
 
