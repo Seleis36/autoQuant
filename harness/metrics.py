@@ -30,6 +30,8 @@ LIVE_DIR = os.path.join(REPO_ROOT, "live")
 BARS_PER_YEAR = {"1m": 525_600, "5m": 105_120, "15m": 35_040, "30m": 17_520,
                  "1h": 8_760, "2h": 4_380, "4h": 2_190, "6h": 1_460,
                  "12h": 730, "1d": 365}
+SCHEDULE_SECONDS = {"1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600,
+                    "2h": 7200, "4h": 14400, "6h": 21600, "12h": 43200, "1d": 86400}
 MIN_DAYS_FOR_SHARPE = 30.0
 
 
@@ -56,7 +58,7 @@ def _ts(row) -> datetime:
 
 def current_segment(rows: list) -> list:
     """Rebalance events since the last shadow/live mode change."""
-    rb = [r for r in rows if r.get("event") == "rebalance" and r.get("equity")]
+    rb = [r for r in rows if r.get("event") == "rebalance" and r.get("equity") is not None]
     if not rb:
         return []
     mode = rb[-1].get("shadow", False)
@@ -66,6 +68,19 @@ def current_segment(rows: list) -> list:
             break
         seg.append(r)
     return list(reversed(seg))
+
+
+def segment_truncated_by_mode_switch(rows: list) -> bool:
+    """True when a shadow<->live switch is what makes the current segment short.
+
+    Worth distinguishing: a strategy that has run for days but dropped into shadow mode
+    and back shows an empty chart and "not enough history", which reads like the daemon
+    is broken rather than like the book was restarted.
+    """
+    rb = [r for r in rows if r.get("event") == "rebalance" and r.get("equity") is not None]
+    if not rb:
+        return False
+    return any(r.get("shadow", False) != rb[-1].get("shadow", False) for r in rb)
 
 
 def _drawdown(equity: list) -> float:
@@ -81,10 +96,13 @@ def compute(name: str, schedule: str = "1h") -> dict:
     """Live statistics for one strategy, plus a buy-&-hold benchmark on the same bars."""
     rows = read_journal(name)
     seg = current_segment(rows)
+    switched = segment_truncated_by_mode_switch(rows)
     out = {"strategy": name, "bars": len(seg), "sufficient": False,
+           "mode_switched": switched,
            "shadow": seg[-1].get("shadow", False) if seg else None}
     if len(seg) < 2:
-        out["reason"] = "not enough history yet"
+        out["reason"] = ("the book switched between shadow and live, so the curve starts "
+                         "again from that point" if switched else "not enough history yet")
         return out
 
     t0, t1 = _ts(seg[0]), _ts(seg[-1])
@@ -139,6 +157,9 @@ def compute(name: str, schedule: str = "1h") -> dict:
     if not out["sufficient"]:
         out["reason"] = (f"only {days:.1f} days live; a live Sharpe needs at least "
                          f"{MIN_DAYS_FOR_SHARPE:.0f} days before it means anything")
+        if switched:
+            out["reason"] += (" -- the clock restarted at the last shadow/live switch, "
+                              "the two books cannot be spliced")
     return out
 
 
@@ -162,14 +183,30 @@ def equity_series(name: str, max_points: int = 600) -> dict:
     }
 
 
+def _bucket(ts: datetime, step_s: int) -> int:
+    """Floor a timestamp to a `step_s` grid, so two strategies' bars line up."""
+    return int(ts.timestamp() // step_s)
+
+
 def correlation(names: list, schedule_by_name: dict) -> dict:
-    """Pairwise correlation of hourly strategy returns.
+    """Pairwise correlation of strategy returns, per schedule.
 
     Every strategy this venue can host is a long-only crypto book, so a wall of
     0.9s is the expected -- and the point: it says the book is one bet, not five.
+
+    Only strategies on the SAME schedule are compared. `schedule_by_name` was accepted
+    and then ignored, with every series bucketed to the hour regardless: a daily
+    strategy contributed one return per day and an hourly one contributed the single
+    return that happened to fall in the same hour, and the pair was reported as a
+    correlation. Two series on different bar sizes have no shared return to correlate,
+    so the honest answer is to not report the pair at all.
     """
     series = {}
     for n in names:
+        sched = schedule_by_name.get(n) or "1h"
+        step_s = SCHEDULE_SECONDS.get(sched)
+        if step_s is None:
+            continue
         seg = current_segment(read_journal(n))
         if len(seg) < 3:
             continue
@@ -178,26 +215,30 @@ def correlation(names: list, schedule_by_name: dict) -> dict:
         for r in seg:
             e = float(r["equity"])
             if prev is not None and prev > 0:
-                by_ts[_ts(r).replace(minute=0, second=0, microsecond=0)] = e / prev - 1.0
+                by_ts[_bucket(_ts(r), step_s)] = e / prev - 1.0
             prev = e
         if by_ts:
-            series[n] = by_ts
+            series[n] = (sched, by_ts)
     out = {}
     for a in series:
         for b in series:
             if a >= b:
                 continue
-            shared = sorted(set(series[a]) & set(series[b]))
+            (sched_a, ser_a), (sched_b, ser_b) = series[a], series[b]
+            if sched_a != sched_b:
+                continue
+            shared = sorted(set(ser_a) & set(ser_b))
             if len(shared) < 10:
                 continue
-            xs = [series[a][t] for t in shared]
-            ys = [series[b][t] for t in shared]
+            xs = [ser_a[t] for t in shared]
+            ys = [ser_b[t] for t in shared]
             mx, my = sum(xs) / len(xs), sum(ys) / len(ys)
             cov = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
             vx = math.sqrt(sum((x - mx) ** 2 for x in xs))
             vy = math.sqrt(sum((y - my) ** 2 for y in ys))
             if vx > 0 and vy > 0:
-                out[f"{a}|{b}"] = {"corr": cov / (vx * vy), "n": len(shared)}
+                out[f"{a}|{b}"] = {"corr": cov / (vx * vy), "n": len(shared),
+                                   "schedule": sched_a}
     return out
 
 

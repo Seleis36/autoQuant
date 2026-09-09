@@ -140,7 +140,8 @@ def _request(url: str, headers=None, method="GET", timeout=20, retries=3):
             last = err
         except (urllib.error.URLError, TimeoutError, OSError) as e:
             last = RuntimeError(f"network error: {e}")
-        time.sleep(2 ** attempt)
+        if attempt < retries - 1:
+            time.sleep(2 ** attempt)     # no backoff after the last try -- just raise
     raise last
 
 
@@ -230,16 +231,37 @@ class MarketData:
         if step is None:
             raise ValueError(f"unsupported interval {interval!r}")
 
-        # Page backwards until we hold `bars` bars ending at the last closed one.
-        end = None
         guard = 0
+
+        # Phase 1: bring an existing cache up to the present. A single tail fetch is
+        # enough only if it OVERLAPS the cache. A daemon that was down for longer than
+        # one fetch (1000 bars is 41 days of hourly data) would otherwise have the tail
+        # spliced straight onto a stale cache, leaving a hole in the middle that every
+        # rolling window then quietly spans -- a signal computed across a gap that is
+        # never visible in the output. So keep paging back until the two meet.
+        if len(df):
+            cached_end = df.index.max()
+            end = None
+            while guard < 40:
+                guard += 1
+                chunk = self.klines(symbol, interval, limit=self._max_limit(),
+                                    end_time=end)
+                if chunk.empty:
+                    break
+                df = pd.concat([df, chunk])
+                if chunk.index[0] <= cached_end + timedelta(seconds=step):
+                    break                  # the fetch reaches back into the cache
+                new_end = chunk.index[0].to_pydatetime() - timedelta(seconds=step)
+                if end is not None and new_end >= end:
+                    break                  # not making progress
+                end = new_end
+
+        # Phase 2: page backwards until we hold `bars` bars ending at the last closed one.
+        end = None
         while guard < 40:
             guard += 1
             have = df[~df.index.duplicated(keep="last")].sort_index()
             if len(have) >= bars and not have.empty:
-                # cache is deep enough; top it up to the present and stop
-                tail = self.klines(symbol, interval, limit=min(1000, self._max_limit()))
-                df = pd.concat([have, tail])
                 break
             chunk = self.klines(symbol, interval, limit=self._max_limit(), end_time=end)
             if chunk.empty:
@@ -252,6 +274,13 @@ class MarketData:
             end = new_end
 
         df = df[~df.index.duplicated(keep="last")].sort_index()
+        # Say so if a hole survived. Silently returning a gapped series is the failure
+        # mode this is here to prevent; a caller that cannot tolerate one can check.
+        if len(df) > 1:
+            gaps = df.index.to_series().diff().dt.total_seconds().gt(step * 1.5).sum()
+            if gaps:
+                log.warning("%s %s history has %d gap(s) after refresh -- a rolling "
+                            "window will span them", symbol, interval, int(gaps))
         if cache and len(df):
             try:
                 df.to_parquet(path)
@@ -625,19 +654,33 @@ class PaperBroker:
                               "quantity": f"{qty:.{self.qty_prec}f}"}, method="POST")
             executed = float(o.get("executedQty") or 0)
             quote_qty = float(o.get("cummulativeQuoteQty") or 0)
-            fee = sum(float(f.get("commission") or 0) for f in o.get("fills", [])
-                      if f.get("commissionAsset") == self.quote)
-            # Update the ledger from the ACTUAL fill, so it tracks reality.
+            fills = o.get("fills", []) or []
+            # Binance charges a BUY's commission in the BASE asset and a SELL's in the
+            # quote asset. Counting only the quote side -- which is what this did -- meant
+            # every buy credited the ledger with more base than the account actually
+            # received, so the book drifted further from the exchange on every trade and
+            # equity read high. Both sides are now taken out of the units they were
+            # actually charged in.
+            fee_quote = sum(float(f.get("commission") or 0) for f in fills
+                            if f.get("commissionAsset") == self.quote)
+            fee_base = sum(float(f.get("commission") or 0) for f in fills
+                           if f.get("commissionAsset") == self.base)
+            # A commission paid in a third asset (BNB discount) touches neither leg; the
+            # ledger is then optimistic by that amount and reconcile() is what shows it.
             if side == "BUY":
-                self._base_units += executed
-                self._quote_units -= quote_qty + fee
+                self._base_units += executed - fee_base
+                self._quote_units -= quote_qty + fee_quote
             else:
-                self._base_units -= executed
-                self._quote_units += quote_qty - fee
+                self._base_units -= executed + fee_base
+                self._quote_units += quote_qty - fee_quote
             self._save_ledger()
+            fill_price = (quote_qty / executed) if executed else px
             rep.update(traded=executed > 0, side=side, order_id=o.get("orderId"),
-                       status=o.get("status"), filled_qty=executed, fee=fee,
-                       fill_price=(quote_qty / executed) if executed else px)
+                       status=o.get("status"), filled_qty=executed,
+                       # journalled in quote terms so fees_paid stays one currency
+                       fee=fee_quote + fee_base * fill_price,
+                       fee_base=fee_base, fee_quote=fee_quote,
+                       fill_price=fill_price)
         except BinanceError as e:
             rep["error"] = str(e)
             log.error("order rejected: %s", e)

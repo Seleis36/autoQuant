@@ -19,19 +19,19 @@ bindable from here -- see harness/README.md for the mirrored-networking fix.
 from __future__ import annotations
 
 import argparse
+import functools
 import glob
 import json
 import os
 import re
-import shutil
-import socket
 import subprocess
 import sys
 import threading
 import time
 import traceback
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlsplit
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import metrics  # noqa: E402
@@ -48,6 +48,12 @@ POLLER = os.path.join(HARNESS_DIR, "poll_prs.sh")
 RESEARCH = os.path.join(HARNESS_DIR, "launch_research.sh")
 RESUME = os.path.join(HARNESS_DIR, "resume_aborted.sh")
 SESSIONS_DIR = os.path.join(STATE_DIR, "sessions")
+
+# A deployment is always "<asset-class>/<short-name>": one slash, no traversal. Kept in
+# one place because the HTTP layer and the action layer must agree on what is addressable.
+STRATEGY_RE = r"[\w.-]+/[\w.-]+"
+LOGFILE_RE = r"[\w.-]+\.log"
+MAX_BODY_BYTES = 1 << 20
 
 ASSET_CLASSES = ["spot-btc", "spot-eth", "crypto-perps", "crypto-alts", "us-large-cap",
                  "sector-etf", "global-equity-etf", "fx-majors", "rates-bonds",
@@ -128,7 +134,10 @@ def _read_json(path, default=None):
         return default
 
 
+@functools.lru_cache(maxsize=256)
 def systemd_unit(name: str) -> str:
+    """Escaping is a pure function of the name, but it costs a subprocess, and
+    /api/state asked for it several times per strategy on a 10s poll."""
     rc, out, _ = sh(["systemd-escape", name], 10)
     return f"autoquant-strategy@{out}.service" if rc == 0 else ""
 
@@ -157,19 +166,20 @@ def pid_of(name: str):
 
 
 def proc_started(pid):
+    """Wall-clock epoch seconds at which `pid` started, so callers can subtract it
+    from now to get an age. It used to return the age itself, which the one caller
+    then subtracted from time.time() again -- reporting every daemon as up since
+    the epoch, "20705d 16h"."""
     try:
         with open(f"/proc/{pid}/stat") as fh:
-            starttime = int(fh.read().split(")")[-1].split()[19])
+            # comm can contain spaces and parens, so split after the LAST ")".
+            starttime = int(fh.read().rsplit(")", 1)[1].split()[19])
         with open("/proc/uptime") as fh:
             up = float(fh.read().split()[0])
         hz = os.sysconf("SC_CLK_TCK")
-        return time.time() - (time.time() - up + starttime / hz)
+        return (time.time() - up) + starttime / hz
     except Exception:  # noqa: BLE001
         return None
-
-
-SCHED_S = {"1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600,
-           "2h": 7200, "4h": 14400, "6h": 21600, "12h": 43200, "1d": 86400}
 
 
 def build_strategies() -> list:
@@ -188,7 +198,7 @@ def build_strategies() -> list:
             try:
                 lr = datetime.fromisoformat(state["last_run"].replace("Z", "+00:00"))
                 last_run_age = (datetime.now(timezone.utc) - lr).total_seconds()
-                stale = last_run_age > 2.2 * SCHED_S.get(sched, 3600)
+                stale = last_run_age > 2.2 * metrics.SCHEDULE_SECONDS.get(sched, 3600)
             except Exception:  # noqa: BLE001
                 pass
 
@@ -395,36 +405,61 @@ def refresher_loop(stop: threading.Event):
 
 # --------------------------------------------------------------------------- actions
 
+# Run out-of-process on purpose: flattening loads the broker, talks to the venue and can
+# block, and none of that belongs on a dashboard request thread.
+FLATTEN_SRC = """
+import json, os, sys
+sys.path.insert(0, 'harness')
+from live_lib import PaperBroker
+d = os.path.join('live', sys.argv[1])
+m = json.load(open(os.path.join(d, 'meta.json')))
+b = PaperBroker(m['symbol'], capital_usdt=m.get('capital_usdt', 2500),
+                state_file=os.path.join(d, 'ledger.json'))
+b.preflight()
+print(json.dumps(b.flatten(), default=str))
+"""
+
+
 def do_action(body: dict) -> dict:
     a = body.get("action")
     name = body.get("strategy", "")
-    if name and (".." in name or not re.fullmatch(r"[\w.-]+/[\w.-]+", name)):
+    if name and (".." in name or not re.fullmatch(STRATEGY_RE, name)):
         return {"ok": False, "error": "bad strategy name"}
 
     if a in ("start", "stop", "restart"):
+        # An empty name reaches launch_live.sh as an empty argument, where it resolves to
+        # the live/ directory itself rather than to any strategy.
+        if not name:
+            return {"ok": False, "error": "no strategy given"}
         rc, out, err = sh([LAUNCH, a, name], 120)
         return {"ok": rc == 0, "output": out or err}
     if a == "flatten":
+        if not name:
+            return {"ok": False, "error": "no strategy given"}
+        # The name goes in as argv, not spliced into the source text. The regex above
+        # already bars quotes, but a validator and a code generator drifting apart is
+        # exactly how that stops being true.
         rc, out, err = sh([os.path.join(REPO_ROOT, ".venv/bin/python"), "-c",
-                           "import sys;sys.path.insert(0,'harness');"
-                           "from live_lib import PaperBroker;import json,os;"
-                           f"d=os.path.join('live','{name}');"
-                           "m=json.load(open(os.path.join(d,'meta.json')));"
-                           "b=PaperBroker(m['symbol'],capital_usdt=m.get('capital_usdt',2500),"
-                           "state_file=os.path.join(d,'ledger.json'));b.preflight();"
-                           "print(json.dumps(b.flatten(),default=str))"], 90)
+                           FLATTEN_SRC, name], 90)
         return {"ok": rc == 0, "output": out or err}
     if a == "kill_all":
-        results = []
+        stopped, failed = [], []
         for s in strategy_dirs():
-            sh([LAUNCH, "stop", s], 60)
-            results.append(s)
-        return {"ok": True, "output": "stopped: " + ", ".join(results)}
+            rc, out, err = sh([LAUNCH, "stop", s], 60)
+            (stopped if rc == 0 else failed).append(s if rc == 0 else f"{s}: {err or out}")
+        # Report the failures. This used to answer ok:True unconditionally, so a kill
+        # switch that had stopped nothing still showed a tick.
+        msg = "stopped: " + (", ".join(stopped) or "none")
+        if failed:
+            msg += "\nFAILED: " + "; ".join(failed)
+        return {"ok": not failed, "output": msg}
     if a == "flatten_all":
-        outs = []
+        outs, ok = [], True
         for s in strategy_dirs():
-            outs.append(do_action({"action": "flatten", "strategy": s}).get("output", ""))
-        return {"ok": True, "output": "\n".join(outs)}
+            r = do_action({"action": "flatten", "strategy": s})
+            ok = ok and r.get("ok", False)
+            outs.append(f"{s}: {r.get('output') or r.get('error', '')}")
+        return {"ok": ok, "output": "\n".join(outs)}
     if a in ("poller_start", "poller_stop"):
         rc, out, err = sh([POLLER, "--start" if a == "poller_start" else "--stop"], 60)
         return {"ok": rc == 0, "output": out or err}
@@ -488,9 +523,12 @@ class Handler(BaseHTTPRequestHandler):
             pass
 
     def do_GET(self):
-        path = self.path.split("?")[0]
-        qs = dict(p.split("=", 1) for p in self.path.split("?")[1].split("&")
-                  if "=" in p) if "?" in self.path else {}
+        # parse_qs, not a hand-rolled split: every strategy name contains a "/", so the
+        # browser sends it percent-encoded and an undecoded value matches no name at all.
+        # That single omission broke Log, Trades and every equity sparkline at once.
+        split = urlsplit(self.path)
+        path = split.path
+        qs = {k: v[0] for k, v in parse_qs(split.query).items() if v}
         if path in ("/", "/index.html"):
             f = os.path.join(WEB_DIR, "index.html")
             if not os.path.exists(f):
@@ -519,22 +557,28 @@ class Handler(BaseHTTPRequestHandler):
             })
         if path == "/api/series":
             name = qs.get("strategy", "")
-            if not re.fullmatch(r"[\w.-]+/[\w.-]+", name or ""):
+            if not re.fullmatch(STRATEGY_RE, name or ""):
                 return self._send(400, {"error": "bad strategy"})
             return self._send(200, metrics.equity_series(name))
         if path == "/api/journal":
             name = qs.get("strategy", "")
-            if not re.fullmatch(r"[\w.-]+/[\w.-]+", name or ""):
+            if not re.fullmatch(STRATEGY_RE, name or ""):
                 return self._send(400, {"error": "bad strategy"})
             rows = [r for r in metrics.read_journal(name) if r.get("event") != "heartbeat"]
             return self._send(200, rows[-200:])
         if path == "/api/log":
             name = qs.get("strategy", "")
-            n = min(int(qs.get("n", 200) or 200), 2000)
-            if re.fullmatch(r"[\w.-]+/[\w.-]+", name or ""):
+            try:
+                n = min(max(int(qs.get("n") or 200), 1), 2000)
+            except ValueError:
+                return self._send(400, {"error": "bad line count"})
+            fname = qs.get("file", "")
+            if re.fullmatch(STRATEGY_RE, name or ""):
                 f = os.path.join(LIVE_DIR, name, "runner.log")
-            elif qs.get("file", "").replace("%2F", "/") and "/" not in qs.get("file", ""):
-                f = os.path.join(LOGS_DIR, qs["file"])
+            elif re.fullmatch(LOGFILE_RE, fname or ""):
+                # A bare `*.log` basename: no separator can appear in the character
+                # class, so this cannot escape LOGS_DIR.
+                f = os.path.join(LOGS_DIR, fname)
             else:
                 return self._send(400, {"error": "bad target"})
             if not os.path.exists(f):
@@ -548,7 +592,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(404, {"error": "not found"})
         try:
             n = int(self.headers.get("Content-Length") or 0)
+            if n < 0 or n > MAX_BODY_BYTES:
+                return self._send(413, {"ok": False, "error": "body too large"})
             body = json.loads(self.rfile.read(n) or b"{}")
+            if not isinstance(body, dict):
+                return self._send(400, {"ok": False, "error": "body must be an object"})
         except Exception:  # noqa: BLE001
             return self._send(400, {"ok": False, "error": "bad body"})
         try:
@@ -560,16 +608,15 @@ class Handler(BaseHTTPRequestHandler):
 
 def tailscale_ip():
     """This host's tailnet address, if it is bindable from here."""
-    for pat in ("100.", ):
-        try:
-            out = subprocess.run(["ip", "-4", "-o", "addr"], capture_output=True,
-                                 text=True, timeout=10).stdout
-        except Exception:  # noqa: BLE001
-            return None
-        for line in out.splitlines():
-            m = re.search(r"inet (100\.\d+\.\d+\.\d+)/", line)
-            if m:
-                return m.group(1)
+    try:
+        out = subprocess.run(["ip", "-4", "-o", "addr"], capture_output=True,
+                             text=True, timeout=10).stdout
+    except Exception:  # noqa: BLE001
+        return None
+    for line in out.splitlines():
+        m = re.search(r"inet (100\.\d+\.\d+\.\d+)/", line)
+        if m:
+            return m.group(1)
     return None
 
 

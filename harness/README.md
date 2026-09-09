@@ -299,6 +299,33 @@ mode produced it.
 | `install_autostart.sh`, `systemd/` | Reboot survival: systemd units + Windows logon hook |
 | `windows_autostart_task.ps1` | Optional true at-boot task (needs elevation) |
 | `state/`, `logs/` | Bookkeeping and session logs (gitignored) |
+| `../tests/` | The test suite (see below) |
+
+## Tests
+
+```bash
+.venv/bin/python -m pytest              # everything, ~45s
+.venv/bin/python -m pytest tests/test_metrics.py -q
+```
+
+`pytest` and `node` are the only requirements (`uv pip install pytest`). Nothing in the
+suite touches the network, GitHub, systemd or the venue: the broker is driven through a
+stubbed HTTP layer, and the shell tests build a throwaway repo under `tmp_path` with a
+stand-in daemon rather than driving the real one.
+
+| File | Covers |
+|---|---|
+| `test_dashboard_api.py` | The JSON API over a real socket: query decoding, validation, traversal |
+| `test_dashboard_actions.py` | `POST /api/action` — validation, bulk actions, request limits |
+| `test_process_uptime.py` | `/proc` parsing and uptime arithmetic |
+| `test_metrics.py` | Segmentation, live statistics, the equity series, correlation |
+| `test_live_lib.py` | Ledger arithmetic, commission accounting, bar scheduling, history assembly |
+| `test_shell_scripts.py` | Argument handling and the dashboard's process discovery and locking |
+| `test_systemd_units.py` | Unit files, including directives systemd ignores rather than rejects |
+| `test_frontend.py` → `test_dashboard_ui.mjs` | The page's action dispatch, run under node |
+
+The browser-side suite extracts the `<script>` block from `web/index.html` and evaluates it
+against a DOM stub, because the page has no build step and no module boundary to import.
 
 ## Capital
 

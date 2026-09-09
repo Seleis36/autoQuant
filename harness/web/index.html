@@ -155,21 +155,38 @@ const dur = s => { if(s==null) return '—'; s=Math.floor(s);
   return d?`${d}d ${h}h`: h?`${h}h ${m}m`: `${m}m`; };
 const tok = n => n>=1e6 ? (n/1e6).toFixed(1)+'M' : n>=1e3 ? (n/1e3).toFixed(0)+'k' : String(n||0);
 
-let STATE = null, busy = false;
+let STATE = null;
+// In flight, keyed by action+target. A single global "busy" flag used to live here, and
+// because a restart holds the request open for the whole stop/start cycle (up to ~25s),
+// every other button was a no-op for that window: restarting two strategies a few seconds
+// apart silently ran only the first. Serialising per target, not globally, lets independent
+// strategies act at once while still refusing to double-fire on one of them.
+const INFLIGHT = new Set();
+const actKey = b => [b.action, b.strategy||'', b.pr||'', b.session||''].join(':');
 
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('on');
   clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('on'),4200); }
 
+function syncButtons(){
+  document.querySelectorAll('button[data-act]').forEach(b=>{
+    const card = b.closest('.card');
+    b.disabled = INFLIGHT.has(actKey({action:b.dataset.act, strategy:card?card.dataset.name:''}));
+  });
+}
+
 async function act(body, label){
-  if(busy) return; busy=true;
+  const key = actKey(body);
+  if(INFLIGHT.has(key)){ toast((label||body.action)+' is already running…'); return; }
+  INFLIGHT.add(key); syncButtons();
   toast((label||body.action)+'…');
   try{
     const r = await fetch('/api/action',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify(body)});
     const j = await r.json();
-    toast((j.ok?'✓ ':'✗ ')+(j.output||j.error||'done').slice(0,400));
+    toast((j.ok?'✓ ':'✗ ')+String(j.output||j.error||'done').slice(0,400));
   }catch(e){ toast('✗ '+e); }
-  busy=false; refresh();
+  finally{ INFLIGHT.delete(key); }
+  refresh();
 }
 
 function sparkline(series, bench){
@@ -220,6 +237,8 @@ function card(s){
     ${s.stale?`<div class="note">Stale: last rebalance ${dur(s.last_run_age_s)} ago, longer than
        two ${esc(s.schedule)} bars. The process is up but not working.</div>`:''}
     ${sparkline(s._series&&s._series.equity, s._series&&s._series.benchmark)}
+    ${lv.mode_switched&&!(s._series&&s._series.equity&&s._series.equity.length>1)
+      ? `<div class="note">${esc(lv.reason||'the shadow/live book changed')}</div>` : ''}
     <div class="row dim" style="font-size:11px;justify-content:space-between;margin-bottom:8px">
       <span>strategy</span><span>— — buy &amp; hold</span></div>
     <table><thead><tr><th></th><th>live</th><th>backtest</th></tr></thead><tbody>
@@ -338,7 +357,14 @@ function renderSessions(){
     : '<span class="dim">no agent sessions yet</span>';
 }
 
+let refreshing = false;
 async function refresh(){
+  if(refreshing) return;          // a 10s tick landing on top of a post-action refresh
+  refreshing = true;
+  try{ await _refresh(); } finally { refreshing = false; }
+}
+
+async function _refresh(){
   try{
     const r = await fetch('/api/state'); STATE = await r.json();
   }catch(e){ return; }
@@ -349,6 +375,7 @@ async function refresh(){
   $('#strategies').innerHTML = (STATE.strategies||[]).map(card).join('')
     || '<div class="card dim">Nothing deployed yet. Merge a research PR and the deployment agent will put it here.</div>';
   renderHeader(); renderPRs(); renderHealth(); renderAgents(); renderSessions();
+  syncButtons();      // the cards were just rebuilt; re-disable anything still running
   const sel = $('#ac');
   if(!sel.options.length) sel.innerHTML = (STATE.asset_classes||[]).map(a=>`<option>${a}</option>`).join('');
 }
@@ -369,6 +396,8 @@ document.addEventListener('click', e=>{
       '/api/log?strategy='+encodeURIComponent(name)+'&n=400', j=>`<pre>${esc(j.text||j.error)}</pre>`);
     if(a==='journal') return showModal(name+' — trades',
       '/api/journal?strategy='+encodeURIComponent(name), rows=>{
+        if(!Array.isArray(rows))
+          return `<div class="down">${esc((rows&&rows.error)||'unexpected response')}</div>`;
         const t = rows.filter(r=>r.traded).reverse().slice(0,80);
         if(!t.length) return '<div class="dim">no fills yet</div>';
         return `<table><thead><tr><th>time</th><th>side</th><th>qty</th><th>price</th>

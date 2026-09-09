@@ -61,7 +61,10 @@ watchdog() {
   done
   if systemctl --user is-enabled autoquant-dashboard.service >/dev/null 2>&1; then
     : # systemd owns the dashboard
-  elif [ -f "$STATE/dashboard.pid" ] && ! kill -0 "$(cat "$STATE/dashboard.pid" 2>/dev/null)" 2>/dev/null; then
+  elif ! "$REPO/harness/dashboard.sh" status | grep -q RUNNING; then
+    # Ask the script, which consults the process table. Reading the pidfile here meant a
+    # dashboard whose pidfile went stale was "restarted" every 30 minutes forever, each
+    # attempt dying on "Address already in use" while status insisted it was stopped.
     say "WATCHDOG: dashboard is dead, restarting"
     "$REPO/harness/dashboard.sh" start
   fi
