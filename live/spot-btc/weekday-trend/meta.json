@@ -1,0 +1,43 @@
+{
+  "name": "spot-btc/weekday-trend",
+  "title": "weekday-trend -- vol-managed BTC trend, flat on Thursday",
+  "asset_class": "spot-btc",
+  "short_name": "weekday-trend",
+  "description": "Long/flat spot BTC gated by close>SMA(200) and 20d momentum, sized by clip(0.40/EWMA_20_vol, 0, 1.0), zeroed on every Wednesday close so the strategy never holds into Thursday.",
+  "symbol": "BTCUSDT",
+  "schedule": "1d",
+  "capital_usdt": 2500.0,
+  "direction": "long/flat",
+  "deployed_at": "2026-09-09T07:15:00Z",
+  "provenance": {
+    "pr": 3,
+    "commit": "7e58f25d798e8737742447d05455279fce59622f",
+    "branch": "research/spot-btc-weekday-trend",
+    "spec": "alphas/spot-btc/weekday-trend/2026-09-08_alpha_spec.md",
+    "report": "past_research/spot-btc/weekday-trend/2026-09-08_weekday_trend.md",
+    "strategy_code": "code/spot-btc/weekday-trend/strategy.py"
+  },
+  "backtest": {
+    "period": "2015-01 -> 2026-09",
+    "bars": "daily",
+    "cost_bps_per_side": 10.0,
+    "cost_type": "taker",
+    "sharpe": 1.60,
+    "sharpe_oos": 1.18,
+    "sharpe_walkforward": 1.15,
+    "sharpe_ci": [1.01, 2.18],
+    "cagr_pct": 42.6,
+    "vol_pct": 23.9,
+    "maxdd_pct": -25.1,
+    "sortino": 1.61,
+    "calmar": null,
+    "avg_exposure": 0.241,
+    "round_trips_per_year": 40.6,
+    "benchmark": {"name": "BTC buy & hold", "sharpe": null, "cagr_pct": null, "maxdd_pct": null}
+  },
+  "live_notes": [
+    "Backtest cost (10 bp/side) matches taker fee on the venue -- no live-vs-backtest gap.",
+    "Skip-Thursday gate: weight is 0 on every Wednesday close (t+1 day-of-week == 3).",
+    "Signal is fed from real Binance spot daily klines; testnet prices are used only for fills."
+  ]
+}
