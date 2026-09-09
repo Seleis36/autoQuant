@@ -137,7 +137,20 @@ not reproducing the science. For each strategy the PR proposes, establish:
 4. **Do the headline numbers hold up on their face?** Out-of-sample or walk-forward results
    reported, not in-sample only; costs charged; a stated turnover. You are checking that the
    report tests these things, not re-deriving them.
-5. **Sanity red flags:** a signal that uses same-bar or future information; Sharpe far outside
+5. **Declared acceptance criteria.** If the PR body carries an `## Acceptance criteria`
+   block, it is part of the claim. Check it the way you check everything else — against the
+   report's own numbers, not against its summary of them:
+   * `Met: NO`, reported honestly, with the idea marked **Failed** — that is a complete,
+     correct research result. Not a blocker, not a deployment. Say so and stop.
+   * `Met: YES` where the report's numbers do not actually clear the stated bar, or where the
+     evidence quotes a full-sample figure against an out-of-sample criterion — that is a
+     `needs-revision` blocker. Quote both the criterion and the number that misses it.
+   * A high `Variants tried` count with no accounting for selection — many configurations
+     searched and the best one reported as if it were the only one — is a `needs-revision`
+     blocker. Best-of-N Sharpe is biased upward and the report has to say so.
+   * A PR with no such block was launched without criteria. Nothing to check; carry on.
+
+6. **Sanity red flags:** a signal that uses same-bar or future information; Sharpe far outside
    what the reported turnover and costs could support; an OOS window of a few weeks; results
    that contradict the report's own tables; a spec whose rule differs from what `strategy.py`
    implements. Any of these is a blocker — the numbers cannot be trusted.
@@ -173,11 +186,43 @@ not reproducing the science. For each strategy the PR proposes, establish:
 
 If more than one strategy in the PR is deployable, deploy each of them.
 
-## Phase 4 — If blocked: flag invalid and stop
+## Phase 4 — If blocked: classify the blocker, then flag it
+
+A rejected PR is not the end of the line any more. A revision agent picks up fixable ones and
+does the research work to unblock them, so **you must say which kind of blocker you found**.
+Getting this wrong is expensive in both directions: a `wontfix` on a fixable PR throws away
+good research, and a `needs-revision` on a structural one burns a full research session
+rediscovering that the venue cannot do it.
+
+**`needs-revision`** — the alpha may well be sound; what it needs is research work:
+
+* leverage above 1×, a cap that could be re-set and re-validated at 1.0
+* a spec that is ambiguous or disagrees with `strategy.py`
+* a missing file, an unresolved reference, an absent parameter
+* in-sample-only results, an OOS window too short to mean anything, uncosted returns
+* numbers that contradict the report's own tables
+
+**`wontfix`** — no amount of research makes this deployable *here*:
+
+* the traded instrument does not exist on a crypto spot venue (equities, ETFs, FX, rates,
+  commodities, vol products) or is a vestigial tokenized-stock listing
+* the strategy is short by construction, or needs a net-negative weight
+* it needs an instrument type the venue does not offer at all — options, futures, a NAV
+* the signal needs data we cannot obtain live: a paid feed, an endpoint we lack, a series
+  that exists only in a local research file
+* a rebalance faster than 1 minute, or a minimum notional it cannot meet at a sane size
+
+The distinguishing question is simple: **could a researcher fix this with a keyboard and a
+backtest, without changing what venue we trade on?** If yes it is `needs-revision`. A genuine
+lookahead defect is `needs-revision` — the research is wrong, but the idea might survive being
+done correctly.
 
 ```bash
 gh label create invalid --color E4E669 --description "Cannot be deployed as submitted" 2>/dev/null
-echo '{"labels":["invalid"]}' | gh api -X POST "repos/$SLUG/issues/$ARGUMENTS/labels" --input -
+gh label create needs-revision --color D93F0B --description "Fixable blocker -- back to research" 2>/dev/null
+gh label create wontfix --color FFFFFF --description "Structurally undeployable here" 2>/dev/null
+# invalid ALWAYS, plus exactly one of needs-revision / wontfix:
+echo '{"labels":["invalid","needs-revision"]}' | gh api -X POST "repos/$SLUG/issues/$ARGUMENTS/labels" --input -
 gh pr comment $ARGUMENTS --body-file <a file you write>
 gh pr view $ARGUMENTS --json labels --jq '[.labels[].name]'    # confirm it stuck
 ```
@@ -190,9 +235,14 @@ terminal state — if it does not stick, the poller hands this PR back every 30 
 so verify it and say so in your final report if it failed.
 
 The comment must state: which strategy you assessed, the specific blocking reasons (quote the
-file and line that shows each one), and what the researcher would have to change for the PR to
-pass. Be concrete and brief. **Do not merge. Do not close the PR** — leave it open so the
-researcher can fix it. Then remove the worktree and stop.
+file and line that shows each one), **which verdict you applied and why**, and what would have
+to change for the PR to pass. Be concrete and brief — a revision agent will work from this
+comment as its brief, so the blocker list needs to be actionable on its own, without re-deriving
+your reasoning.
+
+**Do not merge. Do not close the PR.** A `needs-revision` PR goes to the revision agent; a
+`wontfix` PR stays open for a human to close, since a structural verdict is the one most worth
+a second pair of eyes. Then remove the worktree and stop.
 
 ## Phase 5 — If deployable: reserve capital, then write the runner
 

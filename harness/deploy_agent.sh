@@ -3,13 +3,22 @@
 #
 #   ./harness/deploy_agent.sh 7
 #
-# Claims the PR with the `harness:processing` label, launches a headless Claude
-# Code session on the /deploy-strategy command, and releases the claim afterwards.
-# The agent itself is what applies the `deployed` / `invalid` label and merges;
-# this script only supervises it.
+# Claims the PR with `harness:processing`, runs a headless Claude session on the
+# /deploy-strategy command, and releases the claim afterwards. The agent itself applies
+# the terminal label (deployed / invalid+needs-revision / invalid+wontfix) and merges;
+# this script only supervises it and decides what a non-terminal exit meant.
 set -uo pipefail
 
+# Body wrapped in main() so that editing this script while it is supervising a live agent
+# cannot corrupt the run: bash reads a script incrementally and would otherwise resume from
+# a stale byte offset, but it parses a function body in full before executing any of it.
+main() {
+
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=/dev/null
+. "$REPO/harness/session_lib.sh"
+# shellcheck source=/dev/null
+. "$REPO/harness/gh_lib.sh"
 STATE="$REPO/harness/state"
 LOGS="$REPO/harness/logs"
 mkdir -p "$STATE" "$LOGS"
@@ -17,8 +26,9 @@ mkdir -p "$STATE" "$LOGS"
 PR="${1:?usage: deploy_agent.sh <pr-number>}"
 MODEL="${DEPLOY_AGENT_MODEL:-opus}"
 TIMEOUT="${DEPLOY_AGENT_TIMEOUT:-3600}"
-MAX_BUDGET="${DEPLOY_AGENT_MAX_BUDGET_USD:-10}"   # hard per-run API spend cap
 MAX_ATTEMPTS="${DEPLOY_AGENT_MAX_ATTEMPTS:-3}"
+# No spend cap: this runs on a Claude subscription, not metered API credit, so a dollar
+# limit would be a cap on a number nobody is paying. The timeout is the safety net.
 
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
 LOG="$LOGS/pr-${PR}-${TS}.log"
@@ -26,75 +36,75 @@ ATTEMPT_FILE="$STATE/attempts-${PR}"
 
 say() { echo "[$(date -u +%FT%TZ)] $*" | tee -a "$LOG"; }
 
-# Labels go through the REST API, not `gh pr edit`. Older gh builds (2.4.0 ships
-# with Ubuntu) resolve a PR through a GraphQL query that still asks for
-# projectCards, which GitHub now rejects outright -- every `gh pr edit` fails with
-# "Projects (classic) is being deprecated". Silently losing the label would leave
-# an invalid PR without a terminal state, so the poller would hand it back every
-# 30 minutes forever. The issues API has no such problem.
-SLUG="$(git -C "$REPO" remote get-url origin 2>/dev/null \
-        | sed -E 's#(git@github.com:|https://github.com/)##; s#\.git$##')"
-add_label() {
-  printf '{"labels":["%s"]}' "$1" \
-    | gh api -X POST "repos/$SLUG/issues/$PR/labels" --input - >/dev/null 2>&1
-}
-remove_label() { gh api -X DELETE "repos/$SLUG/issues/$PR/labels/$1" >/dev/null 2>&1; }
-
 attempts="$(cat "$ATTEMPT_FILE" 2>/dev/null || echo 0)"
 if [ "$attempts" -ge "$MAX_ATTEMPTS" ]; then
-  say "PR #$PR: $attempts attempts already made (max $MAX_ATTEMPTS), giving up"
-  gh label create "harness:failed" --color B60205 \
-     --description "Deployment agent could not complete" >/dev/null 2>&1
-  add_label "harness:failed"
-  if ! gh pr view "$PR" --json labels --jq '[.labels[].name]' 2>/dev/null | grep -q "harness:failed"; then
-    say "PR #$PR: WARNING could not apply harness:failed -- the poller will keep retrying it"
-  fi
+  say "PR #$PR: $attempts genuine failures already (max $MAX_ATTEMPTS), giving up"
+  ensure_labels; add_label "$PR" "harness:failed"
+  has_label "$PR" "harness:failed" \
+    || say "PR #$PR: WARNING could not apply harness:failed -- the poller will keep retrying it"
   exit 3
 fi
-echo $((attempts + 1)) > "$ATTEMPT_FILE"
+
+if ! slot_acquire deploy; then
+  say "PR #$PR: $(slot_report) -- deferring to the next sweep"
+  exit 4
+fi
 
 cd "$REPO" || exit 1
 
-# --- claim ------------------------------------------------------------------
-gh label create "harness:processing" --color FBCA04 \
-   --description "Deployment agent is reviewing this PR" >/dev/null 2>&1
-add_label "harness:processing"
+ensure_labels
+add_label "$PR" "harness:processing"
+trap 'remove_label "$PR" "harness:processing"' EXIT
 
-release() { remove_label "harness:processing"; }
-trap release EXIT
+say "PR #$PR: launching deployment agent (attempt $((attempts + 1))/$MAX_ATTEMPTS, model=$MODEL)"
 
-say "PR #$PR: launching deployment agent (attempt $((attempts + 1))/$MAX_ATTEMPTS, model=$MODEL, budget=\$$MAX_BUDGET)"
+PROMPT="/deploy-strategy $PR"
+UUID="$(session_start deploy "pr-$PR" "$PROMPT" "$MODEL" "$LOG")"
+say "PR #$PR: session $UUID"
 
-timeout --signal=TERM --kill-after=60 "$TIMEOUT" \
-  claude -p "/deploy-strategy $PR" \
-    --model "$MODEL" \
-    --permission-mode bypassPermissions \
-    --output-format text \
-    --max-budget-usd "$MAX_BUDGET" \
-    >> "$LOG" 2>&1
+"$REPO/harness/agent_exec.sh" start "$UUID" "$LOG" "$TIMEOUT" "$MODEL" "$PROMPT"
 rc=$?
 
-# --- verify the agent reached a terminal decision ---------------------------
-labels="$(gh pr view "$PR" --json labels --jq '[.labels[].name] | join(",")' 2>/dev/null)"
+# --- did the agent reach a terminal decision? -------------------------------
+# This is the authoritative check. The agent's whole job is to leave a terminal label
+# behind; if one is not there the run did not finish, whatever its exit code claimed.
+labels="$(pr_labels "$PR")"
 state="$(gh pr view "$PR" --json state --jq .state 2>/dev/null)"
+terminal=1
+case ",$labels," in
+  *,deployed,*|*,invalid,*|*,wontfix,*) terminal=0 ;;
+esac
+[ "$state" = "MERGED" ] && terminal=0
 
-if [ "$state" = "MERGED" ] || [[ ",$labels," == *",deployed,"* ]]; then
-  say "PR #$PR: DEPLOYED (state=$state labels=$labels)"
+session_side_effect_override "$UUID" "$terminal"
+status="$(session_status "$UUID")"
+
+if [ "$terminal" -eq 0 ]; then
+  say "PR #$PR: terminal decision reached (state=$state labels=$labels)"
   rm -f "$ATTEMPT_FILE"
-  echo "$PR deployed $TS" >> "$STATE/processed.log"
+  echo "$PR $(echo "$labels" | tr ',' ' ' | grep -oE 'deployed|invalid' | head -1) $TS" >> "$STATE/processed.log"
   exit 0
 fi
-if [[ ",$labels," == *",invalid,"* ]]; then
-  say "PR #$PR: flagged INVALID by the agent (labels=$labels)"
-  rm -f "$ATTEMPT_FILE"
-  echo "$PR invalid $TS" >> "$STATE/processed.log"
-  exit 0
+
+# --- non-terminal: was it cut off, or did it genuinely fail? ----------------
+# An agent killed by a usage limit looks exactly like one that crashed, so this used to
+# burn an attempt either way -- three limit collisions would permanently kill a healthy
+# PR. A cut-off run is parked instead: no attempt spent, and harness:paused keeps the
+# poller off it until the resume button clears it.
+if [ "$status" = "aborted" ]; then
+  reason="$(sl_py -c 'import json,sys;print(json.load(open(sys.argv[1]))["reason"])' \
+            "$SL_SESSIONS/$UUID.json" 2>/dev/null)"
+  say "PR #$PR: agent CUT OFF ($reason) -- parking, no attempt spent"
+  say "PR #$PR: resume with ./harness/resume_aborted.sh $UUID"
+  add_label "$PR" "harness:paused"
+  exit 2
 fi
 
-if [ $rc -eq 124 ] || [ $rc -eq 137 ]; then
-  say "PR #$PR: agent TIMED OUT after ${TIMEOUT}s -- will retry next cycle"
-else
-  say "PR #$PR: agent exited $rc without a terminal label -- will retry next cycle"
-fi
+echo $((attempts + 1)) > "$ATTEMPT_FILE"
+say "PR #$PR: agent failed (rc=$rc, status=$status) -- attempt $((attempts + 1))/$MAX_ATTEMPTS, will retry next cycle"
 say "PR #$PR: log at ${LOG#"$REPO"/}"
 exit 1
+
+}
+
+main "$@"

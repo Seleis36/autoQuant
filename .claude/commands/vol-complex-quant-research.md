@@ -82,6 +82,51 @@ The PR body is the first thing the deployment agent reads, so make it self-conta
 
 A session that only produced failures still opens a PR — a documented negative result keeps the next researcher from repeating it. Title it so nothing looks deployable, e.g. `vol-complex: <short-name> — Failed (Sharpe 0.3)`.
 
+## Acceptance criteria
+
+If the invocation below contains an `ACCEPTANCE CRITERIA` block, it is a **hard gate on what
+you may call Working** — not a theme, not a hint about where to look, and not a target you may
+approximate. It is the standard the deployment agent will hold this PR to, and a PR whose
+headline numbers miss its own declared criteria is sent straight back for revision.
+
+Treat it as separate from the seed idea. A seed says *where to look*; criteria say *what
+counts as having found something*.
+
+**You are expected to fail these criteria most of the time, and reporting that honestly is a
+complete, successful run of this command.** Genuine edges that clear a high bar are rare. If
+after real effort nothing meets the criteria, open the PR as **Failed**, say exactly how close
+you got and what the binding constraint was, and stop. That result is worth having: it stops
+the next agent spending a session on the same ground.
+
+**What you must not do to reach the number.** A criterion like "OOS Sharpe ≥ 2" is trivially
+satisfiable by a dishonest search, and doing so is worse than failing — capital gets reserved
+on the strength of these figures. Every one of these invalidates the claim:
+
+- re-picking the train/test split, the sample start, or the universe after seeing results;
+- dropping a drawdown period, a "regime change", or an inconvenient year without a rule that
+  was fixed in advance and applies symmetrically;
+- relaxing the cost assumption, the slippage budget or the rebalance frequency to clear the bar;
+- reporting the best of many variants as if it were the only one tried, without reporting how
+  many were tried and what that does to the expected best-of-N Sharpe;
+- quoting an in-sample or full-sample number where the criteria ask for out-of-sample.
+
+If you find yourself reaching for one of these to get over the line, you have your answer:
+the idea does not clear the bar. Write it up as Failed.
+
+**Report against the criteria explicitly.** The PR body must carry this block verbatim, filled
+in, so the deployment agent can check it without re-deriving your work:
+
+```
+## Acceptance criteria
+- Criteria: <the criteria you were given, quoted>
+- Met: YES / NO
+- Evidence: <the specific numbers that show it, and where they came from>
+- Variants tried: <how many distinct configurations you evaluated before reporting this>
+```
+
+`Met: NO` with an honest write-up is a valid PR. `Met: YES` with numbers that do not support it
+is the one outcome that wastes everyone's time.
+
 ## This invocation
 
 $ARGUMENTS

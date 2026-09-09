@@ -8,13 +8,23 @@
 #   ./harness/poll_prs.sh --stop      # stop the detached daemon
 #   ./harness/poll_prs.sh --status
 #
-# A PR is picked up when it is open, not a draft, and carries none of the
-# terminal labels the agent applies: deployed / invalid / harness:failed.
-# `harness:processing` marks an in-flight PR so overlapping sweeps never
-# double-launch an agent on the same one.
+# Two queues, swept in that order:
+#
+#   review    open, not a draft, no terminal label      -> deploy_agent.sh
+#   revision  labelled needs-revision, not exhausted    -> revise_agent.sh
+#
+# Revision runs first: it drains PRs back into the review queue, and the slot gate in
+# session_lib.sh gives PR work priority over new research for the same reason.
+#
+# Terminal labels the agents apply: deployed / wontfix / harness:failed /
+# harness:exhausted. `harness:processing` marks an in-flight PR so overlapping sweeps
+# never double-launch an agent on the same one, and `harness:paused` holds a PR whose
+# agent was cut off by a usage limit -- the resume button clears that, not the poller.
 set -uo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=/dev/null
+. "$REPO/harness/session_lib.sh"
 STATE="$REPO/harness/state"
 LOGS="$REPO/harness/logs"
 mkdir -p "$STATE" "$LOGS"
@@ -66,29 +76,59 @@ sweep() {
     say "gh is not authenticated -- skipping sweep"; return 1
   fi
 
+  local n=0
+
+  # --- revision queue first ------------------------------------------------
+  local rev
+  rev="$(gh pr list --state open --limit 50 \
+          --json number,title,isDraft,labels,headRefName \
+          --jq '.[]
+                | select(.isDraft | not)
+                | select([.labels[].name] | any(. == "needs-revision"))
+                | select([.labels[].name]
+                         | any(. == "harness:processing" or . == "harness:paused"
+                               or . == "harness:exhausted" or . == "wontfix"
+                               or . == "deployed")
+                         | not)
+                | "\(.number)\t\(.headRefName)\t\(.title)"' 2>/dev/null)"
+  while IFS=$'\t' read -r num branch title; do
+    [ -z "${num:-}" ] && continue
+    n=$((n + 1))
+    # Detached, unlike the deployment agent. A revision is a full research cycle (4h
+    # timeout, not 1h), and the sweep holds the poll lock for as long as it blocks -- a
+    # synchronous revision would stall every deployment behind it for half a day. The
+    # harness:processing claim stops a later sweep double-launching it, and the slot gate
+    # bounds how many can run at once, so nothing here needs the sweep to wait.
+    say "-> REVISE PR #$num ($branch): $title"
+    setsid nohup "$REPO/harness/revise_agent.sh" "$num" >/dev/null 2>&1 < /dev/null &
+    say "<- PR #$num revision agent launched"
+  done <<< "$rev"
+
+  # --- review queue --------------------------------------------------------
   local prs
   prs="$(gh pr list --state open --limit 50 \
           --json number,title,isDraft,labels,headRefName \
           --jq '.[]
                 | select(.isDraft | not)
                 | select([.labels[].name]
-                         | any(. == "deployed" or . == "invalid"
-                               or . == "harness:failed" or . == "harness:processing")
+                         | any(. == "deployed" or . == "wontfix"
+                               or . == "harness:failed" or . == "harness:exhausted"
+                               or . == "harness:processing" or . == "harness:paused"
+                               or . == "needs-revision" or . == "invalid")
                          | not)
                 | "\(.number)\t\(.headRefName)\t\(.title)"' 2>/dev/null)"
   local grc=$?
   if [ $grc -ne 0 ]; then say "gh pr list failed (rc=$grc)"; return 1; fi
 
-  if [ -z "$prs" ]; then say "no eligible open PRs"; return 0; fi
-
-  local n=0
   while IFS=$'\t' read -r num branch title; do
     [ -z "${num:-}" ] && continue
     n=$((n + 1))
-    say "-> PR #$num ($branch): $title"
+    say "-> DEPLOY PR #$num ($branch): $title"
     "$REPO/harness/deploy_agent.sh" "$num"
     say "<- PR #$num finished with rc=$?"
   done <<< "$prs"
+
+  [ "$n" -eq 0 ] && say "no eligible open PRs"
   say "sweep done, $n PR(s) handled"
 }
 
@@ -137,6 +177,9 @@ case "${1:---once}" in
     else
       echo "poller STOPPED"
     fi
+    echo "$(slot_report)"
+    parked="$("$REPO/harness/resume_aborted.sh" --list | grep -cvE '^(UUID|\(nothing|[0-9]+/)' || true)"
+    [ "${parked:-0}" -gt 0 ] && echo "$parked session(s) parked -- ./harness/resume_aborted.sh --list"
     "$REPO/harness/launch_live.sh" status ;;
   *) echo "usage: $0 {--once|--daemon|--start|--stop|--status}" >&2; exit 2 ;;
 esac

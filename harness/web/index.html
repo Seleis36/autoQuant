@@ -121,6 +121,17 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
         <div id="agents" style="margin-top:12px"></div>
       </div>
       <div class="card">
+        <h3>Agent sessions</h3>
+        <p class="desc">Every headless run, and what it can be resumed from. A session cut off
+           by a usage limit keeps its work in the transcript &mdash; resuming continues it
+           rather than paying for it twice.</p>
+        <div class="row" style="margin:8px 0">
+          <button id="resume-all">Resume cut-off sessions</button>
+          <span id="parked-badge" class="dim"></span>
+        </div>
+        <div id="sessions" class="dim">&mdash;</div>
+      </div>
+      <div class="card">
         <h3>Health</h3>
         <div id="health"></div>
       </div>
@@ -303,6 +314,30 @@ function renderAgents(){
     : '<span class="dim">no agent runs yet</span>';
 }
 
+function renderSessions(){
+  const rows = (STATE.sessions||[]).slice(0,10);
+  const parked = (STATE.sessions||[]).filter(r=>r.status==='aborted');
+  const badge = $('#parked-badge');
+  badge.textContent = parked.length
+    ? parked.length+' parked'+(parked.some(r=>r.reason==='usage_limit')?' (usage limit)':'')
+    : 'nothing parked';
+  badge.style.color = parked.length ? 'var(--warn,#d29922)' : '';
+  $('#resume-all').disabled = !parked.length;
+  const dot = {done:'#3fb950', running:'#58a6ff', aborted:'#d29922', abandoned:'#f85149'};
+  $('#sessions').innerHTML = rows.length ? `<table><tbody>${rows.map(r=>
+    `<tr>
+      <td><span style="color:${dot[r.status]||'#888'}">&#9679;</span>
+          <span class="mono">${esc((r.id||'').slice(0,8))}</span></td>
+      <td class="dim">${esc(r.kind||'')}</td>
+      <td>${esc(r.target||'')}</td>
+      <td class="dim">${esc(r.status||'')}${r.reason&&r.status!=='done'?' &middot; '+esc(r.reason):''}</td>
+      <td class="dim">${r.resumes?('&#8635;'+r.resumes):''}</td>
+      <td>${r.log?`<a href="#" data-log="${esc(r.log.split('/').pop())}">log</a>`:''}</td>
+      <td>${r.status==='aborted'?`<button data-resume="${esc(r.id)}">Resume</button>`:''}</td>
+    </tr>`).join('')}</tbody></table>`
+    : '<span class="dim">no agent sessions yet</span>';
+}
+
 async function refresh(){
   try{
     const r = await fetch('/api/state'); STATE = await r.json();
@@ -313,7 +348,7 @@ async function refresh(){
   }));
   $('#strategies').innerHTML = (STATE.strategies||[]).map(card).join('')
     || '<div class="card dim">Nothing deployed yet. Merge a research PR and the deployment agent will put it here.</div>';
-  renderHeader(); renderPRs(); renderHealth(); renderAgents();
+  renderHeader(); renderPRs(); renderHealth(); renderAgents(); renderSessions();
   const sel = $('#ac');
   if(!sel.options.length) sel.innerHTML = (STATE.asset_classes||[]).map(a=>`<option>${a}</option>`).join('');
 }
@@ -348,6 +383,8 @@ document.addEventListener('click', e=>{
   }
   const rq = e.target.closest('button[data-requeue]');
   if(rq) return act({action:'requeue_pr', pr:rq.dataset.requeue}, 'requeue PR');
+  const rs = e.target.closest('button[data-resume]');
+  if(rs) return act({action:'resume_session', session:rs.dataset.resume}, 'resume session');
   const lg = e.target.closest('a[data-log]');
   if(lg){ e.preventDefault();
     return showModal(lg.dataset.log, '/api/log?file='+encodeURIComponent(lg.dataset.log)+'&n=500',
@@ -359,6 +396,7 @@ $('#poller-toggle').onclick = ()=>act({action: STATE.poller.running?'poller_stop
 $('#poller-sweep').onclick  = ()=>act({action:'poller_sweep'}, 'sweeping (may take a while)');
 $('#go-research').onclick   = ()=>act({action:'launch_research', asset_class:$('#ac').value,
                                        seed:$('#seed').value}, 'launch research');
+$('#resume-all').onclick = ()=>act({action:'resume_aborted'}, 'resume cut-off sessions');
 $('#killall').onclick = ()=>{
   if(!confirm('Stop every strategy daemon?\n\nPositions are LEFT OPEN — use Flatten first if you want out of the market.')) return;
   act({action:'kill_all'}, 'kill all');

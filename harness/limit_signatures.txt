@@ -1,0 +1,18 @@
+# Log patterns (grep -E, case-insensitive) that mean "this agent was cut off by a
+# subscription usage limit", not that it crashed or finished.
+#
+# NOTE: no real usage-limit abort has been observed on this machine yet, so these are
+# educated guesses at the wording. The FIRST time a run is genuinely cut off, read
+# harness/logs/ and correct this file -- and keep the log. Classification does not rely
+# on this file alone: session_classify() checks the structured JSON result first, and
+# the callers fall back on a side-effect check (did the PR actually get a label?) that
+# needs no knowledge of these strings at all.
+usage limit reached
+approaching (your )?usage limit
+you've (reached|hit) your .{0,40}limit
+claude usage limit
+rate.?limit(ed)? .{0,40}(retry|reset|try again)
+429 too many requests
+resets at [0-9]
+upgrade to (a )?(higher|pro|max)
+insufficient (credit|quota)

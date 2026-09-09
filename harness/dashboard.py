@@ -46,6 +46,8 @@ LOGS_DIR = os.path.join(HARNESS_DIR, "logs")
 LAUNCH = os.path.join(HARNESS_DIR, "launch_live.sh")
 POLLER = os.path.join(HARNESS_DIR, "poll_prs.sh")
 RESEARCH = os.path.join(HARNESS_DIR, "launch_research.sh")
+RESUME = os.path.join(HARNESS_DIR, "resume_aborted.sh")
+SESSIONS_DIR = os.path.join(STATE_DIR, "sessions")
 
 ASSET_CLASSES = ["spot-btc", "spot-eth", "crypto-perps", "crypto-alts", "us-large-cap",
                  "sector-etf", "global-equity-etf", "fx-majors", "rates-bonds",
@@ -329,6 +331,38 @@ def refresh_agents():
     CACHE.set("agents", runs)
 
 
+def _repo_slug():
+    rc, out, _ = sh(["gh", "repo", "view", "--json", "nameWithOwner",
+                     "--jq", ".nameWithOwner"], 20)
+    return out.strip() if rc == 0 else ""
+
+
+def refresh_sessions():
+    """The agent-session registry: what ran, how it ended, what can be resumed."""
+    out = []
+    for f in glob.glob(os.path.join(SESSIONS_DIR, "*.json")):
+        if f.endswith(".result.json"):
+            continue
+        try:
+            d = json.load(open(f))
+        except Exception:  # noqa: BLE001
+            continue
+        pid = d.get("pid")
+        if d.get("status") == "running" and pid:
+            try:
+                os.kill(int(pid), 0)
+            except (OSError, ValueError):
+                # The process is gone but nothing wrote a verdict -- the supervisor was
+                # killed too (a reboot, a kill -9). Show it as parked rather than as a
+                # run that is still going, which is what it would look like forever.
+                d["status"], d["reason"] = "aborted", "orphaned"
+        out.append({k: d.get(k) for k in
+                    ("id", "kind", "target", "status", "reason", "launched_at",
+                     "ended_at", "log", "model")} | {"resumes": len(d.get("resumes") or [])})
+    out.sort(key=lambda r: r.get("launched_at") or "", reverse=True)
+    CACHE.set("sessions", out[:40])
+
+
 def poller_status():
     pf = os.path.join(STATE_DIR, "poller.pid")
     if os.path.exists(pf):
@@ -342,7 +376,8 @@ def poller_status():
 
 
 REFRESHERS = [(refresh_prs, 120), (refresh_account, 45), (refresh_usage, 120),
-              (refresh_data_freshness, 300), (refresh_git, 120), (refresh_agents, 30)]
+              (refresh_data_freshness, 300), (refresh_git, 120), (refresh_agents, 30),
+              (refresh_sessions, 20)]
 
 
 def refresher_loop(stop: threading.Event):
@@ -396,12 +431,25 @@ def do_action(body: dict) -> dict:
     if a == "poller_sweep":
         rc, out, err = sh([POLLER, "--once"], 600)
         return {"ok": rc == 0, "output": out or err}
+    if a in ("resume_aborted", "resume_session"):
+        arg = str(body.get("session", "")).strip() or "--all"
+        if arg != "--all" and not re.fullmatch(r"[0-9a-fA-F-]{36}", arg):
+            return {"ok": False, "error": "bad session id"}
+        rc, out, err = sh([RESUME, arg], 120)
+        refresh_sessions()
+        return {"ok": rc == 0, "output": out or err}
     if a == "requeue_pr":
         num = str(body.get("pr", "")).strip()
         if not num.isdigit():
             return {"ok": False, "error": "bad pr number"}
-        for lab in ("invalid", "harness:failed", "harness:processing"):
-            sh(["gh", "pr", "edit", num, "--remove-label", lab], 30)
+        # `gh pr edit` is broken on this machine -- it resolves the PR through a GraphQL
+        # query asking for projectCards, which GitHub now refuses outright, so every call
+        # failed silently and this button did nothing at all. The issues API is fine.
+        slug = _repo_slug()
+        for lab in ("invalid", "needs-revision", "harness:failed",
+                    "harness:processing", "harness:paused", "harness:exhausted"):
+            sh(["gh", "api", "-X", "DELETE",
+                f"repos/{slug}/issues/{num}/labels/{lab.replace(':', '%3A')}"], 30)
         try:
             os.remove(os.path.join(STATE_DIR, f"attempts-{num}"))
         except OSError:
@@ -463,9 +511,11 @@ class Handler(BaseHTTPRequestHandler):
                 "data": CACHE.get("data", []),
                 "git": CACHE.get("git", {}),
                 "agents": CACHE.get("agents", []),
+                "sessions": CACHE.get("sessions", []),
                 "asset_classes": ASSET_CLASSES,
                 "ages": {k: CACHE.age(k) for k in
-                         ("prs", "account", "usage", "data", "git", "agents")},
+                         ("prs", "account", "usage", "data", "git", "agents",
+                          "sessions")},
             })
         if path == "/api/series":
             name = qs.get("strategy", "")
@@ -527,7 +577,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--bind", default="auto",
                     help="'auto' (loopback + tailnet), or an explicit address")
-    ap.add_argument("--port", type=int, default=8787)
+    ap.add_argument("--port", type=int, default=8788)
     args = ap.parse_args()
     load_env()
 
