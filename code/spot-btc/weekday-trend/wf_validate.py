@@ -5,7 +5,7 @@ Strategy (default params):
 where
     trend       = 1{close_t > SMA(200)}
     momentum    = 1{return_20 > 0}
-    vol_scalar  = clip(0.40 / EWMA_vol_20, 0, 1.5)
+    vol_scalar  = clip(0.40 / EWMA_vol_20, 0, 1.0)
     skip_thu    = 0 if (t+1).dayofweek == 3 else 1
 """
 import sys, os
@@ -18,7 +18,7 @@ btc = load_btc()
 c = btc["Close"]
 r = c.pct_change()
 
-def weights(T=200, M=20, target=0.4, hl=20, cap=1.5, skip_dow=(3,)):
+def weights(T=200, M=20, target=0.4, hl=20, cap=1.0, skip_dow=(3,)):
     trend = (c > c.rolling(T).mean()).astype(float)
     mom = (c.pct_change(M) > 0).astype(float)
     v = ewm_vol(r, halflife=hl)
@@ -29,7 +29,7 @@ def weights(T=200, M=20, target=0.4, hl=20, cap=1.5, skip_dow=(3,)):
 
 # 1. Full-sample stats
 w = weights()
-net, stats = backtest(w, c, cost_bps=10.0, name="dip-in-uptrend")
+net, stats = backtest(w, c, cost_bps=10.0, name="weekday-trend")
 print("=== Full-sample (2015-01-01 -> 2026-09-06), 10bp/side ===")
 print(fmt(pd.DataFrame([stats]).T.T))
 
@@ -69,7 +69,7 @@ param_grid = []
 for T in [100, 150, 200]:
     for M in [10, 20, 40]:
         for tv in [0.30, 0.40, 0.50]:
-            param_grid.append(dict(T=T, M=M, target=tv, hl=20, cap=1.5, skip_dow=(3,)))
+            param_grid.append(dict(T=T, M=M, target=tv, hl=20, cap=1.0, skip_dow=(3,)))
 
 wf_start = pd.Timestamp("2018-01-01")
 train_yrs = 3
@@ -139,7 +139,7 @@ for y in years:
 print(pd.DataFrame(rows, columns=["yr", "Sharpe", "CAGR", "MDD", "Expo"]).round(2).to_string(index=False))
 
 # 9. Save equity curve for plotting
-outdir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "alphas", "spot-btc", "dip-in-uptrend")
+outdir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "alphas", "spot-btc", "weekday-trend")
 os.makedirs(outdir, exist_ok=True)
 eq_df = pd.DataFrame({"strategy": (1 + net).cumprod(),
                       "buy_and_hold": c / c.iloc[0]})
@@ -152,9 +152,9 @@ try:
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     fig, axes = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
-    axes[0].semilogy((1 + net).cumprod(), label="dip-in-uptrend", lw=1.5)
+    axes[0].semilogy((1 + net).cumprod(), label="weekday-trend", lw=1.5)
     axes[0].semilogy(c / c.iloc[0], label="Buy & hold BTC", lw=1, alpha=0.7)
-    axes[0].legend(); axes[0].set_title("dip-in-uptrend equity curve (log scale, 10bp/side)")
+    axes[0].legend(); axes[0].set_title("weekday-trend equity curve (log scale, 10bp/side)")
     axes[0].axvline(pd.Timestamp("2022-01-01"), color="gray", ls="--", alpha=0.5, label="OOS")
     axes[0].grid(alpha=0.3)
     dd = (1 + net).cumprod() / (1 + net).cumprod().cummax() - 1
