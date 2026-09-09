@@ -6,7 +6,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATE="$REPO/harness/state"; LOG="$REPO/harness/logs/dashboard.log"
 PIDFILE="$STATE/dashboard.pid"
 PY="$REPO/.venv/bin/python"; [ -x "$PY" ] || PY="$(command -v python3)"
-PORT="${DASHBOARD_PORT:-8787}"; BIND="${DASHBOARD_BIND:-auto}"
+PORT="${DASHBOARD_PORT:-8788}"; BIND="${DASHBOARD_BIND:-auto}"
 mkdir -p "$STATE" "$REPO/harness/logs"
 
 alive() { [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE" 2>/dev/null)" 2>/dev/null; }

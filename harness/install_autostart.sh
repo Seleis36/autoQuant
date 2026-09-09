@@ -93,8 +93,10 @@ if [ -d "$STARTUP" ]; then
   cat > "$VBS" <<VBSEOF
 ' autoQuant - boot WSL at logon so its systemd units come up.
 ' Written by harness/install_autostart.sh. Runs hidden (0) and does not wait.
+' The trailing sleep is load-bearing: WSL tears the distro down ~15s after the
+' last wsl.exe client exits, which would kill the units linger keeps alive.
 CreateObject("WScript.Shell").Run _
-  "wsl.exe -d $DISTRO -u $USER --exec /bin/bash -lc ""systemctl --user start autoquant.target""", 0, False
+  "wsl.exe -d $DISTRO -u $USER --exec /bin/bash -lc ""systemctl --user start autoquant.target; exec /bin/sleep infinity""", 0, False
 VBSEOF
   say "Startup entry written: ${VBS#/mnt/c/}"
   say "  boots distro '$DISTRO' at Windows logon"
