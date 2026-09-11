@@ -5,7 +5,7 @@
 #
 # Claims the PR with `harness:processing`, runs a headless Claude session on the
 # /deploy-strategy command, and releases the claim afterwards. The agent itself applies
-# the terminal label (deployed / invalid+needs-revision / invalid+wontfix) and merges;
+# the terminal outcome (deployed / invalid+needs-revision / archived) and merges;
 # this script only supervises it and decides what a non-terminal exit meant.
 set -uo pipefail
 
@@ -24,7 +24,10 @@ LOGS="$REPO/harness/logs"
 mkdir -p "$STATE" "$LOGS"
 
 PR="${1:?usage: deploy_agent.sh <pr-number>}"
-MODEL="${DEPLOY_AGENT_MODEL:-opus}"
+# Pinned model id, not the `opus` short name: on this CLI `--model opus` resolves to Opus
+# 4.7, so the alias quietly ran a previous generation. An id also makes the session
+# registry say exactly what produced a decision.
+MODEL="${DEPLOY_AGENT_MODEL:-claude-opus-5}"
 TIMEOUT="${DEPLOY_AGENT_TIMEOUT:-3600}"
 MAX_ATTEMPTS="${DEPLOY_AGENT_MAX_ATTEMPTS:-3}"
 # No spend cap: this runs on a Claude subscription, not metered API credit, so a dollar

@@ -396,8 +396,8 @@ async function _refresh(){
   if(msel && !msel.options.length && (STATE.research_models||[]).length){
     msel.innerHTML = STATE.research_models.map(m=>
       `<option value="${esc(m.key)}"${m.default&&!m.unavailable?' selected':''}`
-      + `${m.unavailable?' disabled':''} title="${esc(m.unavailable||m.id)}">`
-      + `${esc(m.label)}${m.unavailable?' (unavailable)':''}</option>`).join('');
+      + `${m.unavailable?' disabled':''} title="${esc(m.unavailable||m.note||m.id)}">`
+      + `${esc(m.label)}${m.unavailable?' (unavailable)':m.note?' ($)':''}</option>`).join('');
   }
 }
 

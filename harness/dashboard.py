@@ -67,7 +67,11 @@ ASSET_CLASSES = ["spot-btc", "spot-eth", "crypto-perps", "crypto-alts", "us-larg
 RESEARCH_MODELS = {
     "opus":   {"id": "claude-opus-5",   "label": "Opus 5"},
     "sonnet": {"id": "claude-sonnet-5", "label": "Sonnet 5"},
-    "fable":  {"id": "claude-fable-5-1", "label": "Fable 5.1", "min_cli": "2.1.251"},
+    # Fable is NOT covered by the Claude subscription the rest of this harness runs on --
+    # it bills purchased usage credits, so a long research session on it costs real money
+    # where an Opus or Sonnet one does not. Offered, flagged, and never the default.
+    "fable":  {"id": "claude-fable-5-1", "label": "Fable 5.1", "min_cli": "2.1.251",
+               "note": "bills usage credits, not the subscription"},
 }
 DEFAULT_RESEARCH_MODEL = "opus"
 
@@ -121,6 +125,8 @@ def research_model_options() -> list:
     for key, m in RESEARCH_MODELS.items():
         row = {"key": key, "id": m["id"], "label": m["label"],
                "default": key == DEFAULT_RESEARCH_MODEL}
+        if m.get("note"):
+            row["note"] = m["note"]
         need = m.get("min_cli")
         if need and cli and _version_below(cli, need):
             row["unavailable"] = (f"needs Claude Code >= {need}; this machine has {cli}. "

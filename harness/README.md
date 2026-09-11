@@ -117,12 +117,15 @@ generation, and `fable` is not accepted at all. An id also makes the session reg
 exactly what produced a result, which is what you want when comparing two research runs
 months apart.
 
-Fable 5.1 needs Claude Code >= 2.1.251. On an older binary the dashboard shows it disabled
-with the version it found and refuses to launch onto it, rather than letting a detached agent
-die on its first API call. `RESEARCH_AGENT_MODEL` still overrides the default for the CLI.
+**Fable 5.1 costs real money.** It is not covered by the Claude subscription the rest of this
+harness runs on — it bills purchased usage credits, so a four-hour research session on it is a
+metered spend where the same session on Opus or Sonnet is not. The picker marks it `($)` and
+it is never the default. It also needs Claude Code >= 2.1.251; on an older binary the
+dashboard shows it disabled with the version it found and refuses to launch onto it, rather
+than letting a detached agent die on its first API call.
 
-The deployment and revision agents still default to the `opus` *alias* via
-`DEPLOY_AGENT_MODEL` / `REVISE_AGENT_MODEL`, so they run Opus 4.7 until those are pinned too.
+All three agents — research, deploy and revise — default to `claude-opus-5`, overridable with
+`RESEARCH_AGENT_MODEL` / `DEPLOY_AGENT_MODEL` / `REVISE_AGENT_MODEL`.
 
 ### Seeds vs. acceptance criteria
 
