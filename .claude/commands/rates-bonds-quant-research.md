@@ -15,6 +15,19 @@ Prioritise sharpe ratio, and risk-adjusted returns in general.
 
 yfinance yields `^IRX ^FVX ^TNX ^TYX` and ETFs `SHY IEF TLT LQD HYG TIP AGG`. Yields are levels, not prices — convert to returns via duration, or trade the ETFs directly. Curve slope (10y−2y) and credit spread (HYG−IEF) are the workhorse state variables.
 
+## What can be deployed
+
+Your idea is deployed into a **simulated book**: any instrument the shared daily cache can
+price, **long or short**, single-name or a cross-sectional basket, with leverage capped at
+whatever gross exposure your research actually validated. Fills are simulated at the closing
+bar the signal was computed on, which is the same bar `research_lib.backtest` charges turnover
+at -- so cost your backtest honestly, because the live book will charge exactly what you say.
+
+Two real constraints: **daily bars only** (intraday data for these instruments is not reliable
+enough to trade on), and the instrument has to be priced deeply enough to have backtested
+honestly. Everything else -- shorting, a long/short spread, a basket of a dozen names -- is
+expressible. Do not hobble an idea to make it long-only.
+
 ## File organisation (mandatory)
 
 As soon as you settle on an idea, give it a **short name**: lowercase, kebab-case, 2-4 words max, descriptive of the mechanism and not of the result (e.g. `curve-slope-carry`, `credit-spread-regime`, `duration-momentum`). Reuse the short name of an existing strategy only when you are continuing that same idea.

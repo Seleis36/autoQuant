@@ -214,3 +214,48 @@ def test_start_reports_only_this_run(stopped_dashboard):
     log.write_text("WARNING: cannot bind 1.2.3.4:8788: [Errno 98] stale and long fixed\n")
     out = dash(r, "start").stdout
     assert "stale and long fixed" not in out
+
+
+# ------------------------------------------------------- wontfix PRs are closed
+#
+# The agents are told to close a `wontfix` PR, and the supervisors enforce it too. The
+# helper is driven through a stand-in `gh` on PATH that records its arguments, so the
+# test proves which GitHub call would be made without ever making one.
+
+def _enforce(tmp_path, labels, state, gh_rc=0):
+    log = tmp_path / "gh.log"
+    fake = tmp_path / "bin" / "gh"
+    fake.parent.mkdir(exist_ok=True)
+    fake.write_text(f'#!/usr/bin/env bash\necho "$*" >> {log}\nexit {gh_rc}\n')
+    fake.chmod(0o755)
+    script = (f'source {os.path.join(HARNESS, "gh_lib.sh")}; '
+              f'enforce_wontfix_closed 42 "{labels}" "{state}"; echo "rc=$?"')
+    p = subprocess.run(["bash", "-c", script], capture_output=True, text=True,
+                       env={**os.environ, "PATH": f"{fake.parent}:{os.environ['PATH']}"})
+    calls = log.read_text().splitlines() if log.exists() else []
+    return p.stdout.split(), calls
+
+
+def test_an_open_wontfix_pr_is_closed_through_rest(tmp_path):
+    out, calls = _enforce(tmp_path, "invalid,wontfix", "OPEN")
+    assert out == ["closed", "rc=0"]
+    assert len(calls) == 1
+    assert calls[0].startswith("api -X PATCH repos/") and "/pulls/42" in calls[0]
+    assert "state=closed" in calls[0]
+
+
+@pytest.mark.parametrize("labels,state", [
+    ("invalid,needs-revision", "OPEN"),      # fixable: stays open for the revision agent
+    ("deployed", "MERGED"),
+    ("invalid,wontfix", "CLOSED"),           # the agent already closed it
+    ("invalid,not-wontfix", "OPEN"),         # a substring is not the label
+])
+def test_nothing_else_is_touched(tmp_path, labels, state):
+    out, calls = _enforce(tmp_path, labels, state)
+    assert out == ["rc=0"]
+    assert calls == []
+
+
+def test_a_failed_close_is_reported_not_swallowed(tmp_path):
+    out, _ = _enforce(tmp_path, "invalid,wontfix", "OPEN", gh_rc=1)
+    assert out == ["close-failed", "rc=1"]

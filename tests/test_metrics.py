@@ -161,3 +161,73 @@ def test_schedule_tables_agree():
     import live_lib
     assert set(metrics.SCHEDULE_SECONDS) == set(metrics.BARS_PER_YEAR)
     assert metrics.SCHEDULE_SECONDS == live_lib._INTERVAL_SECONDS
+
+
+# ------------------------------------------------- annualisation and basket turnover
+#
+# A "1d" bar happens 365 times a year on a crypto venue and about 252 times on an
+# equity one, and a basket has no single delta_qty/price pair to derive turnover from.
+# Both were read off the schedule alone, which is right for exactly one of the books.
+
+def _row(ts, equity, **kw):
+    return {"ts": ts, "event": "rebalance", "equity": equity, "shadow": True, **kw}
+
+
+def test_annualisation_prefers_what_the_journal_recorded():
+    seg = [_row("2026-01-01T00:00:00+00:00", 100.0, bars_per_year=252.0),
+           _row("2026-01-02T00:00:00+00:00", 101.0, bars_per_year=252.0)]
+    assert metrics.bars_per_year(seg, "1d") == 252.0
+
+
+def test_annualisation_falls_back_to_the_schedule_for_older_journals():
+    seg = [_row("2026-01-01T00:00:00+00:00", 100.0)]
+    assert metrics.bars_per_year(seg, "1d") == 365.0
+    assert metrics.bars_per_year(seg, "1h") == 8_760
+
+
+def test_an_equity_sharpe_is_not_inflated_by_the_crypto_year(live_dir):
+    """Annualising 252 daily bars with 365 overstates the Sharpe by ~20% -- on the
+    live number the desk compares straight against the backtest."""
+    from datetime import datetime, timedelta, timezone
+    t0 = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    rows = [_row((t0 + timedelta(days=i)).isoformat(), 100.0 * (1.001 ** i),
+                 weight=1.0, bars_per_year=252.0) for i in range(40)]
+    write_strategy(live_dir, "sector-etf/x", journal_rows=rows)
+    equity_ann = metrics.compute("sector-etf/x", "1d")["sharpe"]
+
+    for r in rows:
+        del r["bars_per_year"]
+    write_strategy(live_dir, "spot-btc/y", journal_rows=rows)
+    crypto_ann = metrics.compute("spot-btc/y", "1d")["sharpe"]
+
+    assert equity_ann < crypto_ann
+    assert equity_ann / crypto_ann == pytest.approx((252 / 365) ** 0.5, rel=1e-6)
+
+
+def test_a_basket_reports_the_turnover_it_journalled(live_dir):
+    """Deriving it the single-instrument way reports exactly zero for every
+    cross-sectional strategy: there is no `delta_qty` and no `price` on the row."""
+    rows = [_row("2026-01-01T00:00:00+00:00", 100_000.0, weight=0.0, traded=True,
+                 turnover_usdt=50_000.0),
+            _row("2026-01-02T00:00:00+00:00", 100_100.0, weight=0.0, traded=True,
+                 turnover_usdt=25_000.0)]
+    write_strategy(live_dir, "sector-etf/z", journal_rows=rows)
+    assert metrics.compute("sector-etf/z", "1d")["turnover_usdt"] == 75_000.0
+
+
+def test_a_basket_gets_no_invented_benchmark(live_dir):
+    """With no instrument price on the row there is nothing to buy and hold, and a
+    made-up benchmark line is worse than none."""
+    rows = [_row(f"2026-01-{i + 1:02d}T00:00:00+00:00", 100_000.0 + i, weight=0.0,
+                 turnover_usdt=1.0) for i in range(5)]
+    write_strategy(live_dir, "sector-etf/w", journal_rows=rows)
+    out = metrics.compute("sector-etf/w", "1d")
+    assert "benchmark" not in out
+    assert metrics.equity_series("sector-etf/w")["benchmark"] == []
+
+
+def test_single_instrument_turnover_is_unchanged(live_dir):
+    rows = [_row("2026-01-01T00:00:00+00:00", 1000.0, weight=1.0, traded=True,
+                 delta_qty=2.0, price=50.0)]
+    write_strategy(live_dir, "spot-btc/t", journal_rows=rows * 2)
+    assert metrics.compute("spot-btc/t", "1d")["turnover_usdt"] == 200.0

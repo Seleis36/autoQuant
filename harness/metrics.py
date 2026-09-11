@@ -83,6 +83,32 @@ def segment_truncated_by_mode_switch(rows: list) -> bool:
     return any(r.get("shadow", False) != rb[-1].get("shadow", False) for r in rb)
 
 
+def bars_per_year(seg: list, schedule: str) -> float:
+    """Annualisation factor, preferring what the journal itself recorded.
+
+    A "1d" bar happens 365 times a year on a crypto venue and about 252 times on an
+    equity one, and only the strategy that wrote the row knows which market it traded.
+    Reading it off the schedule alone overstated every equity Sharpe by ~20%.
+    """
+    for r in reversed(seg):
+        v = r.get("bars_per_year")
+        if v:
+            return float(v)
+    return BARS_PER_YEAR.get(schedule, 8_760)
+
+
+def _row_turnover(r: dict) -> float:
+    """Notional traded on one rebalance.
+
+    A basket journals `turnover_usdt` outright: it has many legs and so no single
+    `delta_qty`/`price` pair to multiply, and deriving it the single-instrument way
+    would report exactly zero turnover for every cross-sectional strategy.
+    """
+    if r.get("turnover_usdt") is not None:
+        return abs(float(r["turnover_usdt"]))
+    return abs(float(r.get("delta_qty") or 0)) * float(r.get("price") or 0)
+
+
 def _drawdown(equity: list) -> float:
     peak, mdd = equity[0], 0.0
     for v in equity:
@@ -109,7 +135,7 @@ def compute(name: str, schedule: str = "1h") -> dict:
     days = (t1 - t0).total_seconds() / 86400.0
     eq = [float(r["equity"]) for r in seg]
     px = [float(r["price"]) for r in seg if r.get("price")]
-    ann = BARS_PER_YEAR.get(schedule, 8_760)
+    ann = bars_per_year(seg, schedule)
 
     rets = [eq[i] / eq[i - 1] - 1.0 for i in range(1, len(eq)) if eq[i - 1] > 0]
     out.update({
@@ -124,8 +150,7 @@ def compute(name: str, schedule: str = "1h") -> dict:
         "errors": sum(1 for r in rows if r.get("event") == "error"),
     })
 
-    turnover_usdt = sum(abs(float(r.get("delta_qty") or 0)) * float(r.get("price") or 0)
-                        for r in seg if r.get("traded"))
+    turnover_usdt = sum(_row_turnover(r) for r in seg if r.get("traded"))
     out["turnover_usdt"] = turnover_usdt
     # Annualising a sub-day span produces theatre, not information.
     if eq[0] and days >= 1.0:

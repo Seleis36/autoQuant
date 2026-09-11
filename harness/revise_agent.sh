@@ -77,6 +77,10 @@ status="$(session_status "$UUID")"
 if [ "$terminal" -eq 0 ]; then
   add_label "$PR" "revision:$next"
   say "PR #$PR: revision round $next complete (state=$state labels=$labels)"
+  case "$(enforce_wontfix_closed "$PR" "$labels" "$state")" in
+    closed)       say "PR #$PR: wontfix -- closed" ;;
+    close-failed) say "PR #$PR: wontfix, but closing it failed -- close it by hand" ;;
+  esac
   echo "$PR revised-$next $TS" >> "$STATE/processed.log"
   exit 0
 fi

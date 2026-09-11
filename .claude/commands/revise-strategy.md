@@ -147,14 +147,16 @@ git commit -m "<short-name>: Failed under the <constraint> constraint — retiri
 git push origin HEAD:"$BR"
 cd /home/seleis/autoQuant && git worktree remove "$WT" --force
 
+gh pr comment $ARGUMENTS --body-file <a file you write outside the repo>   # comment FIRST
 gh api -X DELETE "repos/$SLUG/issues/$ARGUMENTS/labels/needs-revision"
 echo '{"labels":["wontfix"]}' | gh api -X POST "repos/$SLUG/issues/$ARGUMENTS/labels" --input -
-gh pr comment $ARGUMENTS --body-file <a file you write outside the repo>
 gh pr close $ARGUMENTS
 ```
 
 The comment states what the constraint did to the numbers and why the idea is not worth
-carrying further. Keep the branch and the report — the negative result is the deliverable.
+carrying further. It goes before the label because the harness closes any open PR carrying
+`wontfix` — if you were cut off between the two, the PR must not end up closed with no
+explanation on it. Keep the branch and the report — the negative result is the deliverable.
 
 ---
 

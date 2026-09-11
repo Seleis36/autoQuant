@@ -36,7 +36,7 @@ from urllib.parse import parse_qs, urlsplit
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import metrics  # noqa: E402
 from live_lib import (BASE_URL, LIVE_DIR, REPO_ROOT, PaperBroker,  # noqa: E402
-                      _read_allocations, load_env)
+                      allocations_summary, load_env)
 
 HARNESS_DIR = os.path.dirname(os.path.abspath(__file__))
 WEB_DIR = os.path.join(HARNESS_DIR, "web")
@@ -216,6 +216,13 @@ def build_strategies() -> list:
             "last_run_age_s": last_run_age,
             "uptime_s": (time.time() - started) if started else None,
             "shadow": state.get("shadow", ledger.get("shadow")),
+            # `mode` separates a book that is simulated BY DESIGN from one that wanted
+            # the venue and could not reach it. Both have shadow=True, and only the
+            # second is a fault, so a UI reading `shadow` alone either cries wolf over
+            # every sim strategy or stays silent when a venue strategy degrades.
+            "mode": state.get("mode", ledger.get("mode")),
+            "book": meta.get("book", "venue"),
+            "symbols": meta.get("symbols"),
             "live": metrics.compute(name, sched),
         })
     return out
@@ -245,11 +252,11 @@ def refresh_account():
             "usdt_free": bals.get("USDT", {}).get("free", 0.0),
             "btc_total": bals.get("BTC", {}).get("free", 0.0) + bals.get("BTC", {}).get("locked", 0.0),
             "btc_price": px,
-            "allocations": _read_allocations(),
+            "books": allocations_summary(),
         })
     except Exception as e:  # noqa: BLE001
         CACHE.set("account", {"venue": BASE_URL, "ok": False, "error": str(e),
-                              "allocations": _read_allocations()})
+                              "books": allocations_summary()})
 
 
 def refresh_usage():
@@ -410,11 +417,10 @@ def refresher_loop(stop: threading.Event):
 FLATTEN_SRC = """
 import json, os, sys
 sys.path.insert(0, 'harness')
-from live_lib import PaperBroker
+from live_lib import broker_from_meta
 d = os.path.join('live', sys.argv[1])
 m = json.load(open(os.path.join(d, 'meta.json')))
-b = PaperBroker(m['symbol'], capital_usdt=m.get('capital_usdt', 2500),
-                state_file=os.path.join(d, 'ledger.json'))
+b = broker_from_meta(m, state_file=os.path.join(d, 'ledger.json'))
 b.preflight()
 print(json.dumps(b.flatten(), default=str))
 """

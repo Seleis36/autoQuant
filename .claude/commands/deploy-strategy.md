@@ -37,9 +37,33 @@ Deployments live in `live/<asset-class>/<short-name>/`, one `runner.py` per stra
 The execution runtime is `harness/live_lib.py`. `live/spot-btc/bult/runner.py` is the
 reference deployment — read it before writing your own.
 
-## The venue — read this before anything else
+## The two books — read this before anything else
 
-Everything trades on the **Binance spot testnet** (`https://testnet.binance.vision`).
+A strategy is deployed into one of **two books**, and picking the right one is the first
+judgement you make. Almost every rejection this brief used to produce was really "wrong book".
+
+| | `venue` | `sim` |
+|---|---|---|
+| What it is | Binance spot testnet, real orders | A self-contained simulated book |
+| Instruments | Liquid crypto pairs only | Anything the daily cache prices: equities, ETFs, FX, rates, commodities, crypto |
+| Direction | Long/flat only, `weight` in **[0, 1]** | Long **and short**, `weight` in [-1, 1] |
+| Leverage | None | Up to `max_gross`, capped and enforced |
+| Sizing | Exchange lot steps and a 5 USDT minimum | Fractional |
+| Capital | One shared $10k pool — **capped** | Uncapped |
+| Broker | `PaperBroker` | `SimBroker`, or `SimPortfolioBroker` for a basket |
+| Evidence it produces | Fills against a real order book | Fills against the closing price |
+
+**Choose `venue` when the strategy is long/flat spot crypto**, so it earns the stronger
+evidence of real fills. **Choose `sim` for everything else** — and "everything else" is most
+of what this desk researches: the ETF, FX, rates, commodity, equity and volatility classes,
+anything cross-sectional, and anything with a short leg.
+
+`sim` is not a consolation prize, but it is weaker evidence and you must say so in the PR
+comment. There is no order book, no rejection, no partial fill and no queue position. Never
+present a `sim` track as if it had cleared a real exchange.
+
+### The venue book
+
 Credentials are `BINANCE_SPOT_API_KEY_PAPER` / `BINANCE_SPOT_SECRET_KEY_PAPER` in `.env`.
 Confirm what those keys actually are before you trust them:
 
@@ -53,30 +77,13 @@ permission checkboxes set when creating it ("Enable Spot & Margin Trading") appl
 the site that issued it. If the diagnostic shows no key recognised on spot testnet, say so in
 your report; strategies still run, in shadow mode.
 
-Consequences for your review:
-
-* **Spot, long/flat, unlevered.** `weight` is the fraction of **this strategy's own capital**
-  held in the base asset, in **[0, 1]**. There is no margin and no shorting. A strategy that
-  requires a short leg, a net-negative weight, or leverage above 1× is a blocker.
-* **One account, many strategies.** Every deployment gets its own ledger seeded with an
-  allocated `capital_usdt`, so strategies never fight over the shared testnet balance and the
-  faucet endowment sitting in the account never inflates position sizing. Reserve capital
-  before you deploy — if the pool is oversubscribed this raises, and that is a blocker to
-  report, not something to force:
-
-  ```bash
-  .venv/bin/python -c "import sys; sys.path.insert(0,'harness'); \
-    from live_lib import allocate; print(allocate('<asset-class>/<short-name>', 2500.0))"
-  ```
-
-  Set the same number as `CAPITAL_USDT` in the runner and pass it to `PaperBroker`.
-* **Liquid crypto pairs only.** No ETFs, bonds, commodity futures or volatility products. The
-  venue does list a few tokenized-stock pairs (`AAPLBUSDT`, `SPYBUSDT`) — these are dead
-  listings Binance removed from production years ago, trading a handful of times a day. They
-  are **not** the equity and must never be used as a proxy. `check_symbols.py` flags them.
+* **Spot, long/flat, unlevered.** There is no margin and no shorting here. A strategy needing
+  a short leg, a net-negative weight, or leverage above 1× does not belong in this book —
+  route it to `sim` rather than rejecting it.
+* **Liquid crypto pairs only.** The venue lists a few tokenized-stock pairs (`AAPLBUSDT`,
+  `SPYBUSDT`) — dead listings Binance removed from production years ago, trading a handful of
+  times a day. They are **not** the equity and must never be used as a proxy.
 * Some equity/ETF tickers collide with unrelated crypto tokens. Never substitute a namesake.
-* Non-traded **signal inputs** are unconstrained. A BTC strategy reading HYG, LQD, DXY and
-  ^GSPC is fine: those come from yfinance via `MarketData.daily()` and never touch the venue.
 * **Costs.** The runner sends market orders and pays the taker fee (~10 bp/side). If the
   research assumed maker fees or a few bp, note the gap and what the report's own cost
   sensitivity says it does to Sharpe. Mention it — do not block on it.
@@ -84,10 +91,45 @@ Consequences for your review:
   real Binance data (`MarketData(source="public")`); only orders and balances use the venue.
   Never build a signal on `source="testnet"`.
 
-Check tradability with the traded instruments only:
+### The sim book
+
+Priced from the same shared `data/` cache the backtests read, and filled at the same closing
+bar the signal was computed on — so a simulated fill matches what `research_lib.backtest`
+charged turnover at more closely than a live crypto market order matches its own backtest.
+
+* **Any instrument the vendor prices daily**, deeply enough to have backtested honestly.
+* **Shorting** with `allow_short=True`; **leverage** capped by `max_gross`, which scales an
+  over-exposed book down proportionally rather than clipping one leg.
+* **Baskets** via `SimPortfolioBroker` — `compute_weights(now)` returns `{symbol: weight}`.
+* **Daily bars.** Intraday non-crypto data is not reliable enough here; a sub-daily non-crypto
+  schedule is a blocker.
+* **Session markets need no calendar.** The runner acts when the printed bar changes, so
+  weekends, holidays, half-days and a late vendor are all handled by doing nothing.
+
+### Reserving capital
+
+Every deployment gets its own ledger seeded with an allocated `capital_usdt`, so strategies
+never fight over a shared balance. Reserve it before you deploy, naming the book:
 
 ```bash
-.venv/bin/python harness/check_symbols.py BTC-USD          # exits non-zero on a blocker
+.venv/bin/python -c "import sys; sys.path.insert(0,'harness'); \
+  from live_lib import allocate; print(allocate('<asset-class>/<short-name>', 2500.0, book='sim'))"
+```
+
+`venue` is capped and can genuinely run out — if it raises, that is a real constraint, and
+the fix is usually to deploy to `sim` instead, not to force it. `sim` is uncapped: it refuses
+nothing, because two simulated books share nothing.
+
+Set the same number as `CAPITAL_USDT` in the runner and pass it to the broker.
+
+### Checking tradability
+
+Non-traded **signal inputs** are unconstrained in both books. A BTC strategy reading HYG, LQD,
+DXY and ^GSPC is fine — those never reach a broker. Pass only what the strategy TRADES:
+
+```bash
+.venv/bin/python harness/check_symbols.py --book venue BTC-USD    # exits non-zero on a blocker
+.venv/bin/python harness/check_symbols.py --book sim   XLK XLE TLT
 ```
 
 ---
@@ -160,23 +202,29 @@ not reproducing the science. For each strategy the PR proposes, establish:
 **Blockers** (→ Phase 4, flag invalid):
 
 * No strategy in the PR is marked Working / has a deployable spec.
-* The traded instruments are unavailable on the paper venue (non-crypto, or a vestigial
-  tokenized-stock listing), or the strategy needs an instrument type it does not offer
-  (options, futures, a specific ETF's NAV).
-* The strategy needs to go short, run a net-negative weight, or use leverage above 1×.
-  The spot testnet has no margin.
+* Neither book can trade the instrument: `check_symbols.py --book sim` cannot price it, or
+  prices it too thinly or too stalely to have been backtested honestly. **Not on Binance is
+  not a blocker** — that is what the `sim` book is for.
+* It needs an instrument type neither book has: options, a specific ETF's NAV, anything
+  requiring an intraday non-crypto series.
 * The spec is incomplete or ambiguous on a parameter you cannot recover from the code.
 * Referenced material is missing from the PR (a spec that names a script that is not there,
   a report link that does not resolve, `strategy.py` importing a module the PR never adds).
 * The research is internally inconsistent, or shows a genuine lookahead/overfit defect.
 * The signal needs data we cannot obtain live (a paid feed, an exchange endpoint we lack, a
   series that only exists in a local research file with no live source).
-* The strategy cannot meet the venue's minimum notional (5 USDT) at a sane account size, or
-  demands a rebalance faster than 1 minute.
+* A `venue` strategy cannot meet the exchange minimum notional (5 USDT) at a sane account
+  size — the `sim` book has no such minimum, so consider routing before blocking.
+* It demands a rebalance faster than 1 minute.
 
 **Not blockers** — proceed:
 
-* A long/flat spot idea — that is exactly what the venue does.
+* A long/flat spot crypto idea — that is exactly what the `venue` book does.
+* **A short leg, a net-negative weight, or leverage above 1×.** These used to be automatic
+  rejections. They are now a routing decision: the `sim` book expresses all three. Cap gross
+  at what the research validated and say what you set.
+* **A non-crypto instrument** — equities, ETFs, FX, rates, commodities, vol. Route to `sim`.
+* **A cross-sectional basket.** Use `SimPortfolioBroker` and `compute_weights`.
 * A backtest costed at maker fees while we pay taker; note the gap.
 * Some ideas in the PR failed, as long as at least one works.
 * Modest wording or formatting problems in the report.
@@ -196,41 +244,49 @@ rediscovering that the venue cannot do it.
 
 **`needs-revision`** — the alpha may well be sound; what it needs is research work:
 
-* leverage above 1×, a cap that could be re-set and re-validated at 1.0
+* leverage the research never validated at the cap you would have to set
 * a spec that is ambiguous or disagrees with `strategy.py`
 * a missing file, an unresolved reference, an absent parameter
 * in-sample-only results, an OOS window too short to mean anything, uncosted returns
 * numbers that contradict the report's own tables
 
-**`wontfix`** — no amount of research makes this deployable *here*:
+**`wontfix`** — no amount of research makes this deployable *here*. The PR is closed:
 
-* the traded instrument does not exist on a crypto spot venue (equities, ETFs, FX, rates,
-  commodities, vol products) or is a vestigial tokenized-stock listing
-* the strategy is short by construction, or needs a net-negative weight
-* it needs an instrument type the venue does not offer at all — options, futures, a NAV
+* **neither** book can price the traded instrument, or it prices only thinly or stalely
+* it needs an instrument type neither book offers — options, a NAV, an intraday non-crypto bar
 * the signal needs data we cannot obtain live: a paid feed, an endpoint we lack, a series
   that exists only in a local research file
-* a rebalance faster than 1 minute, or a minimum notional it cannot meet at a sane size
+* a rebalance faster than 1 minute
+
+**"Not tradable on Binance" is no longer a `wontfix`.** It was the single most common verdict
+this brief produced, and it retired good research for being about the wrong asset class. Check
+the `sim` book before you reach for this label.
 
 The distinguishing question is simple: **could a researcher fix this with a keyboard and a
-backtest, without changing what venue we trade on?** If yes it is `needs-revision`. A genuine
-lookahead defect is `needs-revision` — the research is wrong, but the idea might survive being
-done correctly.
+backtest, in either book?** If yes it is `needs-revision`. A genuine lookahead defect is
+`needs-revision` — the research is wrong, but the idea might survive being done correctly.
+
+In this order — comment, then label, then close a `wontfix`:
 
 ```bash
 gh label create invalid --color E4E669 --description "Cannot be deployed as submitted" 2>/dev/null
 gh label create needs-revision --color D93F0B --description "Fixable blocker -- back to research" 2>/dev/null
 gh label create wontfix --color FFFFFF --description "Structurally undeployable here" 2>/dev/null
-# invalid ALWAYS, plus exactly one of needs-revision / wontfix:
+gh pr comment $ARGUMENTS --body-file <a file you write>          # 1. the explanation
+# 2. invalid ALWAYS, plus exactly one of needs-revision / wontfix:
 echo '{"labels":["invalid","needs-revision"]}' | gh api -X POST "repos/$SLUG/issues/$ARGUMENTS/labels" --input -
-gh pr comment $ARGUMENTS --body-file <a file you write>
-gh pr view $ARGUMENTS --json labels --jq '[.labels[].name]'    # confirm it stuck
+gh pr close $ARGUMENTS                                           # 3. wontfix ONLY
+gh pr view $ARGUMENTS --json labels,state --jq '{labels: [.labels[].name], state}'   # confirm
 ```
+
+The comment goes first because the label is what the harness acts on: once `needs-revision`
+lands the revision agent may pick the PR up, and once `wontfix` lands the harness closes it.
+Either way the explanation must already be on the PR by then.
 
 **Label through the REST API, never `gh pr edit`.** The `gh` on this machine is old enough that
 `gh pr edit` resolves the PR with a GraphQL query asking for `projectCards`, which GitHub now
 refuses outright: every `gh pr edit` fails with *"Projects (classic) is being deprecated"*.
-`gh pr view`, `gh pr comment`, `gh pr diff` and `gh api` are all fine. The label is the PR's
+`gh pr view`, `gh pr comment`, `gh pr diff`, `gh pr close` and `gh api` are all fine. The label is the PR's
 terminal state — if it does not stick, the poller hands this PR back every 30 minutes forever,
 so verify it and say so in your final report if it failed.
 
@@ -240,9 +296,12 @@ to change for the PR to pass. Be concrete and brief — a revision agent will wo
 comment as its brief, so the blocker list needs to be actionable on its own, without re-deriving
 your reasoning.
 
-**Do not merge. Do not close the PR.** A `needs-revision` PR goes to the revision agent; a
-`wontfix` PR stays open for a human to close, since a structural verdict is the one most worth
-a second pair of eyes. Then remove the worktree and stop.
+**Do not merge.** A `needs-revision` PR stays open — it goes to the revision agent. A `wontfix`
+PR is **closed**: the verdict is structural, nothing in the loop will ever pick it up again, and
+an open PR reads as work still in flight. Closing is not deleting — the branch, the report and
+your comment all remain, and a human who disagrees can reopen it and clear the label. If you
+forget, or are cut off before step 3, the harness closes it for you; do it anyway. Then remove
+the worktree and stop.
 
 ## Phase 5 — If deployable: reserve capital, then write the runner
 
@@ -252,14 +311,15 @@ around:
 
 ```bash
 .venv/bin/python -c "import sys; sys.path.insert(0,'harness'); \
-  from live_lib import allocate; print(allocate('<asset-class>/<short-name>', 2500.0))"
+  from live_lib import allocate; print(allocate('<asset-class>/<short-name>', 2500.0, book='sim'))"
 ```
 
 Run it from `/home/seleis/autoQuant`, not the worktree: `harness/state/allocations.json` is
-shared, untracked live state and there is only one of it. 2500 USDT is the default ticket; ask
-for less if the pool is tight. If `allocate` raises `ValueError`, the pool is oversubscribed —
-go to Phase 4 and flag the PR invalid with the shortfall quoted. Whatever number it accepts
-becomes `CAPITAL_USDT` in the runner, the `capital_usdt` argument to `PaperBroker`, and the
+shared, untracked live state and there is only one of it. 2500 USDT is the default ticket. The
+`sim` book never refuses. If a `venue` allocation raises `ValueError` the shared pool really is
+oversubscribed — prefer re-routing to `sim` over shrinking the ticket, and only flag the PR
+invalid if the strategy genuinely needs real fills. Whatever number it accepts becomes
+`CAPITAL_USDT` in the runner, the `capital_usdt` argument to the broker, and the
 `capital_usdt` field in `meta.json`; all three must agree.
 
 Then create `live/<asset-class>/<short-name>/runner.py` in the worktree. It must:
@@ -272,25 +332,50 @@ Then create `live/<asset-class>/<short-name>/runner.py` in the worktree. It must
   lag the research applies — if the backtest shifts a daily input by one day plus one hour,
   the runner does too. Getting this wrong is the single most likely way to ship a broken
   deployment.
-* Return a single float weight from `compute_weight(now)`, in the same units the backtest used
-  (fraction of equity; 1.0 = fully long, 0.0 = flat). Negative weights are not executable.
-* End with `StrategyRunner(...).cli()`.
+* Return a weight from `compute_weight(now)` in the same units the backtest used — a fraction
+  of equity, 1.0 fully long, 0.0 flat. A `venue` runner must stay in [0, 1]; a `sim` runner
+  may go negative when it was deployed with `allow_short=True`.
+* End with `StrategyRunner(...).cli()` — or, for a basket, `PortfolioRunner(...).cli()` with
+  `compute_weights(now)` returning `{symbol: weight}`.
+
+Pick the broker to match the book:
+
+```python
+from live_lib import PaperBroker      # venue: crypto, long/flat, real orders
+from live_lib import SimBroker        # sim: one instrument, optional shorting
+from portfolio import SimPortfolioBroker, PortfolioRunner   # sim: a basket
+
+PaperBroker(SYMBOL, capital_usdt=CAPITAL_USDT, max_weight=1.0)
+SimBroker(SYMBOL, capital_usdt=CAPITAL_USDT, allow_short=True, fee_bps=10.0)
+SimPortfolioBroker(SYMBOLS, capital_usdt=CAPITAL_USDT, max_gross=1.0, allow_short=True)
+```
+
+Set `fee_bps` and `slippage_bps` to what the research actually costed, not to the default.
+A simulated book charges exactly what you tell it to, so this is the one number that decides
+whether the live track is comparable to the backtest at all.
 
 Also write `live/<asset-class>/<short-name>/meta.json` beside it. The dashboard reads this —
 without it the strategy shows up unlabelled and with no backtest column to compare against.
 Copy the shape from `live/spot-btc/bult/meta.json` and fill in **from the PR**, never from
 memory: `title`, `description` (one or two sentences on the mechanism), `symbol`, `schedule`,
-`capital_usdt`, `direction`, `deployed_at`, `provenance` (`pr`, `branch`, `commit`, and repo
+`capital_usdt`, `direction`, `deployed_at`, `book` (`"venue"` or `"sim"`), `provenance` (`pr`, `branch`, `commit`, and repo
 paths to `spec` / `report` / `strategy_code`), `backtest` (sharpe, sharpe_oos, sharpe_ci,
 cagr_pct, vol_pct, maxdd_pct, avg_exposure, round_trips_per_year, cost_bps_per_side,
 cost_type, and a `benchmark` block), and `live_notes` for anything an operator would need to
 know — cost gaps, health checks the spec calls for, known caveats. Leave a field `null` if
 the PR does not state it; do not invent numbers.
 
-`harness/live_lib.py` gives you `MarketData` (`.klines`, `.history`, `.daily`), `PaperBroker`
-(`.preflight`, `.set_target_weight`, `.equity`, `.position`) and `StrategyRunner`
-(`.cli`, `.check`, `.run`). Read it. Do not write your own Binance client, and do not
-change `BASE_URL`.
+For a `sim` deployment also record what reconstructs the broker, because the dashboard's
+flatten button rebuilds it from this file alone via `live_lib.broker_from_meta`: `book`,
+`quotes` (normally `"yahoo-daily"`), `allow_short`, and either `symbol` or — for a basket —
+`symbols` plus `max_gross`. Get these wrong and flatten will operate on a different book than
+the daemon is running.
+
+`harness/live_lib.py` gives you `MarketData` (`.klines`, `.history`, `.daily`), the brokers
+above (`.preflight`, `.set_target_weight(s)`, `.equity`, `.position`) and `StrategyRunner`
+(`.cli`, `.check`, `.run`); `harness/portfolio.py` gives you the basket equivalents. Read
+them. Do not write your own Binance client, do not fetch prices yourself, and do not change
+`BASE_URL`.
 
 ## Phase 6 — Validate before you deploy
 

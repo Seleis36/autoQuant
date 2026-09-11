@@ -25,6 +25,23 @@ pr_labels() {    # pr_labels <pr> -> comma-joined
 has_label() {    # has_label <pr> <label>
   [[ ",$(pr_labels "$1")," == *",$2,"* ]]
 }
+close_pr() {     # close_pr <pr>
+  gh api -X PATCH "repos/$GH_SLUG/pulls/$1" -f state=closed >/dev/null 2>&1
+}
+# enforce_wontfix_closed <pr> <comma-joined labels> <state>
+#   prints nothing (not applicable), `closed`, or `close-failed` (and returns 1)
+#
+# A `wontfix` PR is closed: the verdict is structural, nothing in the loop will ever pick
+# it up again, and an open PR reads as work still in flight. Both agent briefs say so, but
+# an invariant this cheap belongs to the harness rather than to an agent's memory -- and
+# an agent cut off between applying the label and closing the PR would otherwise leave it
+# open forever. The briefs comment BEFORE labelling, so a PR carrying `wontfix` already
+# has its explanation on it and closing here is never a silent close.
+enforce_wontfix_closed() {
+  [[ ",$2," == *",wontfix,"* ]] || return 0
+  [ "$3" = "OPEN" ] || return 0
+  if close_pr "$1"; then echo closed; else echo close-failed; return 1; fi
+}
 ensure_labels() {
   gh label create "harness:processing" --color FBCA04 --description "Agent is working on this PR"      >/dev/null 2>&1
   gh label create "harness:paused"     --color C5DEF5 --description "Agent cut off by a usage limit"   >/dev/null 2>&1

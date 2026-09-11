@@ -15,6 +15,19 @@ Prioritise sharpe ratio, and risk-adjusted returns in general.
 
 yfinance: `EURUSD=X GBPUSD=X USDJPY=X AUDUSD=X USDCAD=X USDCHF=X NZDUSD=X`, dollar index `DX-Y.NYB`. Rate differentials from `^TNX`/`^IRX` and foreign equivalents drive carry. FX has near-zero drift — the benchmark to beat is cash, not buy-and-hold.
 
+## What can be deployed
+
+Your idea is deployed into a **simulated book**: any instrument the shared daily cache can
+price, **long or short**, single-name or a cross-sectional basket, with leverage capped at
+whatever gross exposure your research actually validated. Fills are simulated at the closing
+bar the signal was computed on, which is the same bar `research_lib.backtest` charges turnover
+at -- so cost your backtest honestly, because the live book will charge exactly what you say.
+
+Two real constraints: **daily bars only** (intraday data for these instruments is not reliable
+enough to trade on), and the instrument has to be priced deeply enough to have backtested
+honestly. Everything else -- shorting, a long/short spread, a basket of a dozen names -- is
+expressible. Do not hobble an idea to make it long-only.
+
 ## File organisation (mandatory)
 
 As soon as you settle on an idea, give it a **short name**: lowercase, kebab-case, 2-4 words max, descriptive of the mechanism and not of the result (e.g. `carry-vol-filter`, `dollar-smile-regime`, `cross-momentum-spread`). Reuse the short name of an existing strategy only when you are continuing that same idea.

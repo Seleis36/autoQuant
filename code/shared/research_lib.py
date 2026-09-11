@@ -13,12 +13,45 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 DATA_DIR = os.path.join(_ROOT, "data")
 ANN = 365.0  # crypto trades every day
 
+#: Earliest bar the shared `data/` cache is filled back to. Must stay equal to
+#: `live_lib.DAILY_CACHE_START`: research and the live runners read and write the same
+#: files, so while the two disagreed, whichever reached a ticker first decided how far
+#: back the other could see it.
+DAILY_CACHE_START = "2010-01-01"
+
 # ---------------------------------------------------------------- data
+
+def daily_cache_path(ticker):
+    """The one true filename for a daily series, shared with `harness/live_lib.py`.
+
+    Kept byte-identical to `live_lib.daily_cache_path` on purpose: the two modules
+    read and write the same `data/` directory, and when their naming rules disagreed
+    `^GSPC` ended up cached twice, as two independently-refreshed partial copies.
+    """
+    stem = ticker.replace("-", "_").replace("^", "IDX_")
+    return os.path.join(DATA_DIR, f"{stem}_d.parquet")
+
+
+def _atomic_parquet(df, path):
+    """Write a cache file a concurrent reader can never catch half-written.
+
+    Research agents run concurrently and `data/` is shared with the live runners, so
+    two processes refreshing one ticker do overlap. The pid in the temp name keeps
+    those writers from clobbering each other's partial file.
+    """
+    tmp = f"{path}.{os.getpid()}.tmp"
+    try:
+        df.to_parquet(tmp)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
 
 def load_btc(start="2014-01-01", end=None, cache=True, ticker="BTC-USD"):
     """Daily OHLCV for BTC-USD from yfinance, with a local parquet cache."""
     os.makedirs(DATA_DIR, exist_ok=True)
-    path = os.path.join(DATA_DIR, f"{ticker.replace('-', '_')}_d.parquet")
+    path = daily_cache_path(ticker)
     if cache and os.path.exists(path):
         df = pd.read_parquet(path)
     else:
@@ -26,16 +59,16 @@ def load_btc(start="2014-01-01", end=None, cache=True, ticker="BTC-USD"):
         df = yf.download(ticker, start=start, end=end, auto_adjust=True,
                          progress=False, multi_level_index=False)
         df = df.dropna()
-        df.to_parquet(path)
+        _atomic_parquet(df, path)
     df.index = pd.to_datetime(df.index).tz_localize(None)
     df = df[~df.index.duplicated(keep="last")].sort_index()
     return df
 
 
-def load_series(ticker, start="2010-01-01", end=None, cache=True):
+def load_series(ticker, start=DAILY_CACHE_START, end=None, cache=True):
     """Daily close for any yfinance ticker (for macro overlays)."""
     os.makedirs(DATA_DIR, exist_ok=True)
-    path = os.path.join(DATA_DIR, f"{ticker.replace('-', '_').replace('^','IDX_')}_d.parquet")
+    path = daily_cache_path(ticker)
     if cache and os.path.exists(path):
         df = pd.read_parquet(path)
     else:
@@ -43,7 +76,7 @@ def load_series(ticker, start="2010-01-01", end=None, cache=True):
         df = yf.download(ticker, start=start, end=end, auto_adjust=True,
                          progress=False, multi_level_index=False)
         df = df.dropna()
-        df.to_parquet(path)
+        _atomic_parquet(df, path)
     df.index = pd.to_datetime(df.index).tz_localize(None)
     return df[~df.index.duplicated(keep="last")].sort_index()
 

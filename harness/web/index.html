@@ -42,6 +42,7 @@ h2{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim)
 .b-stale{background:rgba(210,153,34,.18);color:var(--warn)}
 .b-stop{background:var(--panel2);color:var(--dim)}
 .b-shadow{background:rgba(163,113,247,.15);color:var(--shadow)}
+    .b-sim{background:rgba(88,166,255,.15);color:var(--accent)}
 .b-paper{background:rgba(88,166,255,.13);color:var(--accent)}
 table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 th,td{text-align:right;padding:3px 0;font-size:12px}
@@ -207,8 +208,13 @@ function sparkline(series, bench){
 function card(s){
   const m = s.meta||{}, bt = m.backtest||{}, lv = s.live||{}, st = s.state||{};
   const badge = {RUNNING:'b-run',DEAD:'b-dead',STALE:'b-stale',STOPPED:'b-stop'}[s.status]||'b-stop';
-  const mode = s.shadow ? '<span class="badge b-shadow">shadow</span>'
-                        : '<span class="badge b-paper">live paper</span>';
+  // Three states, not two. `sim` is a self-contained simulated book and is working
+  // as designed; `shadow` is a venue book that could NOT reach the venue and is a
+  // fault. Both carry shadow=true, so labelling off that alone would either flag every
+  // sim strategy as broken or hide a real degradation.
+  const mode = s.mode === 'sim' ? '<span class="badge b-sim">simulated</span>'
+             : s.shadow         ? '<span class="badge b-shadow">shadow</span>'
+                                : '<span class="badge b-paper">live paper</span>';
   const prov = m.provenance||{};
   const gh = (STATE.git&&STATE.git.url)||'';
   const links = [
@@ -283,8 +289,14 @@ function renderPRs(){
 
 function renderHealth(){
   const a = STATE.account||{}, corr = STATE.correlation||{}, data = STATE.data||[];
-  const alloc = a.allocations||{};
-  const committed = Object.values(alloc.strategies||{}).reduce((s,v)=>s+(v.capital_usdt||0),0);
+  const books = a.books||{};
+  const bookRows = Object.entries(books).map(([name,b])=>{
+    const cap = b.unlimited ? 'uncapped'
+              : `$${fmt(b.committed_usdt,0)} of $${fmt(b.pool_usdt,0)}`;
+    return `<tr><td>Book <span class="mono">${esc(name)}</span></td>
+      <td colspan="2" style="text-align:right">${cap}
+      <span class="dim">· ${b.strategies} strategy(ies)</span></td></tr>`;
+  }).join('');
   const stale = data.filter(d=>d.age_h>36).slice(0,4);
   const corrRows = Object.entries(corr).map(([k,v])=>
     `<tr><td>${esc(k.replace('|',' ↔ '))}</td><td>${fmt(v.corr,2)}</td><td class="dim">n=${v.n}</td></tr>`).join('');
@@ -292,9 +304,7 @@ function renderHealth(){
     <table><tbody>
       <tr><td>Venue</td><td colspan="2" style="text-align:right">
         ${a.ok?'<span class="up">reachable</span>':'<span class="down">'+esc(a.error||'unreachable')+'</span>'}</td></tr>
-      <tr><td>Capital pool</td><td colspan="2" style="text-align:right">
-        $${fmt(committed,0)} of $${fmt(alloc.pool_usdt,0)} committed
-        <span class="dim">· ${Object.keys(alloc.strategies||{}).length} strategy(ies)</span></td></tr>
+      ${bookRows}
       <tr><td>Account free</td><td colspan="2" style="text-align:right">
         ${fmt(a.usdt_free,2)} USDT · ${fmt(a.btc_total,5)} BTC</td></tr>
     </tbody></table>

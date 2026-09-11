@@ -81,6 +81,10 @@ status="$(session_status "$UUID")"
 
 if [ "$terminal" -eq 0 ]; then
   say "PR #$PR: terminal decision reached (state=$state labels=$labels)"
+  case "$(enforce_wontfix_closed "$PR" "$labels" "$state")" in
+    closed)       say "PR #$PR: wontfix -- closed" ;;
+    close-failed) say "PR #$PR: wontfix, but closing it failed -- close it by hand" ;;
+  esac
   rm -f "$ATTEMPT_FILE"
   echo "$PR $(echo "$labels" | tr ',' ' ' | grep -oE 'deployed|invalid' | head -1) $TS" >> "$STATE/processed.log"
   exit 0
