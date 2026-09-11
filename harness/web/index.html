@@ -42,6 +42,7 @@ h2{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim)
 .b-stale{background:rgba(210,153,34,.18);color:var(--warn)}
 .b-stop{background:var(--panel2);color:var(--dim)}
 .b-shadow{background:rgba(163,113,247,.15);color:var(--shadow)}
+    .b-sim{background:rgba(88,166,255,.15);color:var(--accent)}
 .b-paper{background:rgba(88,166,255,.13);color:var(--accent)}
 table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 th,td{text-align:right;padding:3px 0;font-size:12px}
@@ -115,6 +116,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
            uncapped (subscription). It opens a PR; the poller does the rest.</p>
         <div class="row">
           <select id="ac"></select>
+          <select id="model" title="Model the research agent runs on"></select>
           <input type="text" id="seed" placeholder="optional seed idea or paper">
           <button id="go-research">Launch</button>
         </div>
@@ -155,21 +157,38 @@ const dur = s => { if(s==null) return '—'; s=Math.floor(s);
   return d?`${d}d ${h}h`: h?`${h}h ${m}m`: `${m}m`; };
 const tok = n => n>=1e6 ? (n/1e6).toFixed(1)+'M' : n>=1e3 ? (n/1e3).toFixed(0)+'k' : String(n||0);
 
-let STATE = null, busy = false;
+let STATE = null;
+// In flight, keyed by action+target. A single global "busy" flag used to live here, and
+// because a restart holds the request open for the whole stop/start cycle (up to ~25s),
+// every other button was a no-op for that window: restarting two strategies a few seconds
+// apart silently ran only the first. Serialising per target, not globally, lets independent
+// strategies act at once while still refusing to double-fire on one of them.
+const INFLIGHT = new Set();
+const actKey = b => [b.action, b.strategy||'', b.pr||'', b.session||''].join(':');
 
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('on');
   clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('on'),4200); }
 
+function syncButtons(){
+  document.querySelectorAll('button[data-act]').forEach(b=>{
+    const card = b.closest('.card');
+    b.disabled = INFLIGHT.has(actKey({action:b.dataset.act, strategy:card?card.dataset.name:''}));
+  });
+}
+
 async function act(body, label){
-  if(busy) return; busy=true;
+  const key = actKey(body);
+  if(INFLIGHT.has(key)){ toast((label||body.action)+' is already running…'); return; }
+  INFLIGHT.add(key); syncButtons();
   toast((label||body.action)+'…');
   try{
     const r = await fetch('/api/action',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify(body)});
     const j = await r.json();
-    toast((j.ok?'✓ ':'✗ ')+(j.output||j.error||'done').slice(0,400));
+    toast((j.ok?'✓ ':'✗ ')+String(j.output||j.error||'done').slice(0,400));
   }catch(e){ toast('✗ '+e); }
-  busy=false; refresh();
+  finally{ INFLIGHT.delete(key); }
+  refresh();
 }
 
 function sparkline(series, bench){
@@ -190,8 +209,13 @@ function sparkline(series, bench){
 function card(s){
   const m = s.meta||{}, bt = m.backtest||{}, lv = s.live||{}, st = s.state||{};
   const badge = {RUNNING:'b-run',DEAD:'b-dead',STALE:'b-stale',STOPPED:'b-stop'}[s.status]||'b-stop';
-  const mode = s.shadow ? '<span class="badge b-shadow">shadow</span>'
-                        : '<span class="badge b-paper">live paper</span>';
+  // Three states, not two. `sim` is a self-contained simulated book and is working
+  // as designed; `shadow` is a venue book that could NOT reach the venue and is a
+  // fault. Both carry shadow=true, so labelling off that alone would either flag every
+  // sim strategy as broken or hide a real degradation.
+  const mode = s.mode === 'sim' ? '<span class="badge b-sim">simulated</span>'
+             : s.shadow         ? '<span class="badge b-shadow">shadow</span>'
+                                : '<span class="badge b-paper">live paper</span>';
   const prov = m.provenance||{};
   const gh = (STATE.git&&STATE.git.url)||'';
   const links = [
@@ -220,6 +244,8 @@ function card(s){
     ${s.stale?`<div class="note">Stale: last rebalance ${dur(s.last_run_age_s)} ago, longer than
        two ${esc(s.schedule)} bars. The process is up but not working.</div>`:''}
     ${sparkline(s._series&&s._series.equity, s._series&&s._series.benchmark)}
+    ${lv.mode_switched&&!(s._series&&s._series.equity&&s._series.equity.length>1)
+      ? `<div class="note">${esc(lv.reason||'the shadow/live book changed')}</div>` : ''}
     <div class="row dim" style="font-size:11px;justify-content:space-between;margin-bottom:8px">
       <span>strategy</span><span>— — buy &amp; hold</span></div>
     <table><thead><tr><th></th><th>live</th><th>backtest</th></tr></thead><tbody>
@@ -264,8 +290,14 @@ function renderPRs(){
 
 function renderHealth(){
   const a = STATE.account||{}, corr = STATE.correlation||{}, data = STATE.data||[];
-  const alloc = a.allocations||{};
-  const committed = Object.values(alloc.strategies||{}).reduce((s,v)=>s+(v.capital_usdt||0),0);
+  const books = a.books||{};
+  const bookRows = Object.entries(books).map(([name,b])=>{
+    const cap = b.unlimited ? 'uncapped'
+              : `$${fmt(b.committed_usdt,0)} of $${fmt(b.pool_usdt,0)}`;
+    return `<tr><td>Book <span class="mono">${esc(name)}</span></td>
+      <td colspan="2" style="text-align:right">${cap}
+      <span class="dim">· ${b.strategies} strategy(ies)</span></td></tr>`;
+  }).join('');
   const stale = data.filter(d=>d.age_h>36).slice(0,4);
   const corrRows = Object.entries(corr).map(([k,v])=>
     `<tr><td>${esc(k.replace('|',' ↔ '))}</td><td>${fmt(v.corr,2)}</td><td class="dim">n=${v.n}</td></tr>`).join('');
@@ -273,9 +305,7 @@ function renderHealth(){
     <table><tbody>
       <tr><td>Venue</td><td colspan="2" style="text-align:right">
         ${a.ok?'<span class="up">reachable</span>':'<span class="down">'+esc(a.error||'unreachable')+'</span>'}</td></tr>
-      <tr><td>Capital pool</td><td colspan="2" style="text-align:right">
-        $${fmt(committed,0)} of $${fmt(alloc.pool_usdt,0)} committed
-        <span class="dim">· ${Object.keys(alloc.strategies||{}).length} strategy(ies)</span></td></tr>
+      ${bookRows}
       <tr><td>Account free</td><td colspan="2" style="text-align:right">
         ${fmt(a.usdt_free,2)} USDT · ${fmt(a.btc_total,5)} BTC</td></tr>
     </tbody></table>
@@ -338,7 +368,14 @@ function renderSessions(){
     : '<span class="dim">no agent sessions yet</span>';
 }
 
+let refreshing = false;
 async function refresh(){
+  if(refreshing) return;          // a 10s tick landing on top of a post-action refresh
+  refreshing = true;
+  try{ await _refresh(); } finally { refreshing = false; }
+}
+
+async function _refresh(){
   try{
     const r = await fetch('/api/state'); STATE = await r.json();
   }catch(e){ return; }
@@ -349,8 +386,19 @@ async function refresh(){
   $('#strategies').innerHTML = (STATE.strategies||[]).map(card).join('')
     || '<div class="card dim">Nothing deployed yet. Merge a research PR and the deployment agent will put it here.</div>';
   renderHeader(); renderPRs(); renderHealth(); renderAgents(); renderSessions();
+  syncButtons();      // the cards were just rebuilt; re-disable anything still running
   const sel = $('#ac');
   if(!sel.options.length) sel.innerHTML = (STATE.asset_classes||[]).map(a=>`<option>${a}</option>`).join('');
+  // Built from the server's own allowlist, so the picker cannot offer a model the
+  // launcher would refuse. An option the installed CLI is too old for is shown disabled
+  // with the reason, rather than hidden as though the model did not exist.
+  const msel = $('#model');
+  if(msel && !msel.options.length && (STATE.research_models||[]).length){
+    msel.innerHTML = STATE.research_models.map(m=>
+      `<option value="${esc(m.key)}"${m.default&&!m.unavailable?' selected':''}`
+      + `${m.unavailable?' disabled':''} title="${esc(m.unavailable||m.note||m.id)}">`
+      + `${esc(m.label)}${m.unavailable?' (unavailable)':m.note?' ($)':''}</option>`).join('');
+  }
 }
 
 async function showModal(title, url, render){
@@ -369,6 +417,8 @@ document.addEventListener('click', e=>{
       '/api/log?strategy='+encodeURIComponent(name)+'&n=400', j=>`<pre>${esc(j.text||j.error)}</pre>`);
     if(a==='journal') return showModal(name+' — trades',
       '/api/journal?strategy='+encodeURIComponent(name), rows=>{
+        if(!Array.isArray(rows))
+          return `<div class="down">${esc((rows&&rows.error)||'unexpected response')}</div>`;
         const t = rows.filter(r=>r.traded).reverse().slice(0,80);
         if(!t.length) return '<div class="dim">no fills yet</div>';
         return `<table><thead><tr><th>time</th><th>side</th><th>qty</th><th>price</th>
@@ -395,6 +445,7 @@ $('#modal-close').onclick = ()=>$('#modal').close();
 $('#poller-toggle').onclick = ()=>act({action: STATE.poller.running?'poller_stop':'poller_start'});
 $('#poller-sweep').onclick  = ()=>act({action:'poller_sweep'}, 'sweeping (may take a while)');
 $('#go-research').onclick   = ()=>act({action:'launch_research', asset_class:$('#ac').value,
+                                       model:$('#model').value,
                                        seed:$('#seed').value}, 'launch research');
 $('#resume-all').onclick = ()=>act({action:'resume_aborted'}, 'resume cut-off sessions');
 $('#killall').onclick = ()=>{

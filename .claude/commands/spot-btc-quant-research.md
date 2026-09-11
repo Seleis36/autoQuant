@@ -15,6 +15,18 @@ Prioritise sharpe ratio, and risk-adjusted returns in general.
 
 `BTC-USD` daily from yfinance; hourly/minute bars from the free Binance public REST klines endpoint (no API key). Cross-venue sanity checks against Bitstamp/Coinbase.
 
+## What can be deployed
+
+Your idea can be deployed either to the **Binance spot testnet** -- real orders against a real
+order book, but long/flat only, unlevered, and crypto only -- or to a **simulated book**, which
+takes shorts, leverage and baskets but fills against the closing price rather than an order
+book. A long/flat spot idea earns the stronger evidence of the testnet, so prefer expressing it
+that way when the mechanism allows; reach for a short leg when the mechanism genuinely needs
+one, rather than to be clever.
+
+Cost your backtest honestly either way: the testnet charges a ~10 bp taker fee, and the
+simulated book charges exactly what the runner is told to.
+
 ## File organisation (mandatory)
 
 As soon as you settle on an idea, give it a **short name**: lowercase, kebab-case, 2-4 words max, descriptive of the mechanism and not of the result (e.g. `us-close-liquidity`, `funding-carry`, `etf-flow-momentum`). Reuse the short name of an existing strategy only when you are continuing that same idea.

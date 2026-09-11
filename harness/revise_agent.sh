@@ -23,7 +23,10 @@ STATE="$REPO/harness/state"; LOGS="$REPO/harness/logs"
 mkdir -p "$STATE" "$LOGS"
 
 PR="${1:?usage: revise_agent.sh <pr-number>}"
-MODEL="${REVISE_AGENT_MODEL:-opus}"
+# Pinned model id, not the `opus` short name: on this CLI `--model opus` resolves to Opus
+# 4.7, so the alias quietly ran a previous generation. An id also makes the session
+# registry say exactly what produced a decision.
+MODEL="${REVISE_AGENT_MODEL:-claude-opus-5}"
 TIMEOUT="${REVISE_AGENT_TIMEOUT:-14400}"     # a revision is research, not packaging
 MAX_ROUNDS="${REVISE_MAX_ROUNDS:-2}"
 
@@ -62,14 +65,15 @@ say "PR #$PR: session $UUID"
 "$REPO/harness/agent_exec.sh" start "$UUID" "$LOG" "$TIMEOUT" "$MODEL" "$PROMPT"
 rc=$?
 
-# The revision agent's side effect: either it cleared `needs-revision` (pushed a fix, PR
-# goes back to the deploy queue) or it closed the PR as a genuine dead end. Anything else
-# means it did not finish.
+# The revision agent's side effect is always the same shape: `needs-revision` is gone, so
+# the PR is back in the review queue. That covers both of its outcomes -- a pushed fix, and
+# an idea retired as Failed, which it hands back for the reviewer to merge as a record
+# rather than closing. It never merges and never deploys; that is the reviewer's job.
 labels="$(pr_labels "$PR")"
 state="$(gh pr view "$PR" --json state --jq .state 2>/dev/null)"
 terminal=1
 case ",$labels," in *",needs-revision,"*) ;; *) terminal=0 ;; esac
-[ "$state" = "CLOSED" ] && terminal=0
+case "$state" in CLOSED|MERGED) terminal=0 ;; esac
 
 session_side_effect_override "$UUID" "$terminal"
 status="$(session_status "$UUID")"

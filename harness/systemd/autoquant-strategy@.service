@@ -5,6 +5,12 @@ Description=autoQuant live strategy %I
 After=network-online.target
 Wants=network-online.target
 PartOf=autoquant.target
+# A strategy that cannot start is a bug to fix, not something to hammer the venue with.
+# These belong in [Unit]: systemd moved them there in v229 and answers a [Service]
+# placement with "Unknown key name ... ignoring", so the limit silently did not apply
+# and a crash-looping runner restarted every 15s indefinitely.
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -12,9 +18,6 @@ WorkingDirectory=%h/autoQuant/live/%I
 ExecStart=%h/autoQuant/.venv/bin/python -u runner.py
 Restart=always
 RestartSec=15
-# A strategy that cannot start is a bug to fix, not something to hammer the venue with.
-StartLimitIntervalSec=300
-StartLimitBurst=5
 StandardOutput=append:%h/autoQuant/live/%I/runner.log
 StandardError=append:%h/autoQuant/live/%I/runner.log
 

@@ -18,8 +18,11 @@ without a human in the middle.
                                              └──────────────────────────┘
 ```
 
-Everything trades the **Binance spot testnet** — spot, long/flat, unlevered, real prices,
-fake money.
+Strategies trade in one of two paper books: the **Binance spot testnet** — real orders,
+real prices, fake money, but long/flat crypto only — or a **simulated book** that prices
+anything the research covers (equities, ETFs, FX, rates, commodities, vol), takes shorts and
+baskets, and is not rationed. Long/flat crypto goes to the testnet because real fills are
+better evidence; everything else goes to the simulator.
 
 ## The two agents
 
@@ -34,14 +37,22 @@ from `spot-btc` to `fx-majors` to `vol-complex`.
 
 **The deployment engineer** (`/deploy-strategy <pr>`) reviews each PR in an isolated git
 worktree. It doesn't re-derive the science; it checks the claim is coherent and *executable
-on the venue we actually have*. If it passes, the agent reserves capital, writes a
-`runner.py` that imports the researcher's own `strategy.py`, proves the live weight matches
-the backtest weight bar-for-bar, merges, and starts the daemon. If it doesn't, the PR gets
-labelled `invalid` with the blocking reasons quoted line by line, and nothing is merged.
+in one of the two books*. Its first judgement is which book — real fills for long/flat spot
+crypto, the simulator for everything else. If it passes, the agent reserves capital from that
+book, writes a `runner.py` that imports the researcher's own `strategy.py`, proves the live
+weight matches the backtest weight bar-for-bar, merges, and starts the daemon. If it doesn't,
+the PR gets labelled `invalid` with the blocking reasons quoted line by line.
 
-Its bar is deliberately unfriendly: needs shorting, needs leverage, needs an instrument the
-testnet doesn't list, spec ambiguous, numbers contradict the report — all rejections. Roughly
-one PR in two doesn't make it through.
+Its bar is deliberately unfriendly, but it is a bar about the *research*: spec ambiguous,
+numbers contradict the report, a lookahead defect, a signal we cannot obtain live. What is no
+longer a rejection is being about the wrong asset class — shorting, leverage and non-crypto
+instruments used to be automatic rejections, and that verdict retired good research for the
+sole reason that the desk only owned a crypto exchange.
+
+**A rejected PR is still merged** — as a research record, with nothing in `live/`. Researchers
+pick their next idea by reading `past_research/<asset>/all_ideas.md` on `main`, so a negative
+result that never merges is one the next agent rediscovers from scratch. Only a PR going back
+for revision stays open.
 
 **The revision agent** (`/revise-strategy <pr>`) picks up what the reviewer sent back. The
 rejection comment is its brief: it fixes the quoted blocker, re-runs the whole validation
@@ -63,6 +74,7 @@ strength of these numbers.
 | `code/<asset>/<idea>/` | Experiment scripts + `strategy.py`, the reusable signal function |
 | `live/<asset>/<idea>/` | A deployed strategy: `runner.py`, `meta.json`, journal, ledger |
 | `harness/` | The machinery — poller, agent launchers, execution runtime, dashboard |
+| `harness/portfolio.py` | Cross-sectional execution, for strategies that trade a basket |
 | `data/` | Flat shared cache of market data, named by instrument |
 
 ## Running it
@@ -94,7 +106,13 @@ paying for the work twice.
 
 ## Caveat
 
-Paper only. Testnet klines are simulated and drift from the real market, so signals are
-always computed from real Binance public data and only orders and balances touch the venue.
+Paper only, and the two books are not equally strong evidence.
+
+On the testnet, klines are simulated and drift from the real market, so signals are always
+computed from real Binance public data and only orders and balances touch the venue. In the
+simulated book there is no order book at all — no rejection, no partial fill, no queue
+position — so a fill there is an assumption, not an observation. The dashboard labels it
+`simulated` for that reason, and the two are never spliced into one track.
+
 Nothing here has traded a live dollar, and the strategies are found by machines that are very
 good at finding patterns in noise — read the OOS column before believing anything.

@@ -48,12 +48,20 @@ is_running() {  # $1 = pidfile
 # instead, matching on the runner's working directory.
 running_pids_for() {  # $1 = strategy dir
   local dir; dir="$(readlink -f "$1")"
-  local p c
+  local p argv
   for p in /proc/[0-9]*; do
     # A process can exit between the glob and the read; that is normal, not an error.
     [ -r "$p/cmdline" ] || continue
-    c="$( { tr '\0' ' ' < "$p/cmdline"; } 2>/dev/null )" || continue
-    case "$c" in *runner.py*) ;; *) continue ;; esac
+    # argv element by element, not a substring of the flattened line: a shell or editor
+    # that merely mentions runner.py must not be mistaken for the daemon and killed.
+    mapfile -d '' -t argv < "$p/cmdline" 2>/dev/null || continue
+    [ "${#argv[@]}" -gt 1 ] || continue
+    case "${argv[0]##*/}" in python|python3|python3.*) ;; *) continue ;; esac
+    local a hit=""
+    for a in "${argv[@]:1}"; do
+      case "$a" in *runner.py) hit=1; break ;; esac
+    done
+    [ -n "$hit" ] || continue
     [ "$(readlink -f "/proc/${p#/proc/}/cwd" 2>/dev/null)" = "$dir" ] && echo "${p#/proc/}"
   done
 }
@@ -160,8 +168,11 @@ cmd_status() {
       "$PY" -c "
 import json
 s=json.load(open('$st'))
-print('w=%-7s eq=%-11s %s %s%s' % (round(s.get('last_weight') or 0,4), round(s.get('equity') or 0,2),
-      'SHADOW' if s.get('shadow') else 'PAPER', s.get('updated',''), '$managed'))" 2>/dev/null         || echo "$managed"
+# 'sim' is a simulated book working as designed; 'SHADOW' is a venue book that
+# could not reach its venue. Both set shadow=True, so only one of them is a fault.
+mode = s.get('mode') or ('shadow' if s.get('shadow') else 'live')
+print('w=%-7s eq=%-11s %-6s %s%s' % (round(s.get('last_weight') or 0,4), round(s.get('equity') or 0,2),
+      {'sim':'SIM','shadow':'SHADOW','live':'PAPER'}.get(mode, mode.upper()), s.get('updated',''), '$managed'))" 2>/dev/null         || echo "$managed"
     else
       echo "(no state.json yet)$managed"
     fi

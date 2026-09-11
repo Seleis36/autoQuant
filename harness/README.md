@@ -11,11 +11,11 @@ Turns quant-research pull requests into running paper-trading daemons.
         ▲                               │ invalid                └──────────────────┘
         │                     ┌─────────┴──────────┐
         │                     │                    │
-        │            needs-revision            wontfix
+        │            needs-revision            archive
         │                     │                    │
-        │          ┌──────────▼───────────┐   (terminal, PR
-        └──────────┤ revise_agent.sh      │    stays open for
-        re-review  │  └─ /revise-strategy │    a human)
+        │          ┌──────────▼───────────┐   merged as a
+        └──────────┤ revise_agent.sh      │   research record,
+        re-review  │  └─ /revise-strategy │   nothing in live/
                    └──────────────────────┘
 ```
 
@@ -101,7 +101,31 @@ Research agents can be launched directly (the dashboard does this for you):
 ./harness/launch_research.sh spot-btc                       # pick its own idea
 ./harness/launch_research.sh fx-majors "carry around NFP"   # with a seed
 ./harness/launch_research.sh spot-btc "" --require "OOS Sharpe >= 2.0 after 10bp/side"
+./harness/launch_research.sh sector-etf "" --model claude-sonnet-5
 ```
+
+### Choosing the model
+
+`--model` takes a **pinned model id**, and the dashboard's launcher has a picker for the
+three that are offered: `claude-opus-5` (the default), `claude-sonnet-5` and
+`claude-fable-5-1`. The dashboard validates against that allowlist, so the picker cannot ask
+for something the launcher would refuse.
+
+Ids rather than the short names on purpose: on this CLI build `--model opus` resolves to
+**Opus 4.7** and `sonnet` to **Sonnet 4.6**, so the short names quietly selected a previous
+generation, and `fable` is not accepted at all. An id also makes the session registry say
+exactly what produced a result, which is what you want when comparing two research runs
+months apart.
+
+**Fable 5.1 costs real money.** It is not covered by the Claude subscription the rest of this
+harness runs on — it bills purchased usage credits, so a four-hour research session on it is a
+metered spend where the same session on Opus or Sonnet is not. The picker marks it `($)` and
+it is never the default. It also needs Claude Code >= 2.1.251; on an older binary the
+dashboard shows it disabled with the version it found and refuses to launch onto it, rather
+than letting a detached agent die on its first API call.
+
+All three agents — research, deploy and revise — default to `claude-opus-5`, overridable with
+`RESEARCH_AGENT_MODEL` / `DEPLOY_AGENT_MODEL` / `REVISE_AGENT_MODEL`.
 
 ### Seeds vs. acceptance criteria
 
@@ -208,10 +232,29 @@ then either:
 * **deploys** — writes `live/<asset-class>/<short-name>/runner.py`, validates it with
   `--check`, commits it to the PR branch, merges the PR into `main` (which closes it),
   labels it `deployed`, and starts the daemon; or
-* **sends it back** — labels the PR `invalid` plus either `needs-revision` (a blocker a
-  researcher could fix with a keyboard and a backtest) or `wontfix` (structurally undeployable
-  on this venue), comments with the blocking reasons quoted line by line, and merges nothing.
-  A `needs-revision` PR goes to `revise_agent.sh`; a `wontfix` one waits for a human.
+* **sends it back** — comments with the blocking reasons quoted line by line, labels the PR
+  `invalid` + `needs-revision`, and merges nothing. `revise_agent.sh` picks it up; or
+* **archives it** — merges the research with **nothing in `live/`**, labelled `archived`
+  (plus `wontfix` when a Working strategy was structurally undeployable).
+
+**Why a rejected PR still merges.** A research agent's first act is to read
+`past_research/<asset-class>/all_ideas.md` on `main` so it does not repeat what has been tried.
+Research that never merges is invisible there, so the next agent burns a whole session
+rediscovering the same dead end — which is the one thing a negative result exists to prevent.
+Closing a PR instead of merging it destroys exactly the output that was worth keeping. So a
+Failed write-up, a structurally undeployable strategy, and a blocker that outlived its
+revision rounds all merge; only the research record lands, never a runner.
+
+When a **Working** strategy is not deployed, the reviewer marks its `all_ideas.md` row
+`**Working — not deployed**` with the reason and appends a `## Deployment review` section to
+the report. Without that the next researcher reads "Working", sees nothing live, and has no
+idea why.
+
+The merge — not the label — is what ends the job. `review_outcome` in `gh_lib.sh` treats
+`archived` on an *open* PR as unfinished, so the poller hands it back and the agent completes
+it. Merging is left to the agent rather than enforced by a script because the usual failure is
+a conflict in `all_ideas.md`, where two PRs appended a row to one table; keeping both rows
+takes judgement.
 
 Every sweep also runs a **watchdog** for anything *not* under systemd. Once
 `install_autostart.sh` has run, systemd is the supervisor — including of the poller itself —
@@ -227,7 +270,7 @@ restarts:
 | `harness:paused` | Cut off by a usage limit | skip — the resume button clears it |
 | `invalid` + `needs-revision` | Fixable blocker | picks up → revise |
 | `revision:1` / `revision:2` | Round counter | — |
-| `invalid` + `wontfix` | Structurally undeployable here | terminal |
+| `archived` (+ `wontfix`) | Merged as a research record; nothing deployed | terminal, PR merged |
 | `harness:exhausted` | Two revision rounds spent | terminal |
 | `harness:failed` | 3 genuine agent failures | terminal |
 | `deployed` | Live | terminal, PR merged |
@@ -238,16 +281,54 @@ The agent reviews in a `git worktree`, never by checking out a branch in the mai
 tree — a branch missing another strategy's `live/` directory would delete it out from under
 a running daemon.
 
-## Venue
+## The two books
 
-Everything trades on the **Binance spot testnet** (`https://testnet.binance.vision`) —
-spot, long/flat, unlevered. A strategy's weight is the fraction of equity held in the base
-asset, in `[0, 1]`.
+A strategy is deployed into one of two books. They differ in what they can express and in
+how strong the evidence they produce is.
+
+| | `venue` | `sim` |
+|---|---|---|
+| What it is | Binance spot testnet, real orders | A self-contained simulated book |
+| Instruments | Liquid crypto pairs only | Anything the daily cache prices |
+| Direction | Long/flat, weight in `[0, 1]` | Long **and short** |
+| Leverage | None | Capped by `max_gross` |
+| Sizing | Exchange lot steps, 5 USDT minimum | Fractional |
+| Capital | One shared $10k pool — **capped** | Uncapped |
+| Broker | `PaperBroker` | `SimBroker` / `SimPortfolioBroker` |
 
 ```bash
-.venv/bin/python harness/check_credentials.py   # which account do .env's keys belong to?
-.venv/bin/python harness/check_symbols.py BTC-USD ETH-USD
+.venv/bin/python harness/check_credentials.py            # whose account are .env's keys?
+.venv/bin/python harness/check_symbols.py --book venue BTC-USD ETH-USD
+.venv/bin/python harness/check_symbols.py --book sim   XLK XLE TLT EURUSD=X
 ```
+
+**Why two.** Paper trading was defined as "the Binance spot testnet account", and three
+separable things were welded to it: price discovery, fill simulation, and capital accounting.
+Only the last genuinely needs the account. Splitting them is what lifted both limits at once —
+the four-strategy ceiling was the shared pool, and the crypto-only ceiling was the venue's
+instrument list. Neither applies to a book that has no account behind it.
+
+**What `sim` is not.** There is no order book, no rejection, no partial fill and no queue
+position. A simulated track is weaker evidence than a venue-executed one, and the dashboard
+labels it `simulated` rather than folding it in with `shadow`. Do not read a `sim` Sharpe as
+though it had cleared a real exchange.
+
+What it *is* good at: a simulated fill happens at the close of the bar the signal was computed
+on, which is the bar `research_lib.backtest` charges turnover at — so it matches its backtest's
+own assumption more closely than a live crypto market order matches its.
+
+### Markets that are not open 24/7
+
+There is no market calendar here, on purpose. Each quote source reports the identity of the
+bar its price came from, and the runner rebalances only when that changes. A weekend, a
+holiday, a half-day and a data vendor running an hour late are then all the same non-event:
+nothing to encode, nothing to keep up to date, and nothing to get wrong. A continuous market
+reports no bar identity and trades on every boundary, exactly as it always did.
+
+### The venue book in detail
+
+Spot, long/flat, unlevered. A strategy's weight is the fraction of its own capital held in
+the base asset, in `[0, 1]`.
 
 Credentials are `BINANCE_SPOT_API_KEY_PAPER` / `BINANCE_SPOT_SECRET_KEY_PAPER` in `.env`,
 minted at https://testnet.binance.vision (GitHub login → *Generate HMAC_SHA256 Key*).
@@ -256,15 +337,15 @@ a key from one does not exist on the others, and the "Enable Spot & Margin Tradi
 applies only within the site that issued it. `check_credentials.py` reports which host
 recognises a key, so this is never a guess.
 
-Three constraints shape what the agent will accept:
+Three constraints shape what the agent will accept *in this book* — each of them a routing
+decision now rather than a rejection, since the `sim` book has none of them:
 
-* **Liquid crypto pairs only.** No ETFs, bonds, commodity futures or volatility products, so
-  equity/FX/rates/commodity strategies are flagged invalid. The venue does list vestigial
-  tokenized-stock pairs (`AAPLBUSDT`, `SPYBUSDT`) with a handful of trades a day — dead
-  listings, never a proxy for the equity. Non-traded *signal* inputs (HYG, ^GSPC, DX-Y.NYB)
-  are unaffected; they come from yfinance.
-* **No shorting and no margin.** A strategy needing a negative weight or leverage > 1× cannot
-  be deployed.
+* **Liquid crypto pairs only.** No ETFs, bonds, commodity futures or volatility products. The
+  venue does list vestigial tokenized-stock pairs (`AAPLBUSDT`, `SPYBUSDT`) with a handful of
+  trades a day — dead listings, never a proxy for the equity. Non-traded *signal* inputs
+  (HYG, ^GSPC, DX-Y.NYB) are unaffected; they come from yfinance.
+* **No shorting and no margin.** A strategy needing a negative weight or leverage > 1× goes
+  to `sim`.
 * **Testnet klines are simulated** and drift ~1% from the real market. Signals are computed
   from real Binance endpoints (`MarketData(source="public")`) while orders and balances use
   the venue. `MarketData` warns if you ask it for testnet prices.
@@ -289,9 +370,10 @@ mode produced it.
 | `gh_lib.sh` | PR label helpers (REST, never the broken `gh pr edit`) |
 | `resume_aborted.sh` | Resume sessions that were cut off, rather than restarting them |
 | `limit_signatures.txt` | Editable log patterns that mean "cut off by a usage limit" |
-| `live_lib.py` | Execution runtime: `MarketData`, `PaperBroker`, `StrategyRunner` |
+| `live_lib.py` | Execution runtime: `MarketData`, quote sources, `LedgerBroker`/`PaperBroker`/`SimBroker`, `StrategyRunner` |
+| `portfolio.py` | Cross-sectional execution: `SimPortfolioBroker`, `PortfolioRunner` |
 | `launch_live.sh` | Start/stop/status/logs for deployed daemons |
-| `check_symbols.py` | Is this instrument tradable on the venue? (flags ticker collisions and dead listings) |
+| `check_symbols.py` | Is this instrument tradable in a given book? (`--book venue\|sim`) |
 | `check_credentials.py` | Which Binance account do `.env`'s keys belong to? |
 | `dashboard.py`, `dashboard.sh`, `web/` | The control dashboard |
 | `metrics.py` | Journal → live Sharpe/CAGR/MaxDD/turnover, and the equity series |
@@ -299,6 +381,38 @@ mode produced it.
 | `install_autostart.sh`, `systemd/` | Reboot survival: systemd units + Windows logon hook |
 | `windows_autostart_task.ps1` | Optional true at-boot task (needs elevation) |
 | `state/`, `logs/` | Bookkeeping and session logs (gitignored) |
+| `../tests/` | The test suite (see below) |
+
+## Tests
+
+```bash
+.venv/bin/python -m pytest              # everything, ~45s
+.venv/bin/python -m pytest tests/test_metrics.py -q
+```
+
+`pytest` and `node` are the only requirements (`uv pip install pytest`). Nothing in the
+suite touches the network, GitHub, systemd or the venue: the broker is driven through a
+stubbed HTTP layer, and the shell tests build a throwaway repo under `tmp_path` with a
+stand-in daemon rather than driving the real one.
+
+| File | Covers |
+|---|---|
+| `test_dashboard_api.py` | The JSON API over a real socket: query decoding, validation, traversal |
+| `test_dashboard_actions.py` | `POST /api/action` — validation, bulk actions, request limits |
+| `test_process_uptime.py` | `/proc` parsing and uptime arithmetic |
+| `test_metrics.py` | Segmentation, live statistics, the equity series, correlation |
+| `test_live_lib.py` | Ledger arithmetic, commission accounting, bar scheduling, history assembly |
+| `test_shell_scripts.py` | Argument handling and the dashboard's process discovery and locking |
+| `test_allocation_books.py` | Book migration, per-book caps, and that `sim` is not rationed |
+| `test_sim_broker.py` | The simulated single-instrument book: fills, shorts, exits, quote sources |
+| `test_portfolio.py` | Cross-sectional execution: leverage caps, sell-before-buy, restart safety |
+| `test_runner_bars.py` | Bar-advance gating, state merging, rebuilding a broker from `meta.json` |
+| `test_data_cache.py` | The shared `data/` cache: one name per series, atomic writes, depth floor |
+| `test_systemd_units.py` | Unit files, including directives systemd ignores rather than rejects |
+| `test_frontend.py` → `test_dashboard_ui.mjs` | The page's action dispatch, run under node |
+
+The browser-side suite extracts the `<script>` block from `web/index.html` and evaluates it
+against a DOM stub, because the page has no build step and no module boundary to import.
 
 ## Capital
 
@@ -308,8 +422,25 @@ the faucet endowment sitting in that account never inflates anyone's position si
 
 Capital is *allocated, not divided*: deploying or retiring a strategy never resizes the
 others, because dividing account equity by the live strategy count would make every strategy
-churn its whole position each time an unrelated one came or went. `harness/state/allocations.json`
-holds the pool and what is committed; `live_lib.allocate()` refuses to oversubscribe it.
+churn its whole position each time an unrelated one came or went.
+
+Allocation is **per book**, which is what removed the four-strategy ceiling:
+
+```bash
+.venv/bin/python -c "import sys; sys.path.insert(0,'harness'); \
+  from live_lib import allocate; print(allocate('sector-etf/momo', 2500.0, book='sim'))"
+```
+
+* `venue` holds a real $10k pool. Those ledgers are backed by an actual shared testnet
+  balance, so they must add up to something the account can fund; `allocate()` refuses to
+  oversubscribe it, and that refusal is a real constraint.
+* `sim` is uncapped. Two simulated books share nothing — no account, no balance, no
+  instrument inventory — so rationing them would be inventing a scarcity that does not exist.
+
+`harness/state/allocations.json` holds both. A pre-books file migrates on read: its single
+top-level pool becomes the `venue` pool and every strategy in it is `venue`-backed, because
+those ledgers *are* covered by a live account and reading them as simulated would silently
+uncap it.
 
 `PaperBroker.reconcile()` compares a ledger against the exchange. Persistent drift means
 fills that were not recorded.
