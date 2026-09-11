@@ -1,5 +1,5 @@
 ---
-description: Review a quant-research PR and, if it contains a working and tradable strategy, deploy it live (paper) and merge the PR — otherwise flag it invalid.
+description: Review a quant-research PR and, if it contains a working and tradable strategy, deploy it live (paper) and merge the PR — otherwise send it back for revision, or merge it as a research record with nothing deployed.
 argument-hint: <pr-number>
 ---
 
@@ -156,8 +156,12 @@ Work in `$WT` for Phases 2–5. Always invoke `/home/seleis/autoQuant/.venv/bin/
 (the worktree has no venv of its own). Remove the worktree when you are done:
 `git worktree remove "$WT" --force`.
 
-If the PR is already merged, closed, a draft, or carries a `deployed` / `invalid` label,
-stop and report that — do not process it twice.
+If the PR is already merged or closed, is a draft, or carries `deployed` or
+`needs-revision`, stop and report that — do not process it twice.
+
+**One exception: an OPEN PR labelled `archived`.** A previous run decided to archive it and
+was cut off before the merge landed, which is why the poller handed it back. Do not re-review
+it — go straight to Phase 4b and finish from whichever step did not complete.
 
 ## Phase 2 — Review
 
@@ -199,25 +203,58 @@ not reproducing the science. For each strategy the PR proposes, establish:
 
 ## Phase 3 — Decide
 
-**Blockers** (→ Phase 4, flag invalid):
+Every PR ends in one of three outcomes, and **two of the three merge**:
 
-* No strategy in the PR is marked Working / has a deployable spec.
-* Neither book can trade the instrument: `check_symbols.py --book sim` cannot price it, or
-  prices it too thinly or too stalely to have been backtested honestly. **Not on Binance is
-  not a blocker** — that is what the `sim` book is for.
-* It needs an instrument type neither book has: options, a specific ETF's NAV, anything
-  requiring an intraday non-crypto series.
-* The spec is incomplete or ambiguous on a parameter you cannot recover from the code.
-* Referenced material is missing from the PR (a spec that names a script that is not there,
-  a report link that does not resolve, `strategy.py` importing a module the PR never adds).
-* The research is internally inconsistent, or shows a genuine lookahead/overfit defect.
-* The signal needs data we cannot obtain live (a paid feed, an exchange endpoint we lack, a
-  series that only exists in a local research file with no live source).
-* A `venue` strategy cannot meet the exchange minimum notional (5 USDT) at a sane account
-  size — the `sim` book has no such minimum, so consider routing before blocking.
-* It demands a rebalance faster than 1 minute.
+| Outcome | Merges? | Goes live? | When |
+|---|---|---|---|
+| **Deploy** (Phase 5-7) | yes | yes | a Working strategy this desk can trade |
+| **Send back** (Phase 4a) | no — stays open | no | a blocker a researcher could fix, and a revision round is left |
+| **Archive** (Phase 4b) | **yes** | **no** | everything else: the research is the deliverable |
 
-**Not blockers** — proceed:
+**Archiving is not a bin.** A research agent's first act is to read
+`past_research/<asset-class>/all_ideas.md` on `main` so it does not repeat what has already
+been tried. Research that never merges is invisible there, so the next agent spends a full
+session rediscovering the same dead end. A negative result is worth keeping *precisely
+because* it is negative — it just must not put anything in `live/`.
+
+**Archive** when:
+
+* No strategy in the PR is marked Working — a Failed write-up is a finished negative result,
+  not a defective PR. This is the common case and it is not a rejection.
+* A Working strategy is structurally undeployable in **either** book (below), so no amount of
+  research would change the verdict.
+* A fixable blocker remains but the **last revision round is already spent** — the PR carries
+  `revision:2` (or whatever `REVISE_MAX_ROUNDS` is set to). Another `needs-revision` would
+  only bounce off the round limit and strand the research in an open PR.
+
+Structurally undeployable, i.e. archive rather than send back:
+
+* **neither** book can price the traded instrument, or prices it only thinly or stalely
+* it needs an instrument type neither book offers — options, a NAV, an intraday non-crypto bar
+* the signal needs data we cannot obtain live: a paid feed, an endpoint we lack, a series
+  that exists only in a local research file
+* a rebalance faster than 1 minute
+
+**Send back** (`needs-revision`) — the alpha may well be sound; what it needs is research work:
+
+* leverage the research never validated at the cap you would have to set
+* a spec that is ambiguous or disagrees with `strategy.py`
+* a missing file, an unresolved reference, an absent parameter
+* in-sample-only results, an OOS window too short to mean anything, uncosted returns
+* numbers that contradict the report's own tables
+* a genuine lookahead defect — the research is wrong, but the idea might survive being done
+  correctly
+* a `venue` strategy that cannot meet the exchange minimum notional (5 USDT) at a sane size,
+  where routing it to `sim` is the fix
+
+The distinguishing question is simple: **could a researcher fix this with a keyboard and a
+backtest, in either book?** If yes it is `needs-revision` — unless the rounds are gone.
+
+**"Not tradable on Binance" is not a reason to reject anything.** It was the single most
+common verdict this brief produced, and it retired good research for being about the wrong
+asset class. Check the `sim` book first.
+
+**Not blockers at all** — deploy:
 
 * A long/flat spot crypto idea — that is exactly what the `venue` book does.
 * **A short leg, a net-negative weight, or leverage above 1×.** These used to be automatic
@@ -232,76 +269,103 @@ not reproducing the science. For each strategy the PR proposes, establish:
   degrades to a clearly-labelled shadow book and keeps producing a live track. Say so in
   your comment; do not block.
 
-If more than one strategy in the PR is deployable, deploy each of them.
+If more than one strategy in the PR is deployable, deploy each of them. A PR can mix the
+outcomes: deploy what is deployable, and annotate any Working strategy you did **not** deploy
+exactly as Phase 4b describes before you merge.
 
-## Phase 4 — If blocked: classify the blocker, then flag it
+## Phase 4a — If it can be fixed: send it back
 
-A rejected PR is not the end of the line any more. A revision agent picks up fixable ones and
-does the research work to unblock them, so **you must say which kind of blocker you found**.
-Getting this wrong is expensive in both directions: a `wontfix` on a fixable PR throws away
-good research, and a `needs-revision` on a structural one burns a full research session
-rediscovering that the venue cannot do it.
-
-**`needs-revision`** — the alpha may well be sound; what it needs is research work:
-
-* leverage the research never validated at the cap you would have to set
-* a spec that is ambiguous or disagrees with `strategy.py`
-* a missing file, an unresolved reference, an absent parameter
-* in-sample-only results, an OOS window too short to mean anything, uncosted returns
-* numbers that contradict the report's own tables
-
-**`wontfix`** — no amount of research makes this deployable *here*. The PR is closed:
-
-* **neither** book can price the traded instrument, or it prices only thinly or stalely
-* it needs an instrument type neither book offers — options, a NAV, an intraday non-crypto bar
-* the signal needs data we cannot obtain live: a paid feed, an endpoint we lack, a series
-  that exists only in a local research file
-* a rebalance faster than 1 minute
-
-**"Not tradable on Binance" is no longer a `wontfix`.** It was the single most common verdict
-this brief produced, and it retired good research for being about the wrong asset class. Check
-the `sim` book before you reach for this label.
-
-The distinguishing question is simple: **could a researcher fix this with a keyboard and a
-backtest, in either book?** If yes it is `needs-revision`. A genuine lookahead defect is
-`needs-revision` — the research is wrong, but the idea might survive being done correctly.
-
-In this order — comment, then label, then close a `wontfix`:
+A revision agent picks these up and does the research work to unblock them. **Comment first,
+then label** — the label is what the harness acts on, so the explanation has to be on the PR
+before the revision agent can be handed it.
 
 ```bash
 gh label create invalid --color E4E669 --description "Cannot be deployed as submitted" 2>/dev/null
 gh label create needs-revision --color D93F0B --description "Fixable blocker -- back to research" 2>/dev/null
-gh label create wontfix --color FFFFFF --description "Structurally undeployable here" 2>/dev/null
 gh pr comment $ARGUMENTS --body-file <a file you write>          # 1. the explanation
-# 2. invalid ALWAYS, plus exactly one of needs-revision / wontfix:
 echo '{"labels":["invalid","needs-revision"]}' | gh api -X POST "repos/$SLUG/issues/$ARGUMENTS/labels" --input -
-gh pr close $ARGUMENTS                                           # 3. wontfix ONLY
 gh pr view $ARGUMENTS --json labels,state --jq '{labels: [.labels[].name], state}'   # confirm
 ```
-
-The comment goes first because the label is what the harness acts on: once `needs-revision`
-lands the revision agent may pick the PR up, and once `wontfix` lands the harness closes it.
-Either way the explanation must already be on the PR by then.
-
-**Label through the REST API, never `gh pr edit`.** The `gh` on this machine is old enough that
-`gh pr edit` resolves the PR with a GraphQL query asking for `projectCards`, which GitHub now
-refuses outright: every `gh pr edit` fails with *"Projects (classic) is being deprecated"*.
-`gh pr view`, `gh pr comment`, `gh pr diff`, `gh pr close` and `gh api` are all fine. The label is the PR's
-terminal state — if it does not stick, the poller hands this PR back every 30 minutes forever,
-so verify it and say so in your final report if it failed.
 
 The comment must state: which strategy you assessed, the specific blocking reasons (quote the
 file and line that shows each one), **which verdict you applied and why**, and what would have
 to change for the PR to pass. Be concrete and brief — a revision agent will work from this
-comment as its brief, so the blocker list needs to be actionable on its own, without re-deriving
-your reasoning.
+comment as its brief, so the blocker list needs to be actionable on its own, without
+re-deriving your reasoning.
 
-**Do not merge.** A `needs-revision` PR stays open — it goes to the revision agent. A `wontfix`
-PR is **closed**: the verdict is structural, nothing in the loop will ever pick it up again, and
-an open PR reads as work still in flight. Closing is not deleting — the branch, the report and
-your comment all remain, and a human who disagrees can reopen it and clear the label. If you
-forget, or are cut off before step 3, the harness closes it for you; do it anyway. Then remove
-the worktree and stop.
+**Do not merge and do not close.** The PR stays open; the revision agent owns it next.
+
+## Phase 4b — If it will never deploy: archive it (merge, nothing live)
+
+The research merges; no strategy starts. Work in the worktree, in this order.
+
+**1. Nothing from this PR may land in `live/`.** The dashboard treats every directory under
+`live/` as a strategy, so a stray runner would show up as a stopped deployment forever.
+
+```bash
+cd "$WT"
+git diff --name-only origin/main...HEAD -- live/      # must print nothing
+```
+
+If it prints anything, `git rm -r` those paths and commit before going on.
+
+**2. Say why, where the next researcher will actually read it.** Only needed when a
+**Working** strategy is not being deployed — a Failed line already tells the whole story.
+
+* In `past_research/<asset-class>/all_ideas.md`, on that idea's row, change the status cell
+  from `**Working**` to `**Working — not deployed**`, and append one sentence to the Key
+  result cell: the reason plus the PR number.
+* Append a short `## Deployment review` section to the report in
+  `past_research/<asset-class>/<short-name>/`, quoting the blockers the way your comment
+  does. The PR comment is not in the repository; the report is, and that is what the next
+  agent opens.
+
+```bash
+git add past_research/<asset-class>
+git commit -m "Archive <short-name>: not deployed — <one-line reason>"
+git push origin HEAD:"$BR"
+```
+
+**3. Comment, then label, then merge.**
+
+```bash
+gh label create archived --color C2E0C6 --description "Merged as a research record -- nothing deployed" 2>/dev/null
+gh label create wontfix --color FFFFFF --description "Structurally undeployable here" 2>/dev/null
+gh pr comment $ARGUMENTS --body-file <a file you write>           # 1. why nothing deploys
+# 2. `archived` always; add `wontfix` when a WORKING strategy was structurally undeployable.
+#    Do not apply `invalid` here -- it pairs with needs-revision, and this PR is being merged.
+echo '{"labels":["archived"]}' | gh api -X POST "repos/$SLUG/issues/$ARGUMENTS/labels" --input -
+# 3. clear any labels from an earlier round that would contradict the merge
+gh api -X DELETE "repos/$SLUG/issues/$ARGUMENTS/labels/invalid" 2>/dev/null
+gh api -X DELETE "repos/$SLUG/issues/$ARGUMENTS/labels/needs-revision" 2>/dev/null
+gh pr merge $ARGUMENTS --merge --delete-branch
+```
+
+If `gh pr merge` fails the way the label call does (a `projectCards` GraphQL error), use REST:
+
+```bash
+echo '{"merge_method":"merge"}' | gh api -X PUT "repos/$SLUG/pulls/$ARGUMENTS/merge" --input -
+gh api -X DELETE "repos/$SLUG/git/refs/heads/$BR"
+```
+
+**If the merge is refused as conflicting** it is almost always `all_ideas.md` — two PRs
+appending a row to the same table. Resolve it in the worktree and keep **every** row from both
+sides; dropping one deletes another agent's result:
+
+```bash
+cd "$WT" && git fetch origin main && git merge origin/main   # fix conflicts, keep all rows
+git push origin HEAD:"$BR"
+```
+
+**4. Bring the main tree forward**, so the next research agent reads the updated
+`all_ideas.md`, then remove the worktree. Use the same procedure as Phase 7 — `git pull
+--ff-only` when the main tree is on `main`, and `git fetch origin main:main` without touching
+the checkout when a research agent has it on another branch.
+
+**The merge is the point of this phase**, not the label. An `archived` PR that has not merged
+is an unfinished run: the harness sees no terminal outcome and hands the PR straight back to
+you on the next sweep. If you are resuming such a PR, do not re-review it — pick up from
+whichever step above did not complete.
 
 ## Phase 5 — If deployable: reserve capital, then write the runner
 
@@ -492,15 +556,22 @@ shadow book, and where the log and journal live.
 * **Never trade a production venue.** `BASE_URL` in `live_lib.py` is the spot testnet and
   stays that way. Never build a signal on testnet prices.
 * **Never invent a missing parameter.** A number you cannot find in the PR is a blocker.
-* **Never edit the research to make it deployable.** Fix your runner; otherwise flag invalid.
-* **Never merge a PR you did not deploy**, and never merge before `--check` passes.
+* **Never edit the research to make it deployable.** Fix your runner; otherwise send it back.
+  Archiving is the one time you touch the research, and only to record *why* it was not
+  deployed — never to change a result.
+* **Never deploy before `--check` passes.** Merging is different: a deployed PR merges with
+  its runner, and an archived one merges as a research record with nothing in `live/`. The
+  only PR that does not merge is one sent back for revision.
 * **Never `git checkout` in the main working tree** while daemons are running — use the worktree.
 * Do not touch, restart or stop strategies deployed by earlier PRs.
 * Do not commit `.env` or any key. Secrets are read at runtime by `load_env()`.
 * **`gh pr edit` is broken on this machine** — use the `gh api` label calls above. Always
   read the labels back afterwards; an unlabelled PR is an unfinished job.
-* If you genuinely cannot decide between deploy and invalid, flag invalid and explain the
-  ambiguity. A PR left open is cheap; a broken strategy trading unattended is not.
+* If you genuinely cannot decide between deploying and sending back, send it back and explain
+  the ambiguity. A PR left open is cheap; a broken strategy trading unattended is not.
+* **Archiving is not a way to dispose of a PR you did not want to review.** It merges research
+  into `main`, where every future agent reads it. If the blocker is fixable and a revision
+  round remains, it is `needs-revision`.
 
 End your run with a short report: the PR, the decision, the reason, and — if deployed — the
 strategy name, symbol, schedule, current weight and daemon pid.

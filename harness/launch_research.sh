@@ -4,6 +4,7 @@
 #   ./harness/launch_research.sh spot-btc
 #   ./harness/launch_research.sh fx-majors "carry unwind around NFP"
 #   ./harness/launch_research.sh spot-btc "" --require "OOS Sharpe >= 2.0 after 10bp/side"
+#   ./harness/launch_research.sh fx-majors "" --model claude-sonnet-5
 #
 # A seed says where to look; --require says what counts as having found something. The
 # seed has never been a gate -- PR #3 was launched with the seed "2+ sharpe strat", the
@@ -25,13 +26,23 @@ AC="${1:?usage: launch_research.sh <asset-class> [seed idea] [--require <criteri
 SEED="${2:-}"
 REQUIRE=""
 shift $(( $# > 2 ? 2 : $# ))
+MODEL=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --require) REQUIRE="${2:-}"; shift 2 ;;
+    --model)   MODEL="${2:-}"; shift 2 ;;
     *) echo "ERROR: unknown option '$1'" >&2; exit 2 ;;
   esac
 done
-MODEL="${RESEARCH_AGENT_MODEL:-opus}"
+
+# Pinned model IDs, not the short names. `claude --model sonnet` resolves to Sonnet 4.6 and
+# `opus` to Opus 4.7 on this CLI build, so the short names quietly select a previous
+# generation -- and `fable` is not accepted at all. An id makes the transcript say exactly
+# what ran, which matters when comparing two research sessions months apart.
+MODEL="${MODEL:-${RESEARCH_AGENT_MODEL:-claude-opus-5}}"
+case "$MODEL" in
+  -*|"") echo "ERROR: --model needs a model id (e.g. claude-opus-5), got '$MODEL'" >&2; exit 2 ;;
+esac
 # Deliberately uncapped: this runs on a Claude subscription, not metered API credit.
 # The timeout below is the safety net -- it reaps a hung agent, not an expensive one.
 TIMEOUT="${RESEARCH_AGENT_TIMEOUT:-14400}"
@@ -65,7 +76,7 @@ setsid nohup "$REPO/harness/agent_exec.sh" start "$UUID" "$LOG" "$TIMEOUT" "$MOD
 pid=$!
 sleep 2
 if kill -0 "$pid" 2>/dev/null; then
-  echo "started research agent for $AC"
+  echo "started research agent for $AC on $MODEL"
   [ -n "$REQUIRE" ] && echo "  criteria: $REQUIRE"
   echo "  session $UUID   log: harness/logs/$(basename "$LOG")"
   echo "  $(slot_report)"

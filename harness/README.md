@@ -11,11 +11,11 @@ Turns quant-research pull requests into running paper-trading daemons.
         ▲                               │ invalid                └──────────────────┘
         │                     ┌─────────┴──────────┐
         │                     │                    │
-        │            needs-revision            wontfix
+        │            needs-revision            archive
         │                     │                    │
-        │          ┌──────────▼───────────┐   (terminal,
-        └──────────┤ revise_agent.sh      │    PR closed)
-        re-review  │  └─ /revise-strategy │
+        │          ┌──────────▼───────────┐   merged as a
+        └──────────┤ revise_agent.sh      │   research record,
+        re-review  │  └─ /revise-strategy │   nothing in live/
                    └──────────────────────┘
 ```
 
@@ -101,7 +101,28 @@ Research agents can be launched directly (the dashboard does this for you):
 ./harness/launch_research.sh spot-btc                       # pick its own idea
 ./harness/launch_research.sh fx-majors "carry around NFP"   # with a seed
 ./harness/launch_research.sh spot-btc "" --require "OOS Sharpe >= 2.0 after 10bp/side"
+./harness/launch_research.sh sector-etf "" --model claude-sonnet-5
 ```
+
+### Choosing the model
+
+`--model` takes a **pinned model id**, and the dashboard's launcher has a picker for the
+three that are offered: `claude-opus-5` (the default), `claude-sonnet-5` and
+`claude-fable-5-1`. The dashboard validates against that allowlist, so the picker cannot ask
+for something the launcher would refuse.
+
+Ids rather than the short names on purpose: on this CLI build `--model opus` resolves to
+**Opus 4.7** and `sonnet` to **Sonnet 4.6**, so the short names quietly selected a previous
+generation, and `fable` is not accepted at all. An id also makes the session registry say
+exactly what produced a result, which is what you want when comparing two research runs
+months apart.
+
+Fable 5.1 needs Claude Code >= 2.1.251. On an older binary the dashboard shows it disabled
+with the version it found and refuses to launch onto it, rather than letting a detached agent
+die on its first API call. `RESEARCH_AGENT_MODEL` still overrides the default for the CLI.
+
+The deployment and revision agents still default to the `opus` *alias* via
+`DEPLOY_AGENT_MODEL` / `REVISE_AGENT_MODEL`, so they run Opus 4.7 until those are pinned too.
 
 ### Seeds vs. acceptance criteria
 
@@ -208,18 +229,29 @@ then either:
 * **deploys** — writes `live/<asset-class>/<short-name>/runner.py`, validates it with
   `--check`, commits it to the PR branch, merges the PR into `main` (which closes it),
   labels it `deployed`, and starts the daemon; or
-* **sends it back** — comments with the blocking reasons quoted line by line, then labels the
-  PR `invalid` plus either `needs-revision` (a blocker a researcher could fix with a keyboard
-  and a backtest) or `wontfix` (structurally undeployable in either book), and merges nothing.
-  A `needs-revision` PR goes to `revise_agent.sh`; a `wontfix` one is **closed**.
+* **sends it back** — comments with the blocking reasons quoted line by line, labels the PR
+  `invalid` + `needs-revision`, and merges nothing. `revise_agent.sh` picks it up; or
+* **archives it** — merges the research with **nothing in `live/`**, labelled `archived`
+  (plus `wontfix` when a Working strategy was structurally undeployable).
 
-A `wontfix` is closed because nothing in the loop will ever pick it up again, and an open PR
-reads as work still in flight. Closing loses nothing — the branch, the report and the comment
-all stay, and reopening it plus clearing the label puts it back in the queue. The agents are
-told to close it, and `deploy_agent.sh` / `revise_agent.sh` enforce it as well
-(`enforce_wontfix_closed` in `gh_lib.sh`): an invariant that cheap should not depend on an
-agent remembering it, nor on one not being cut off between labelling and closing. The agents
-comment *before* they label for the same reason, so a harness close is never a silent one.
+**Why a rejected PR still merges.** A research agent's first act is to read
+`past_research/<asset-class>/all_ideas.md` on `main` so it does not repeat what has been tried.
+Research that never merges is invisible there, so the next agent burns a whole session
+rediscovering the same dead end — which is the one thing a negative result exists to prevent.
+Closing a PR instead of merging it destroys exactly the output that was worth keeping. So a
+Failed write-up, a structurally undeployable strategy, and a blocker that outlived its
+revision rounds all merge; only the research record lands, never a runner.
+
+When a **Working** strategy is not deployed, the reviewer marks its `all_ideas.md` row
+`**Working — not deployed**` with the reason and appends a `## Deployment review` section to
+the report. Without that the next researcher reads "Working", sees nothing live, and has no
+idea why.
+
+The merge — not the label — is what ends the job. `review_outcome` in `gh_lib.sh` treats
+`archived` on an *open* PR as unfinished, so the poller hands it back and the agent completes
+it. Merging is left to the agent rather than enforced by a script because the usual failure is
+a conflict in `all_ideas.md`, where two PRs appended a row to one table; keeping both rows
+takes judgement.
 
 Every sweep also runs a **watchdog** for anything *not* under systemd. Once
 `install_autostart.sh` has run, systemd is the supervisor — including of the poller itself —
@@ -235,13 +267,12 @@ restarts:
 | `harness:paused` | Cut off by a usage limit | skip — the resume button clears it |
 | `invalid` + `needs-revision` | Fixable blocker | picks up → revise |
 | `revision:1` / `revision:2` | Round counter | — |
-| `invalid` + `wontfix` | Structurally undeployable here | terminal, PR closed |
+| `archived` (+ `wontfix`) | Merged as a research record; nothing deployed | terminal, PR merged |
 | `harness:exhausted` | Two revision rounds spent | terminal |
 | `harness:failed` | 3 genuine agent failures | terminal |
 | `deployed` | Live | terminal, PR merged |
 
-Clear a label to have the PR retried; the dashboard's requeue button does exactly that. A
-`wontfix` PR must also be reopened first — the poller only lists open PRs.
+Clear a label to have the PR retried; the dashboard's requeue button does exactly that.
 
 The agent reviews in a `git worktree`, never by checking out a branch in the main working
 tree — a branch missing another strategy's `live/` directory would delete it out from under

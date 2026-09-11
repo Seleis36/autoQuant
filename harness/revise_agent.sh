@@ -62,14 +62,15 @@ say "PR #$PR: session $UUID"
 "$REPO/harness/agent_exec.sh" start "$UUID" "$LOG" "$TIMEOUT" "$MODEL" "$PROMPT"
 rc=$?
 
-# The revision agent's side effect: either it cleared `needs-revision` (pushed a fix, PR
-# goes back to the deploy queue) or it closed the PR as a genuine dead end. Anything else
-# means it did not finish.
+# The revision agent's side effect is always the same shape: `needs-revision` is gone, so
+# the PR is back in the review queue. That covers both of its outcomes -- a pushed fix, and
+# an idea retired as Failed, which it hands back for the reviewer to merge as a record
+# rather than closing. It never merges and never deploys; that is the reviewer's job.
 labels="$(pr_labels "$PR")"
 state="$(gh pr view "$PR" --json state --jq .state 2>/dev/null)"
 terminal=1
 case ",$labels," in *",needs-revision,"*) ;; *) terminal=0 ;; esac
-[ "$state" = "CLOSED" ] && terminal=0
+case "$state" in CLOSED|MERGED) terminal=0 ;; esac
 
 session_side_effect_override "$UUID" "$terminal"
 status="$(session_status "$UUID")"
@@ -77,10 +78,6 @@ status="$(session_status "$UUID")"
 if [ "$terminal" -eq 0 ]; then
   add_label "$PR" "revision:$next"
   say "PR #$PR: revision round $next complete (state=$state labels=$labels)"
-  case "$(enforce_wontfix_closed "$PR" "$labels" "$state")" in
-    closed)       say "PR #$PR: wontfix -- closed" ;;
-    close-failed) say "PR #$PR: wontfix, but closing it failed -- close it by hand" ;;
-  esac
   echo "$PR revised-$next $TS" >> "$STATE/processed.log"
   exit 0
 fi

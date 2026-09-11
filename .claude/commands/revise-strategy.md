@@ -1,5 +1,5 @@
 ---
-description: Fix a quant-research PR that the deployment agent sent back, re-validate it honestly, and put it back in the queue — or retire it if the fix kills the alpha.
+description: Fix a quant-research PR that the deployment agent sent back, re-validate it honestly, and put it back in the queue — or retire it as a documented negative result if the fix kills the alpha.
 argument-hint: <pr-number>
 ---
 
@@ -22,9 +22,11 @@ If that is empty, stop immediately and say a PR number is required.
 
 **You are allowed to conclude that the fix kills the alpha.** If re-capping at 1.0 takes
 Sharpe from 1.63 to 0.6, the honest outcome is to say so, flip the entry in `all_ideas.md` to
-**Failed**, comment on the PR explaining what the constraint cost, and close it. That is a
-successful run of this command — a documented negative result stops the next researcher
-repeating it.
+**Failed**, comment on the PR explaining what the constraint cost, and hand it back to review.
+That is a successful run of this command — the reviewer then merges it as a research record,
+which is what stops the next researcher repeating the idea. Retiring an idea is not closing
+the PR: research that never merges never reaches `all_ideas.md` on `main`, and is therefore
+invisible to the agent that would otherwise repeat it.
 
 A revision agent that can only succeed will manufacture success. You will be tempted to
 quietly widen a window, drop a costly year, relax a cost assumption or re-pick a threshold
@@ -48,8 +50,8 @@ The deployment agent's comment is the brief. It states which strategy it assesse
 blocking reason with the file and line that shows it, and what would unblock the PR. Work
 from that list and nothing else.
 
-If the PR is closed, merged, or carries `deployed`, `wontfix` or `harness:exhausted`, stop and
-report that — it is not yours to touch.
+If the PR is closed, merged, or carries `deployed`, `archived` or `harness:exhausted`, stop
+and report that — it is not yours to touch.
 
 ## Phase 2 — Worktree
 
@@ -149,14 +151,23 @@ cd /home/seleis/autoQuant && git worktree remove "$WT" --force
 
 gh pr comment $ARGUMENTS --body-file <a file you write outside the repo>   # comment FIRST
 gh api -X DELETE "repos/$SLUG/issues/$ARGUMENTS/labels/needs-revision"
-echo '{"labels":["wontfix"]}' | gh api -X POST "repos/$SLUG/issues/$ARGUMENTS/labels" --input -
-gh pr close $ARGUMENTS
+gh api -X DELETE "repos/$SLUG/issues/$ARGUMENTS/labels/invalid"
+gh pr view $ARGUMENTS --json labels --jq '[.labels[].name]'    # confirm both are gone
 ```
 
 The comment states what the constraint did to the numbers and why the idea is not worth
-carrying further. It goes before the label because the harness closes any open PR carrying
-`wontfix` — if you were cut off between the two, the PR must not end up closed with no
-explanation on it. Keep the branch and the report — the negative result is the deliverable.
+carrying further.
+
+**Retiring an idea ends exactly like fixing one: you hand the PR back to review.** The only
+difference is what the PR now says — `all_ideas.md` reads **Failed** and the report carries
+the revision section. The reviewer reads that, finds nothing to deploy, and merges it as a
+research record. That merge is the whole point of the negative result: research agents choose
+their next idea from `all_ideas.md` on `main`, so a retired idea that never merges is one the
+next agent will try again from scratch.
+
+**Do not close the PR and do not merge it yourself.** Closing strands the write-up on a branch
+nobody reads; merging is the reviewer's job. Keep the branch and the report — the negative
+result is the deliverable.
 
 ---
 

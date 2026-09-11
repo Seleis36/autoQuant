@@ -70,23 +70,17 @@ rc=$?
 # behind; if one is not there the run did not finish, whatever its exit code claimed.
 labels="$(pr_labels "$PR")"
 state="$(gh pr view "$PR" --json state --jq .state 2>/dev/null)"
+outcome="$(review_outcome "$labels" "$state")"
 terminal=1
-case ",$labels," in
-  *,deployed,*|*,invalid,*|*,wontfix,*) terminal=0 ;;
-esac
-[ "$state" = "MERGED" ] && terminal=0
+[ "$outcome" != "none" ] && terminal=0
 
 session_side_effect_override "$UUID" "$terminal"
 status="$(session_status "$UUID")"
 
 if [ "$terminal" -eq 0 ]; then
-  say "PR #$PR: terminal decision reached (state=$state labels=$labels)"
-  case "$(enforce_wontfix_closed "$PR" "$labels" "$state")" in
-    closed)       say "PR #$PR: wontfix -- closed" ;;
-    close-failed) say "PR #$PR: wontfix, but closing it failed -- close it by hand" ;;
-  esac
+  say "PR #$PR: terminal decision reached ($outcome; state=$state labels=$labels)"
   rm -f "$ATTEMPT_FILE"
-  echo "$PR $(echo "$labels" | tr ',' ' ' | grep -oE 'deployed|invalid' | head -1) $TS" >> "$STATE/processed.log"
+  echo "$PR $outcome $TS" >> "$STATE/processed.log"
   exit 0
 fi
 

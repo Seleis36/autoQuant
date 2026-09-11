@@ -143,3 +143,101 @@ def test_post_to_an_unknown_path_is_404(server):
     with pytest.raises(urllib.error.HTTPError) as e:
         urllib.request.urlopen(req, timeout=10)
     assert e.value.code == 404
+
+
+# ------------------------------------------------------------- research model picker
+#
+# The dashboard is reachable over the tailnet and this value reaches a subprocess argv,
+# so the model is an allowlist key, never a free-text string that is passed through.
+
+class _Calls(list):
+    """Only the launcher invocations; `sh` also runs `claude --version` for the picker."""
+
+    @property
+    def launches(self):
+        return [c for c in self if c and c[0] == dashboard.RESEARCH]
+
+
+@pytest.fixture
+def captured_launch(monkeypatch):
+    calls = _Calls()
+    monkeypatch.setattr(dashboard, "sh",
+                        lambda cmd, *a, **k: (calls.append(cmd), (0, "started", ""))[1])
+    return calls
+
+
+def test_the_default_model_is_pinned_not_an_alias(server, captured_launch):
+    """`claude --model opus` resolves to Opus 4.7 on this CLI build, so a short name
+    silently runs a previous generation."""
+    code, body = post(server, {"action": "launch_research", "asset_class": "spot-btc"})
+    assert body["ok"] is True
+    assert captured_launch.launches[0][-2:] == ["--model", "claude-opus-5"]
+
+
+@pytest.mark.parametrize("key,model_id", [
+    ("opus", "claude-opus-5"),
+    ("sonnet", "claude-sonnet-5"),
+])
+def test_each_offered_model_launches_on_its_pinned_id(server, captured_launch, key, model_id):
+    code, body = post(server, {"action": "launch_research", "asset_class": "fx-majors",
+                               "model": key})
+    assert body["ok"] is True
+    assert captured_launch.launches[0][-2:] == ["--model", model_id]
+
+
+@pytest.mark.parametrize("bad", ["haiku", "claude-opus-5", "", "--dangerously-skip-permissions"])
+def test_a_model_outside_the_allowlist_is_refused(server, captured_launch, bad):
+    code, body = post(server, {"action": "launch_research", "asset_class": "spot-btc",
+                               "model": bad})
+    if bad == "":
+        assert body["ok"] is True          # empty falls back to the default
+    else:
+        assert body["ok"] is False and "model" in body["error"]
+        assert captured_launch.launches == [], "nothing may be launched on a rejected model"
+
+
+def test_a_model_the_installed_cli_cannot_run_is_refused_before_launching(
+        server, captured_launch, monkeypatch):
+    """The agent is detached, so an unsupported model would otherwise surface as a session
+    that died minutes later with the reason buried in a log."""
+    monkeypatch.setattr(dashboard, "research_model_options", lambda: [
+        {"key": "fable", "id": "claude-fable-5-1", "label": "Fable 5.1",
+         "unavailable": "needs Claude Code >= 2.1.251; this machine has 2.1.114."}])
+    code, body = post(server, {"action": "launch_research", "asset_class": "spot-btc",
+                               "model": "fable"})
+    assert body["ok"] is False
+    assert "2.1.251" in body["error"]
+    assert captured_launch.launches == []
+
+
+def test_model_options_mark_an_unsupported_model_rather_than_hiding_it(monkeypatch):
+    monkeypatch.setattr(dashboard, "_cli_version", lambda: "2.1.114")
+    opts = {o["key"]: o for o in dashboard.research_model_options()}
+    assert set(opts) == set(dashboard.RESEARCH_MODELS)
+    assert "unavailable" in opts["fable"] and "2.1.251" in opts["fable"]["unavailable"]
+    assert "unavailable" not in opts["opus"]
+    assert opts["opus"]["default"] is True
+
+
+def test_a_new_enough_cli_offers_every_model(monkeypatch):
+    monkeypatch.setattr(dashboard, "_cli_version", lambda: "2.2.0")
+    assert all("unavailable" not in o for o in dashboard.research_model_options())
+
+
+@pytest.mark.parametrize("have,want,below", [
+    ("2.1.114", "2.1.251", True), ("2.1.251", "2.1.251", False),
+    ("2.1.300", "2.1.251", False), ("2.2.0", "2.1.251", False),
+    ("3.0.0", "2.1.251", False), ("2.0.999", "2.1.251", True),
+])
+def test_version_comparison_is_numeric_not_lexicographic(have, want, below):
+    assert dashboard._version_below(have, want) is below
+
+
+@pytest.mark.parametrize("model,tier", [
+    ("claude-fable-5-1", "fable"), ("claude-opus-5", "opus"),
+    ("claude-sonnet-5", "sonnet"), ("claude-haiku-4-5", "haiku"),
+])
+def test_usage_is_priced_against_the_right_tier(model, tier):
+    """Fable used to fall through to the sonnet fallback and be costed at a fifth."""
+    assert dashboard._tier(model) == tier
+    assert dashboard.PRICING[tier]["in"] > 0

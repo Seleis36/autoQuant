@@ -216,46 +216,52 @@ def test_start_reports_only_this_run(stopped_dashboard):
     assert "stale and long fixed" not in out
 
 
-# ------------------------------------------------------- wontfix PRs are closed
+# --------------------------------------------------- what counts as a finished review
 #
-# The agents are told to close a `wontfix` PR, and the supervisors enforce it too. The
-# helper is driven through a stand-in `gh` on PATH that records its arguments, so the
-# test proves which GitHub call would be made without ever making one.
+# `review_outcome` is the authoritative "did the deployment agent finish" test, and it is
+# a pure function of the labels and the PR state, so it is driven directly here.
+#
+# The rule it encodes: every PR ends up merged except one sent back for revision. A
+# rejected PR merges as a research record, because the next research agent reads
+# `all_ideas.md` on main and repeats whatever never got there.
 
-def _enforce(tmp_path, labels, state, gh_rc=0):
-    log = tmp_path / "gh.log"
-    fake = tmp_path / "bin" / "gh"
-    fake.parent.mkdir(exist_ok=True)
-    fake.write_text(f'#!/usr/bin/env bash\necho "$*" >> {log}\nexit {gh_rc}\n')
-    fake.chmod(0o755)
+def _outcome(labels, state):
     script = (f'source {os.path.join(HARNESS, "gh_lib.sh")}; '
-              f'enforce_wontfix_closed 42 "{labels}" "{state}"; echo "rc=$?"')
-    p = subprocess.run(["bash", "-c", script], capture_output=True, text=True,
-                       env={**os.environ, "PATH": f"{fake.parent}:{os.environ['PATH']}"})
-    calls = log.read_text().splitlines() if log.exists() else []
-    return p.stdout.split(), calls
+              f'review_outcome "{labels}" "{state}"')
+    p = subprocess.run(["bash", "-c", script], capture_output=True, text=True)
+    assert p.returncode == 0, p.stderr
+    return p.stdout.strip()
 
 
-def test_an_open_wontfix_pr_is_closed_through_rest(tmp_path):
-    out, calls = _enforce(tmp_path, "invalid,wontfix", "OPEN")
-    assert out == ["closed", "rc=0"]
-    assert len(calls) == 1
-    assert calls[0].startswith("api -X PATCH repos/") and "/pulls/42" in calls[0]
-    assert "state=closed" in calls[0]
+@pytest.mark.parametrize("labels,state,expected", [
+    ("deployed", "MERGED", "deployed"),
+    ("archived", "MERGED", "archived"),
+    ("archived,wontfix", "MERGED", "archived"),
+    ("", "MERGED", "archived"),                  # merged without `deployed` is a record
+    ("invalid,needs-revision", "OPEN", "revision"),
+    ("deployed", "OPEN", "deployed"),            # labelled before the merge registered
+])
+def test_a_finished_review_is_recognised(labels, state, expected):
+    assert _outcome(labels, state) == expected
 
 
 @pytest.mark.parametrize("labels,state", [
-    ("invalid,needs-revision", "OPEN"),      # fixable: stays open for the revision agent
-    ("deployed", "MERGED"),
-    ("invalid,wontfix", "CLOSED"),           # the agent already closed it
-    ("invalid,not-wontfix", "OPEN"),         # a substring is not the label
+    ("archived", "OPEN"),                        # decided, but the merge never landed
+    ("archived,wontfix", "OPEN"),
+    ("invalid", "OPEN"),                         # no verdict beyond "not as submitted"
+    ("", "OPEN"),                                # agent left nothing behind
+    ("harness:processing", "OPEN"),
 ])
-def test_nothing_else_is_touched(tmp_path, labels, state):
-    out, calls = _enforce(tmp_path, labels, state)
-    assert out == ["rc=0"]
-    assert calls == []
+def test_an_unfinished_review_is_not_mistaken_for_a_decision(labels, state):
+    """An archived PR that never merged is the case this exists for: the research is still
+    stranded on a branch, so the run is unfinished and the poller must hand it back."""
+    assert _outcome(labels, state) == "none"
 
 
-def test_a_failed_close_is_reported_not_swallowed(tmp_path):
-    out, _ = _enforce(tmp_path, "invalid,wontfix", "OPEN", gh_rc=1)
-    assert out == ["close-failed", "rc=1"]
+def test_an_archived_pr_awaiting_its_merge_returns_to_the_review_queue(tmp_path):
+    """...and the poller must not filter it out on the way. `wontfix` used to park a PR
+    permanently; it now travels with `archived`, so only the merged state is terminal."""
+    src = open(os.path.join(HARNESS, "poll_prs.sh")).read()
+    review = src.split("--- review queue")[1]
+    assert '"wontfix"' not in review, "wontfix must no longer park a PR in the review queue"
+    assert '. == "deployed"' in review

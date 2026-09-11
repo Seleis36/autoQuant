@@ -46,8 +46,13 @@ the PR gets labelled `invalid` with the blocking reasons quoted line by line.
 Its bar is deliberately unfriendly, but it is a bar about the *research*: spec ambiguous,
 numbers contradict the report, a lookahead defect, a signal we cannot obtain live. What is no
 longer a rejection is being about the wrong asset class — shorting, leverage and non-crypto
-instruments used to be automatic `wontfix`, and that verdict retired good research for the
+instruments used to be automatic rejections, and that verdict retired good research for the
 sole reason that the desk only owned a crypto exchange.
+
+**A rejected PR is still merged** — as a research record, with nothing in `live/`. Researchers
+pick their next idea by reading `past_research/<asset>/all_ideas.md` on `main`, so a negative
+result that never merges is one the next agent rediscovers from scratch. Only a PR going back
+for revision stays open.
 
 **The revision agent** (`/revise-strategy <pr>`) picks up what the reviewer sent back. The
 rejection comment is its brief: it fixes the quoted blocker, re-runs the whole validation

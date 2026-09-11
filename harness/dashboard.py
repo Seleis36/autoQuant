@@ -59,20 +59,74 @@ ASSET_CLASSES = ["spot-btc", "spot-eth", "crypto-perps", "crypto-alts", "us-larg
                  "sector-etf", "global-equity-etf", "fx-majors", "rates-bonds",
                  "commodities", "vol-complex"]
 
-# Approximate Claude pricing, $/Mtok, for the local usage estimate only.
+# Models a research agent may be launched on. The dashboard is the only caller that needs
+# an allowlist -- it is reachable over the tailnet, and this value reaches a subprocess
+# argv -- but pinning ids here also fixes a quieter problem: `claude --model opus` resolves
+# to Opus 4.7 and `sonnet` to Sonnet 4.6 on this CLI build, so the short names silently ran
+# a previous generation. Ids make the session registry say exactly what produced a result.
+RESEARCH_MODELS = {
+    "opus":   {"id": "claude-opus-5",   "label": "Opus 5"},
+    "sonnet": {"id": "claude-sonnet-5", "label": "Sonnet 5"},
+    "fable":  {"id": "claude-fable-5-1", "label": "Fable 5.1", "min_cli": "2.1.251"},
+}
+DEFAULT_RESEARCH_MODEL = "opus"
+
+# Approximate Claude pricing, $/Mtok, for the local usage estimate only. A cache write is
+# 1.25x input and a cache read 0.1x -- except Fable, where a read is a flat $0.25/Mtok.
+# Priced per tier, so a transcript from a previous generation (Sonnet 4.6 at $3/$15) is
+# costed at the current rate; the total is an estimate either way.
 PRICING = {
-    "opus":   {"in": 15.0, "out": 75.0, "cache_w": 18.75, "cache_r": 1.50},
-    "sonnet": {"in": 3.0,  "out": 15.0, "cache_w": 3.75,  "cache_r": 0.30},
+    "fable":  {"in": 10.0, "out": 50.0, "cache_w": 12.50, "cache_r": 0.25},
+    "opus":   {"in": 5.0,  "out": 25.0, "cache_w": 6.25,  "cache_r": 0.50},
+    "sonnet": {"in": 2.0,  "out": 10.0, "cache_w": 2.50,  "cache_r": 0.20},
     "haiku":  {"in": 1.0,  "out": 5.0,  "cache_w": 1.25,  "cache_r": 0.10},
 }
 
 
 def _tier(model: str) -> str:
     m = (model or "").lower()
-    for t in ("opus", "sonnet", "haiku"):
+    for t in ("fable", "opus", "sonnet", "haiku"):
         if t in m:
             return t
     return "sonnet"
+
+
+@functools.lru_cache(maxsize=1)
+def _cli_version() -> str:
+    """Version of the `claude` the agents actually run on (CLAUDE_BIN selects it).
+
+    Cached for the life of the process: `/api/state` is polled every 10 seconds and this
+    costs a subprocess. A `claude update` is therefore picked up at the next dashboard
+    restart, which is also when the agents would start using the new binary.
+    """
+    rc, out, _ = sh([os.environ.get("CLAUDE_BIN", "claude"), "--version"], 20)
+    return out.split()[0] if rc == 0 and out else ""
+
+
+def _version_below(have: str, want: str) -> bool:
+    def parts(v):
+        return [int(x) for x in re.findall(r"\d+", v)[:3]] or [0]
+    return parts(have) < parts(want)
+
+
+def research_model_options() -> list:
+    """The picker's options, each marked with why it cannot be used, if it cannot.
+
+    A model the installed CLI is too old for is offered but disabled, rather than hidden:
+    silently dropping it looks like the feature is missing, and launching onto it would
+    fail minutes later inside a detached agent with the reason buried in a log.
+    """
+    cli = _cli_version()
+    out = []
+    for key, m in RESEARCH_MODELS.items():
+        row = {"key": key, "id": m["id"], "label": m["label"],
+               "default": key == DEFAULT_RESEARCH_MODEL}
+        need = m.get("min_cli")
+        if need and cli and _version_below(cli, need):
+            row["unavailable"] = (f"needs Claude Code >= {need}; this machine has {cli}. "
+                                  "Run `claude update`.")
+        out.append(row)
+    return out
 
 
 def sh(cmd, timeout=30, cwd=REPO_ROOT):
@@ -501,8 +555,16 @@ def do_action(body: dict) -> dict:
         ac = body.get("asset_class", "")
         if ac not in ASSET_CLASSES:
             return {"ok": False, "error": "unknown asset class"}
+        key = body.get("model") or DEFAULT_RESEARCH_MODEL
+        if key not in RESEARCH_MODELS:
+            return {"ok": False, "error": f"unknown model {key!r}"}
+        opt = next(o for o in research_model_options() if o["key"] == key)
+        if opt.get("unavailable"):
+            # Caught here rather than at the venue: the agent is detached, so an
+            # unsupported model would otherwise surface as a session that died silently.
+            return {"ok": False, "error": f"{opt['label']} {opt['unavailable']}"}
         seed = (body.get("seed") or "")[:500]
-        rc, out, err = sh([RESEARCH, ac, seed], 60)
+        rc, out, err = sh([RESEARCH, ac, seed, "--model", opt["id"]], 60)
         return {"ok": rc == 0, "output": out or err}
     return {"ok": False, "error": f"unknown action {a!r}"}
 
@@ -557,6 +619,7 @@ class Handler(BaseHTTPRequestHandler):
                 "agents": CACHE.get("agents", []),
                 "sessions": CACHE.get("sessions", []),
                 "asset_classes": ASSET_CLASSES,
+                "research_models": research_model_options(),
                 "ages": {k: CACHE.age(k) for k in
                          ("prs", "account", "usage", "data", "git", "agents",
                           "sessions")},

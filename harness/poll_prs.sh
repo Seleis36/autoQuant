@@ -16,7 +16,7 @@
 # Revision runs first: it drains PRs back into the review queue, and the slot gate in
 # session_lib.sh gives PR work priority over new research for the same reason.
 #
-# Terminal labels the agents apply: deployed / wontfix / harness:failed /
+# Terminal labels the agents apply: deployed / archived (merged) / harness:failed /
 # harness:exhausted. `harness:processing` marks an in-flight PR so overlapping sweeps
 # never double-launch an agent on the same one, and `harness:paused` holds a PR whose
 # agent was cut off by a usage limit -- the resume button clears that, not the poller.
@@ -90,7 +90,7 @@ sweep() {
                 | select([.labels[].name] | any(. == "needs-revision"))
                 | select([.labels[].name]
                          | any(. == "harness:processing" or . == "harness:paused"
-                               or . == "harness:exhausted" or . == "wontfix"
+                               or . == "harness:exhausted" or . == "archived"
                                or . == "deployed")
                          | not)
                 | "\(.number)\t\(.headRefName)\t\(.title)"' 2>/dev/null)"
@@ -114,7 +114,7 @@ sweep() {
           --jq '.[]
                 | select(.isDraft | not)
                 | select([.labels[].name]
-                         | any(. == "deployed" or . == "wontfix"
+                         | any(. == "deployed"
                                or . == "harness:failed" or . == "harness:exhausted"
                                or . == "harness:processing" or . == "harness:paused"
                                or . == "needs-revision" or . == "invalid")
