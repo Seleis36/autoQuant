@@ -139,3 +139,40 @@ code/spot-btc/coinbase-premium/strategy.py           target_weight(binance_close
 alphas/spot-btc/coinbase-premium/                    candidate spec + equity.png/csv, premium_signal.png, premium_quintiles.png
 ```
 `exp01` regenerates `panel.parquet` (not committed); run `fetch_data.py` first.
+
+---
+
+## 9. Deployment review (2026-09-12) — deployed despite the failed criterion
+
+This idea is **live in paper trading** as `live/spot-btc/coinbase-premium`, and §6 above still
+stands: it did **not** clear the Sharpe ≥ 2.0 bar of the brief that produced it. PR #6 remains
+labelled `archived`, not `deployed` — the research verdict has not been revised. The deployment
+is an **explicit operator decision** to trade the strategy at its honest 1.48, taken after the
+PR had been archived, because a real, orthogonal, replicated ~1.5-Sharpe long/flat signal is
+worth a live track even though it missed the bar it was measured against.
+
+What that means for the next agent reading this file:
+
+* **Do not treat this as precedent that 1.48 clears a 2.0 brief.** It does not. A research
+  session given `--require "Sharpe >= 2.0"` should still report `Met: NO` at 1.48 and expect
+  to be archived; this deployment was a human overriding that outcome, not the pipeline
+  accepting it.
+* **The live track should be judged against ~1.35, not 1.48.** §6's own reasoning applies:
+  best-of-310 on a plateau whose walk-forward median is 1.29 argues for discounting the
+  headline. Bootstrap P(Sharpe > 2) is 5.6 %.
+* **Nothing in the research was changed to make it deployable.** The runner imports
+  `code/spot-btc/coinbase-premium/strategy.py :: target_weight` with its committed defaults
+  (z_window 720, enter 0, exit −1.5, trend 1200 h, vol target 0.40, halflife 480 h, cap 1.0).
+  The §7 negative results are all still negative.
+
+### Execution notes established at deployment
+
+| Check | Result |
+|---|---|
+| Book | `venue` — Binance spot testnet, long/flat, unlevered, 2500 USDT own ledger (pool now 10000/10000) |
+| Live vs backtest weight | Runner's 9000-bar window reproduces the full-history `target_weight` **exactly** for the last closed bar (1.0 vs 1.0); max abs difference **7.3e-7** over the last 720 bars |
+| Saved-series lag convention | `alphas/.../equity.csv` weight column is **lag 0** — row *t* is the weight decided at *t* (mean abs diff 1.8e-4 at lag 0 vs 0.08 at lag 1); 1 of 3314 daily rows differs > 1 %, a resample artifact of an intraday state flip |
+| History window | 1500 bars is not enough (max diff 1.0 — the hysteresis state and 1200-bar SMA are unwarmed); 2000 → 9.0e-3, 3000 → 2.4e-4, **9000 → 6.1e-7**. The runner fetches 9000 and refuses below 6000 |
+| Cost | No gap: research charges 10 bp/side, market orders pay ~10 bp taker |
+| Second feed | Coinbase BTC-USD hourly comes from this idea's own `fetch_data.py :: fetch_coinbase`, refreshed incrementally into `data/COINBASE_BTCUSD_1h.parquet` (`MarketData` has no Coinbase source). The runner drops the still-forming candle, raises if Coinbase falls > 3 h behind Binance, and lets a single missing bar carry the state over per the spec |
+| Correlation to what is already live | 0.64 daily (0.70 OOS) with `spot-btc/weekday-trend` (§4.3); both are long-BTC-in-uptrend sleeves and `bult` is a third |

@@ -2,6 +2,9 @@
 
 > Status: **Failed against acceptance criterion** (best 1.48 vs 2.0 required). This spec is kept so the
 > signal can be reused if a future brief has a lower bar. Report: `past_research/spot-btc/coinbase-premium/2026-09-12_coinbase_premium.md`.
+> **Deployed anyway, 2026-09-12** — running in paper trading as `live/spot-btc/coinbase-premium`
+> (venue book, 2500 USDT) on an explicit operator decision to trade it at 1.48. The criterion was
+> not met and PR #6 stays `archived`; see §9 of the report for what that does and does not imply.
 
 ## Instrument & mechanics
 

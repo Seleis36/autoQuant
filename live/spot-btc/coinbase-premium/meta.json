@@ -1,0 +1,48 @@
+{
+  "name": "spot-btc/coinbase-premium",
+  "title": "Coinbase premium — USD-venue vs Binance-USDT dislocation timer",
+  "asset_class": "spot-btc",
+  "short_name": "coinbase-premium",
+  "description": "The Coinbase BTC-USD price relative to Binance BTCUSDT, z-scored against its trailing 30 days of hourly bars, is traded as a hysteresis state machine (long once z > 0, flat once z < −1.5) and sized by a 50-day trend filter and an inverse-EWMA-vol scalar. The report's own conclusion is that the edge lives in the Binance-USDT quote leg, not in US institutional demand: a Coinbase-vs-Bitstamp (USD-vs-USD) premium has zero Sharpe.",
+  "symbol": "BTCUSDT",
+  "schedule": "1h",
+  "capital_usdt": 2500.0,
+  "direction": "long/flat",
+  "book": "venue",
+  "deployed_at": "2026-09-12T07:05:00Z",
+  "provenance": {
+    "pr": 6,
+    "commit": "f08098dfb1ccd62a51e6e450603b613ada21b384",
+    "branch": "research/spot-btc-coinbase-premium",
+    "spec": "alphas/spot-btc/coinbase-premium/2026-09-12_alpha_spec.md",
+    "report": "past_research/spot-btc/coinbase-premium/2026-09-12_coinbase_premium.md",
+    "strategy_code": "code/spot-btc/coinbase-premium/strategy.py"
+  },
+  "backtest": {
+    "period": "2017-08 → 2026-09",
+    "bars": "hourly",
+    "cost_bps_per_side": 10.0,
+    "cost_type": "taker",
+    "sharpe": 1.48,
+    "sharpe_is": 1.48,
+    "sharpe_oos": 1.48,
+    "sharpe_walkforward": 1.37,
+    "sharpe_ci": [0.84, 2.02],
+    "cagr_pct": 39.9,
+    "vol_pct": 27.0,
+    "maxdd_pct": -33.1,
+    "sortino": null,
+    "calmar": null,
+    "avg_exposure": 0.29,
+    "round_trips_per_year": 44,
+    "benchmark": {"name": "BTC buy & hold", "sharpe": 0.82, "cagr_pct": null, "maxdd_pct": null}
+  },
+  "live_notes": [
+    "DEPLOYED AGAINST A FAILED ACCEPTANCE CRITERION. The research brief required Sharpe >= 2.0 and this strategy reaches 1.48 net; PR #6 was archived as a Failed result and is labelled `archived`, not `deployed`. It is live on an explicit operator decision to trade it at 1.48. The report puts P(true Sharpe > 2) at 5.6% and recommends discounting the 1.48 toward ~1.35 for best-of-310 selection bias — judge the live track against ~1.35, not against 1.48.",
+    "No cost gap: the research charges 10 bp/side and the runner's market orders pay the ~10 bp taker fee. The report's cost ladder is 0 bp 1.84 / 3 bp 1.73 / 5 bp 1.66 / 10 bp 1.48 / 20 bp 1.13.",
+    "Live turnover should run under the backtest's 88 side-trades/yr (44 round trips): the 5 USDT minimum notional swallows the hourly drift of the inverse-vol scalar, which the backtest charged in full. Turnover materially ABOVE 88/yr means the state machine is chattering and the premium feed should be checked first.",
+    "Second data feed. The premium needs Coinbase BTC-USD hourly candles from api.exchange.coinbase.com, refreshed by the runner into data/COINBASE_BTCUSD_1h.parquet. If Coinbase falls more than 3 hours behind Binance the runner raises rather than trading a frozen premium; a single missing bar only makes z NaN, and the hysteresis state then carries over, which is the spec's own rule.",
+    "Health check: the edge is +0.2 to +0.35 Sharpe over a plain SMA-50 × inverse-vol baseline that is itself ~1.25. If the rolling premium tercile spread (research: 6.9 bp/h, NW t 6.5 IS / 4.1 OOS) decays toward zero, what is left is the trend baseline and this sleeve stops being worth its correlation to spot-btc/weekday-trend (daily-return correlation 0.64, 0.70 OOS).",
+    "Overlaps two live spot-BTC sleeves. bult and weekday-trend are both long-BTC-in-uptrend; the venue pool is now fully subscribed at 10000/10000 USDT across four strategies."
+  ]
+}
