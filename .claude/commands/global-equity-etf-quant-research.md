@@ -15,6 +15,10 @@ Prioritise sharpe ratio, and risk-adjusted returns in general.
 
 yfinance: `EFA EEM EWJ EWG EWU EWZ EWY EWA EWC FXI INDA ACWI` plus `SPY` as the home leg. Watch the FX overlay — these are USD-denominated wrappers on local indices, so currency is part of the return whether you want it or not.
 
+**Point-in-time macro.** Monthly and quarterly series (CPI, payrolls, GDP, industrial production) are revised for years *and* published weeks after the period they describe. A frame indexed by observation date front-runs every print. Use `from fetch_alfred import as_of, pit_frame` — vintages are cached in `data/vintages/`. Daily market rates (`DGS10`, `^TNX`) are never revised and need none of this.
+
+`code/shared/DATA.md` documents every store and the traps each one hides.
+
 ## What can be deployed
 
 Your idea is deployed into a **simulated book**: any instrument the shared daily cache can

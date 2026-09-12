@@ -15,6 +15,10 @@ Prioritise sharpe ratio, and risk-adjusted returns in general.
 
 yfinance: `XLK XLF XLE XLV XLI XLY XLP XLU XLB XLRE XLC` plus `SPY` as the benchmark. History is clean back to 1999 (XLRE 2015, XLC 2018 — handle the ragged start explicitly).
 
+**Point-in-time macro.** Monthly and quarterly series (CPI, payrolls, GDP, industrial production) are revised for years *and* published weeks after the period they describe. A frame indexed by observation date front-runs every print. Use `from fetch_alfred import as_of, pit_frame` — vintages are cached in `data/vintages/`. Daily market rates (`DGS10`, `^TNX`) are never revised and need none of this.
+
+`code/shared/DATA.md` documents every store and the traps each one hides.
+
 ## What can be deployed
 
 Your idea is deployed into a **simulated book**: any instrument the shared daily cache can

@@ -15,6 +15,12 @@ Prioritise sharpe ratio, and risk-adjusted returns in general.
 
 yfinance: `EURUSD=X GBPUSD=X USDJPY=X AUDUSD=X USDCAD=X USDCHF=X NZDUSD=X`, dollar index `DX-Y.NYB`. Rate differentials from `^TNX`/`^IRX` and foreign equivalents drive carry. FX has near-zero drift — the benchmark to beat is cash, not buy-and-hold.
 
+**Do not charge a flat spread.** `=X` carries no bid/ask, so every cost assumption against it is a guess, and the last FX cycle died on one: a flat 2 bp/side took gross Sharpe 0.69 to net 0.35, while EURUSD's *measured* median spread is ≈0.25 bps. Use `from fetch_dukascopy import spread_bps` for the real figure by pair, year and hour of day, and note that 03:00 and 13:00 are not the same market. Tick-level bid/ask bars are available via `code/shared/fetch_dukascopy.py`.
+
+Also remember the `=X` stamp lag: row `D` is the close at 00:00 UTC on `D`, covering UTC day `D−1`. Dukascopy bars carry their own UTC stamps and need no lag rule.
+
+`code/shared/DATA.md` documents every store and the traps each one hides.
+
 ## What can be deployed
 
 Your idea is deployed into a **simulated book**: any instrument the shared daily cache can

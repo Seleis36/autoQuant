@@ -75,7 +75,10 @@ strength of these numbers.
 | `live/<asset>/<idea>/` | A deployed strategy: `runner.py`, `meta.json`, journal, ledger |
 | `harness/` | The machinery — poller, agent launchers, execution runtime, dashboard |
 | `harness/portfolio.py` | Cross-sectional execution, for strategies that trade a basket |
-| `data/` | Flat shared cache of market data, named by instrument |
+| `data/` | Flat shared cache of daily market data, named by instrument |
+| `data/bars/` | Partitioned intraday store, `<SYMBOL>/<freq>/<year>.parquet` — 1m BTC/ETH since 2017 |
+| `data/vintages/` | Point-in-time macro: each series as it was published on each date |
+| `code/shared/DATA.md` | What data exists, how to read it, and the traps in each source |
 
 ## Running it
 

@@ -13,7 +13,9 @@ Prioritise sharpe ratio, and risk-adjusted returns in general.
 
 ## Universe & data
 
-`ETH-USD` daily from yfinance; hourly/minute bars from the free Binance public REST klines endpoint. ETH/BTC ratio (`ETH-BTC`) is a first-class signal source, as are on-chain gas/burn series.
+`ETH-USD` daily from yfinance. **1-minute bars are cached back to 2017-08-17** (4.76M bars) — `from bars import load_bars; load_bars("ETHUSDT", "1m")`. BTCUSDT is cached on the same grid and the stamps are snapped, so an ETH/BTC ratio joins cleanly minute-by-minute. Extend with `code/shared/fetch_binance_vision.py`. ETH/BTC is a first-class signal source, as are on-chain gas/burn series.
+
+`code/shared/DATA.md` documents every store and the traps each one hides.
 
 ## What can be deployed
 

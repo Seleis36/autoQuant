@@ -13,7 +13,9 @@ Prioritise sharpe ratio, and risk-adjusted returns in general.
 
 ## Universe & data
 
-`BTC-USD` daily from yfinance; hourly/minute bars from the free Binance public REST klines endpoint (no API key). Cross-venue sanity checks against Bitstamp/Coinbase.
+`BTC-USD` daily from yfinance. **1-minute bars are cached back to 2017-08-17** (4.76M bars, 99.8% complete) in the partitioned store — `from bars import load_bars; load_bars("BTCUSDT", "1m")`, or `load_bars("BTCUSDT", "1h", resample_from="1m")` to coarsen without a second copy. Extend or add symbols with `code/shared/fetch_binance_vision.py` (bulk archive, not the 1000-bar REST pages). Measured per-minute spreads are available from futures `bookTicker` — charge those rather than a flat bp figure. Cross-venue sanity checks against Bitstamp/Coinbase.
+
+`code/shared/DATA.md` documents every store and the traps each one hides.
 
 ## What can be deployed
 
