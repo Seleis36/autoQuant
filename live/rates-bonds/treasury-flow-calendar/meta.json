@@ -1,0 +1,53 @@
+{
+  "name": "rates-bonds/treasury-flow-calendar",
+  "title": "Treasury flow calendar — TLT month-end / FOMC / pre-auction",
+  "asset_class": "rates-bonds",
+  "short_name": "treasury-flow-calendar",
+  "description": "Three pre-announced Treasury flow effects netted into one TLT weight in {-1, 0, +1}: long the last 3 trading days of each month (index duration extension), long the day before and the day of each FOMC statement, short the 2 trading days before every 10y and 20y auction incl. reopenings (dealer concession).",
+  "symbol": "TLT",
+  "schedule": "1d",
+  "capital_usdt": 2500.0,
+  "direction": "long/short/flat",
+  "book": "sim",
+  "quotes": "yahoo-daily",
+  "allow_short": true,
+  "max_weight": 1.0,
+  "deployed_at": "2026-09-14T05:31:46Z",
+  "provenance": {
+    "pr": 7,
+    "branch": "research/rates-bonds-treasury-flow-calendar",
+    "commit": "b7b3ad2a88add2046ceb8d49c17fe1522994708f",
+    "spec": "alphas/rates-bonds/treasury-flow-calendar/spec.md",
+    "report": "past_research/rates-bonds/treasury-flow-calendar/2026-09-14_treasury_flow_calendar.md",
+    "strategy_code": "code/rates-bonds/treasury-flow-calendar/strategy.py"
+  },
+  "backtest": {
+    "period": "2010-01 → 2026-09",
+    "bars": "daily",
+    "cost_bps_per_side": 2.0,
+    "cost_type": "all-in (spread + fee), charged per unit of turnover",
+    "sharpe": 1.26,
+    "sharpe_is": 0.88,
+    "sharpe_oos": 1.57,
+    "sharpe_walkforward": [0.75, 0.88],
+    "sharpe_holdout_2002_2009": 0.63,
+    "sharpe_ci": [0.91, 1.63],
+    "cagr_pct": 10.4,
+    "vol_pct": 8.1,
+    "maxdd_pct": -11.5,
+    "avg_exposure": 0.32,
+    "turnover_per_year": 66.3,
+    "round_trips_per_year": 33.2,
+    "benchmark": {"name": "TLT buy & hold", "sharpe": 0.23, "cagr_pct": 2.3, "maxdd_pct": -48.4}
+  },
+  "live_notes": [
+    "SIM book: filled at the yfinance daily close with no order book, rejection or partial fill. Weaker evidence than a venue fill; do not read this Sharpe as exchange-cleared.",
+    "Cost: broker set to 1 bp slippage + 1 bp fee = the research's 2 bp/side all-in. The report's cost ladder: 5 bp -> Sharpe 1.02, 10 bp -> 0.60. Do not rebuild it with the 10 bp default.",
+    "Borderline vs its 'Sharpe >= 1' brief: selection-free estimates are below 1 (walk-forward 0.75-0.88, 2002-09 ETF holdout 0.63, 1990-2009 synthetic 0.87-0.89). The report's honest live expectation is Sharpe 0.9-1.2. The OOS 1.57 is not clean for window selection (report §3).",
+    "Health check: the pre-auction short leg is a post-2010 issuance-regime feature (≈0 Sharpe 1990-2009) and is the first thing expected to break if auction sizes shrink. Month-end + FOMC alone ≈1.0 over 36 years.",
+    "Calendars: FOMC from the committed snapshot, which ends 2027-12-08 -- refresh calendars.py before then. Auctions = snapshot ∪ TreasuryDirect securities/upcoming, fetched each run and persisted to data/treasury_auctions_seen_live.csv; if that endpoint is down the short leg goes flat, the long legs are unaffected.",
+    "Known live-vs-backtest gap: ~6% of 10y/20y auctions (mostly reopenings) were announced one day after the first short-signal close; the date was on Treasury's tentative quarterly schedule, but the upcoming endpoint does not list it yet, so live skips the first short day on those.",
+    "strategy.py's NYSE holiday table observes New Year on Friday when Jan 1 is a Saturday; NYSE does not. Next occurrence 2027-12-31: the December 2027 month-end window will be one day early in live.",
+    "Runs at 00:00 UTC (after the NYSE close) and trades only when the TLT bar changes; a mid-session restart refuses today's forming bar. round_trips_per_year = turnover_per_year / 2 (spec: ≈66 one-way unit weight changes per year)."
+  ]
+}
