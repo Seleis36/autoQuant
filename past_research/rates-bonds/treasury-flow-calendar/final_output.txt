@@ -1,0 +1,28 @@
+
+== strategy.py weights on TLT, 2 bp/side ==
+              Sharpe  CAGR  Vol  MaxDD  HitRate  t_NW  AvgExpo  Turn/yr     N
+PRE 2002-09     0.63   3.9  6.4  -13.0     12.6  1.73     0.24    47.95  1871
+IS 2010-17      0.88   6.4  7.4  -11.5     15.6  2.67     0.28    56.21  2013
+OOS 2018-26     1.57  14.2  8.7   -6.9     20.3  4.79     0.36    75.54  2185
+FULL 2010-26    1.26  10.4  8.1  -11.5     18.1  5.36     0.32    66.33  4198
+
+== TLT buy & hold (0 bp) ==
+              Sharpe  CAGR   Vol  MaxDD
+PRE 2002-09     0.53   6.1  12.7  -26.6
+IS 2010-17      0.58   7.6  14.4  -20.7
+OOS 2018-26    -0.07  -2.3  15.3  -48.4
+FULL 2010-26    0.23   2.3  14.9  -48.4
+
+== per-leg, 2010-26 ==
+  month-end (last 3d, long)            Sharpe 0.78  CAGR 3.9%  t_NW 3.69
+  FOMC (day before + day, long)        Sharpe 0.63  CAGR 2.4%  t_NW 2.95
+  pre-auction 10y/20y (2d, short)      Sharpe 0.72  CAGR 3.8%  t_NW 3.11
+
+== cost sensitivity (full 2010-26 / OOS 2018-26 Sharpe) ==
+  0 bp/side: 1.43 / 1.75
+  1 bp/side: 1.35 / 1.66
+  2 bp/side: 1.26 / 1.57
+  3 bp/side: 1.18 / 1.49
+  5 bp/side: 1.02 / 1.31
+
+figures written to /home/seleis/autoQuant/code/rates-bonds/treasury-flow-calendar/../../../alphas/rates-bonds/treasury-flow-calendar

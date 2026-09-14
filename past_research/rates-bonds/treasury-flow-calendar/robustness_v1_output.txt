@@ -1,0 +1,70 @@
+/home/seleis/autoQuant/code/rates-bonds/treasury-flow-calendar/robustness.py:128: Pandas4Warning: Sorting by default when concatenating all DatetimeIndex is deprecated.  In the future, pandas will respect the default of `sort=False`. Specify `sort=True` or `sort=False` to silence this message. If you see this warnings when not directly calling concat, report a bug to pandas.
+  book = pd.concat({"btc_wt": btc_net, "eth_tf": eth_net, "btc_bh": btc.pct_change(), "tlt_bh": ret,
+
+(a) per-year Sharpe (2 bp/side)
+Date                  2002  2003  2004  2005  2006  2007  2008  2009  2010  2011  2012  2013  2014  2015  2016  2017  2018  2019  2020  2021  2022  2023  2024  2025  2026
+month_end3            2.62  0.18 -0.06  1.38  0.21  1.94  1.04  0.07  1.92  0.80  0.98  0.36  1.80  0.35  1.27  0.73  1.67  1.94  0.41  0.57  0.31  0.36  0.95  0.84 -2.01
+month_end2            1.20  1.16  1.54  1.18  1.13  2.06  0.94  0.76  2.56  1.58  1.12  0.66 -0.01  0.32 -0.17 -0.13  0.69  1.12 -0.10  0.30 -0.42  0.80  1.62  0.47 -1.17
+month_end4            1.66 -0.28 -0.10  1.27 -0.28  1.38  0.46  1.15  1.63  0.19  1.26  0.09  2.44  0.05  1.26  0.01  1.22  1.69 -0.06  0.69 -0.23  1.11  0.62  1.34 -2.18
+month_start_short    -2.36  0.55 -1.24  0.37  0.31  1.41 -0.28  1.78  2.58  0.62  0.81  0.33 -1.04  1.10 -1.22 -0.95 -0.60  0.69 -0.10  1.04  2.09 -0.10 -0.41  0.31  1.06
+fomc_1b+0             3.26 -1.73  0.88  0.35  0.53 -0.18  0.57 -0.24  0.69  1.75 -2.14  0.18 -0.41  0.11  1.38  1.25  0.59  2.84  1.25 -1.13  0.79  1.82  0.16  1.20 -1.30
+fomc_0                2.55 -1.64 -0.04  0.80  0.35  0.15  0.05 -0.55 -0.52  0.46 -2.12 -0.47 -0.63  0.46  1.24  1.51  0.79  2.18  1.31 -1.27  0.96  2.29  0.69 -0.56 -2.01
+fomc_2b+0             2.94 -0.55  0.37 -1.28  0.69 -0.18  1.08 -0.20  0.75  1.42 -1.75 -0.68 -0.92 -0.16  1.75  0.45  0.07  2.30  1.34 -0.02 -1.03  0.78  0.84  0.86 -0.51
+pre_auc_10y20y_2d     1.57 -1.13 -1.14  0.28 -1.79  0.07  0.06 -0.21  1.15 -0.38 -0.75 -0.83 -1.66 -0.24  0.70 -0.01  0.51  0.89  1.72  1.10  2.84  0.89  1.10  0.49  1.40
+pre_auc_10y_2d        1.57 -1.13 -1.14  0.28 -1.79  0.07  0.06 -0.21  1.15 -0.38 -0.75 -0.83 -1.66 -0.24  0.70 -0.01  0.51  0.89  1.46  1.30  0.97  0.55  0.75  1.56  0.18
+pre_auc_10y20y_1d     1.95 -2.00 -1.25  1.65 -0.39  0.51  0.23 -0.64 -0.04  0.21  1.40 -1.53 -1.39 -0.89  0.23 -0.22  1.21 -0.08  1.14  1.17  1.11 -0.27 -0.51  0.34  0.43
+pre_auc_10y20y_3d     0.53 -0.95 -0.84 -0.20 -1.14  0.29 -0.44  1.37  1.08 -0.30  0.23  0.64 -1.70  0.40  0.43  0.44  0.82  0.55  0.87  1.27  2.66  0.40  0.96  0.06  0.58
+pre_auc_10y30y20y_2d  1.57 -1.13 -1.14  0.28 -1.21  0.51 -0.03 -0.56  1.82 -1.19 -0.40  0.48 -1.45 -0.17  0.84 -0.79  0.74  0.69  2.04  0.65  2.68 -0.46  1.58  0.39  2.38
+post_auc_10y30y_12    2.41  0.45  1.51 -1.23 -0.98  0.44  0.65  0.50  1.04  0.02  0.79  0.92  1.95 -0.31 -1.69  0.15  1.96 -0.66  1.66  0.24 -1.53 -0.31 -0.86 -0.91 -0.25
+core3                 4.23 -1.13 -0.35  1.12 -0.03  1.64  1.26  0.34  2.43  1.63 -0.67  0.10 -0.04  0.37  1.50  1.08  1.54  2.51  1.99  0.86  2.56  1.68  1.12  1.33 -0.25
+
+(b) walk-forward leg selection (expanding window from 2002, first test year 2010)
+  thr=1.0: Sharpe 2010-26 0.88 | 2010-17 0.72 | 2018-26 1.01 | CAGR 8.3% MaxDD -14.7%
+  thr=1.5: Sharpe 2010-26 0.80 | 2010-17 0.72 | 2018-26 0.87 | CAGR 7.3% MaxDD -14.5%
+     2010: ['month_end3', 'post_auc_10y30y_12']
+     2011: ['month_end3', 'month_start_short', 'post_auc_10y30y_12']
+     2012: ['month_end3', 'month_start_short', 'fomc_1b+0', 'post_auc_10y30y_12']
+     2013: ['month_end3', 'month_start_short', 'post_auc_10y30y_12']
+     2014: ['month_end3', 'month_start_short', 'post_auc_10y30y_12']
+     2015: ['month_end3', 'month_start_short', 'post_auc_10y30y_12']
+     2016: ['month_end3', 'month_start_short', 'post_auc_10y30y_12']
+     2017: ['month_end3', 'month_start_short', 'post_auc_10y30y_12']
+     2018: ['month_end3', 'month_start_short', 'post_auc_10y30y_12']
+     2019: ['month_end3', 'month_start_short', 'post_auc_10y30y_12']
+     2020: ['month_end3', 'month_start_short', 'fomc_1b+0', 'post_auc_10y30y_12']
+     2021: ['month_end3', 'month_start_short', 'fomc_1b+0', 'post_auc_10y30y_12']
+     2022: ['month_end3', 'month_start_short', 'fomc_1b+0', 'post_auc_10y30y_12']
+     2023: ['month_end3', 'month_start_short', 'fomc_1b+0', 'pre_auc_10y20y_2d', 'post_auc_10y30y_12']
+     2024: ['month_end3', 'month_start_short', 'fomc_1b+0', 'pre_auc_10y20y_2d']
+     2025: ['month_end3', 'month_start_short', 'fomc_1b+0', 'pre_auc_10y20y_2d']
+     2026: ['month_end3', 'month_start_short', 'fomc_1b+0', 'pre_auc_10y20y_2d']
+  thr=2.0: Sharpe 2010-26 0.56 | 2010-17 0.59 | 2018-26 0.53 | CAGR 4.2% MaxDD -16.7%
+
+(c) vol-targeted sizing of core3: w = sign * clip(target/ewm_vol, 0, cap)
+  target=0.12 cap=1.0: {'PRE 2002-09': {'Sharpe': 0.64, 'CAGR': 3.2, 'MaxDD': -12.2, 'AvgExpo': 0.21, 'Turn/yr': 42.76}, 'IS 2010-17': {'Sharpe': 0.84, 'CAGR': 4.8, 'MaxDD': -9.4, 'AvgExpo': 0.24, 'Turn/yr': 48.88}, 'OOS 2018-26': {'Sharpe': 1.46, 'CAGR': 10.0, 'MaxDD': -6.7, 'AvgExpo': 0.3, 'Turn/yr': 62.99}, 'FULL 2010-26': {'Sharpe': 1.18, 'CAGR': 7.5, 'MaxDD': -9.4, 'AvgExpo': 0.27, 'Turn/yr': 56.29}}
+  target=0.15 cap=1.5: {'PRE 2002-09': {'Sharpe': 0.64, 'CAGR': 4.3, 'MaxDD': -15.9, 'AvgExpo': 0.3, 'Turn/yr': 59.71}, 'IS 2010-17': {'Sharpe': 0.85, 'CAGR': 6.3, 'MaxDD': -11.8, 'AvgExpo': 0.32, 'Turn/yr': 64.43}, 'OOS 2018-26': {'Sharpe': 1.43, 'CAGR': 12.8, 'MaxDD': -9.4, 'AvgExpo': 0.4, 'Turn/yr': 83.76}, 'FULL 2010-26': {'Sharpe': 1.17, 'CAGR': 9.6, 'MaxDD': -11.8, 'AvgExpo': 0.36, 'Turn/yr': 74.58}}
+  target=0.15 cap=2.0: {'PRE 2002-09': {'Sharpe': 0.62, 'CAGR': 4.4, 'MaxDD': -16.9, 'AvgExpo': 0.33, 'Turn/yr': 65.16}, 'IS 2010-17': {'Sharpe': 0.84, 'CAGR': 6.3, 'MaxDD': -11.8, 'AvgExpo': 0.32, 'Turn/yr': 65.27}, 'OOS 2018-26': {'Sharpe': 1.42, 'CAGR': 13.1, 'MaxDD': -9.8, 'AvgExpo': 0.41, 'Turn/yr': 86.63}, 'FULL 2010-26': {'Sharpe': 1.16, 'CAGR': 9.8, 'MaxDD': -11.8, 'AvgExpo': 0.37, 'Turn/yr': 76.47}}
+  target=0.2 cap=2.0: {'PRE 2002-09': {'Sharpe': 0.64, 'CAGR': 5.7, 'MaxDD': -20.8, 'AvgExpo': 0.4, 'Turn/yr': 79.61}, 'IS 2010-17': {'Sharpe': 0.85, 'CAGR': 8.4, 'MaxDD': -15.6, 'AvgExpo': 0.43, 'Turn/yr': 85.91}, 'OOS 2018-26': {'Sharpe': 1.43, 'CAGR': 17.2, 'MaxDD': -12.4, 'AvgExpo': 0.53, 'Turn/yr': 111.68}, 'FULL 2010-26': {'Sharpe': 1.17, 'CAGR': 12.9, 'MaxDD': -15.6, 'AvgExpo': 0.48, 'Turn/yr': 99.44}}
+
+(d) core3 full 2010-26: Sharpe 1.25, skew 1.40, kurt(excess) 16.41; deflated-Sharpe P(SR>0 | 25 trials) = 1.000
+(f) block-bootstrap (21d blocks) Sharpe 5-95%: [0.91, 1.63], P(SR>1)=0.89
+
+(e) correlation with the live spot-crypto trend book (proxied by published rules)
+        btc_wt  eth_tf  btc_bh  tlt_bh  core3    me3
+btc_wt   1.000   0.409   0.477  -0.021 -0.030 -0.007
+eth_tf   0.409   1.000   0.501   0.030  0.023  0.019
+btc_bh   0.477   0.501   1.000  -0.014  0.003  0.003
+tlt_bh  -0.021   0.030  -0.014   1.000  0.020  0.328
+core3   -0.030   0.023   0.003   0.020  1.000  0.567
+me3     -0.007   0.019   0.003   0.328  0.567  1.000
+
+  weekly-return correlations:
+        btc_wt  eth_tf  btc_bh
+core3   -0.057  -0.006   0.019
+me3     -0.051  -0.017  -0.039
+tlt_bh  -0.054   0.024  -0.022
+
+  in the worst-decile weeks of btc weekday-trend (n=46): mean btc_wt -3.77%, core3 +0.37%, tlt_bh +0.34%
+  book + 0.5x core3: weekly Sharpe 1.41 (book alone 1.09)
+  book + 1.0x core3: weekly Sharpe 1.66 (book alone 1.09)
+  book + 2.0x core3: weekly Sharpe 1.96 (book alone 1.09)

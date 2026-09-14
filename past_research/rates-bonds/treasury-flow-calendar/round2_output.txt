@@ -1,0 +1,210 @@
+
+################ TLT ################
+
+--- month_end3
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09     0.76   3.6  -12.5     0.14    23.97
+IS 2010-17      0.98   5.0   -3.7     0.14    23.91
+OOS 2018-26     0.59   2.9   -8.0     0.14    24.10
+FULL 2010-26    0.78   3.9   -8.0     0.14    24.07
+
+--- month_end2
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09     1.13   4.6   -8.8      0.1    23.97
+IS 2010-17      0.90   3.6   -2.9      0.1    23.91
+OOS 2018-26     0.39   1.5   -7.2      0.1    24.10
+FULL 2010-26    0.64   2.5   -7.2      0.1    24.07
+
+--- month_end4
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09     0.60   3.2  -12.9     0.19    23.97
+IS 2010-17      0.79   4.7   -5.1     0.19    23.91
+OOS 2018-26     0.51   2.9  -11.1     0.19    24.10
+FULL 2010-26    0.65   3.8  -11.1     0.19    24.07
+
+--- month_start_short_all5
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09     0.30   1.7  -17.2     0.24    23.84
+IS 2010-17      0.33   2.3  -15.4     0.24    23.91
+OOS 2018-26     0.39   2.9  -17.2     0.24    24.10
+FULL 2010-26    0.36   2.6  -17.2     0.24    24.07
+
+--- month_start_short_all3
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09     0.58   2.8  -13.3     0.14    23.84
+IS 2010-17      0.58   3.4  -15.9     0.14    23.91
+OOS 2018-26    -0.01  -0.3  -21.3     0.14    24.10
+FULL 2010-26    0.26   1.5  -21.3     0.14    24.07
+
+--- mid_month_settle
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09     0.45   1.8   -7.3      0.1    24.11
+IS 2010-17      0.39   1.5   -6.6      0.1    24.04
+OOS 2018-26    -0.16  -0.9  -18.4      0.1    23.99
+FULL 2010-26    0.08   0.3  -18.4      0.1    24.01
+
+--- pre_auc_5d_10y30y
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09    -0.07  -0.5  -17.6     0.17    16.30
+IS 2010-17      0.54   4.1  -14.6     0.29    24.04
+OOS 2018-26     0.39   3.0  -21.2     0.29    24.45
+FULL 2010-26    0.46   3.5  -21.2     0.29    24.25
+
+--- fomc_1b+0
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09     0.14   0.4   -5.2     0.07    16.70
+IS 2010-17      0.43   1.6   -8.7     0.06    16.02
+OOS 2018-26     0.80   3.3   -4.8     0.06    16.15
+FULL 2010-26    0.63   2.4   -8.7     0.06    16.09
+
+--- core3
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09     0.63   3.9  -13.0     0.24    47.95
+IS 2010-17      0.88   6.4  -11.5     0.28    56.21
+OOS 2018-26     1.55  14.0   -6.9     0.36    75.54
+FULL 2010-26    1.25  10.3  -11.5     0.32    66.33
+
+--- core3+ms_all5
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09     0.70   5.9  -17.6     0.44    60.47
+IS 2010-17      0.99  10.0  -15.7     0.47    59.34
+OOS 2018-26     1.29  14.7  -16.1     0.53    74.74
+FULL 2010-26    1.15  12.4  -16.1     0.50    67.47
+
+--- core3+ms_all3
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09     0.83   6.4  -16.1     0.36    66.40
+IS 2010-17      1.06   9.8  -15.0     0.41    74.11
+OOS 2018-26     1.23  13.0  -17.5     0.47    91.57
+FULL 2010-26    1.15  11.4  -17.5     0.44    83.32
+
+--- me3+fomc+ms_all5
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09     0.80   6.7  -16.0     0.41    58.32
+IS 2010-17      0.97   9.5  -11.0     0.42    57.08
+OOS 2018-26     0.90   8.8  -13.9     0.41    56.97
+FULL 2010-26    0.93   9.1  -13.9     0.42    57.15
+
+--- me3+fomc+preauc5d
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09     0.58   4.2  -18.3     0.32    49.43
+IS 2010-17      1.16  11.6  -12.7     0.45    56.21
+OOS 2018-26     0.93   9.4  -14.1     0.44    56.17
+FULL 2010-26    1.04  10.4  -14.1     0.45    56.25
+
+--- me3+ms_all5
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09     0.70   5.4  -17.9     0.38    47.81
+IS 2010-17      0.81   7.4  -13.6     0.38    47.82
+OOS 2018-26     0.64   5.9  -15.5     0.38    48.21
+FULL 2010-26    0.72   6.6  -15.5     0.38    48.14
+
+--- walk-forward on TLT
+  WF TLT thr=0.5: 2010-26 Sharpe 0.86 | -2017 0.99 | 2018- 0.75 | CAGR 10.5% MaxDD -22.0% | last-year set ['month_end3', 'month_start_short_all5', 'mid_month_settle', 'fomc_1b+0', 'pre_auc_10y20y_2d', 'pre_auc_5d_10y30y', 'post_auc_10y30y_12']
+  WF TLT thr=1.0: 2010-26 Sharpe 0.75 | -2017 0.80 | 2018- 0.71 | CAGR 8.6% MaxDD -22.0% | last-year set ['month_end3', 'month_start_short_all5', 'mid_month_settle', 'fomc_1b+0', 'pre_auc_10y20y_2d', 'pre_auc_5d_10y30y']
+  WF TLT thr=1.5: 2010-26 Sharpe 0.52 | -2017 0.65 | 2018- 0.43 | CAGR 4.9% MaxDD -22.0% | last-year set ['month_end3', 'month_start_short_all5', 'mid_month_settle', 'fomc_1b+0', 'pre_auc_10y20y_2d', 'pre_auc_5d_10y30y']
+
+################ IEF ################
+
+--- month_end3
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09     0.78   2.1   -6.2     0.14    23.97
+IS 2010-17      1.01   2.3   -2.1     0.14    23.91
+OOS 2018-26     0.92   2.2   -3.1     0.14    24.10
+FULL 2010-26    0.96   2.2   -3.1     0.14    24.07
+
+--- month_end2
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09     1.17   2.6   -4.5      0.1    23.97
+IS 2010-17      0.90   1.5   -1.9      0.1    23.91
+OOS 2018-26     0.56   1.0   -2.7      0.1    24.10
+FULL 2010-26    0.72   1.3   -2.7      0.1    24.07
+
+--- month_end4
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09     0.67   2.0   -6.5     0.19    23.97
+IS 2010-17      0.90   2.4   -2.7     0.19    23.91
+OOS 2018-26     0.81   2.2   -3.2     0.19    24.10
+FULL 2010-26    0.85   2.3   -3.2     0.19    24.07
+
+--- month_start_short_all5
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09    -0.06  -0.3  -10.9     0.24    23.84
+IS 2010-17     -0.07  -0.3   -7.9     0.24    23.91
+OOS 2018-26     0.30   1.1   -8.4     0.24    24.10
+FULL 2010-26    0.13   0.4   -8.4     0.24    24.07
+
+--- month_start_short_all3
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09     0.16   0.4   -8.9     0.14    23.84
+IS 2010-17      0.31   0.8   -6.2     0.14    23.91
+OOS 2018-26    -0.19  -0.6  -10.7     0.14    24.10
+FULL 2010-26    0.03   0.0  -10.9     0.14    24.07
+
+--- mid_month_settle
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09     0.38   0.9   -5.8      0.1    24.11
+IS 2010-17      0.32   0.6   -2.9      0.1    24.04
+OOS 2018-26    -0.20  -0.5   -8.7      0.1    23.99
+FULL 2010-26    0.02   0.0   -8.7      0.1    24.01
+
+--- pre_auc_5d_10y30y
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09    -0.36  -1.2  -12.7     0.17    16.30
+IS 2010-17      0.00  -0.1   -9.1     0.29    24.04
+OOS 2018-26     0.26   0.9  -11.4     0.29    24.45
+FULL 2010-26    0.14   0.4  -11.4     0.29    24.25
+
+--- fomc_1b+0
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09     0.24   0.5   -3.8     0.07    16.70
+IS 2010-17      0.50   0.9   -4.5     0.06    16.02
+OOS 2018-26     0.76   1.5   -2.6     0.06    16.15
+FULL 2010-26    0.64   1.2   -4.5     0.06    16.09
+
+--- core3
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09     0.52   1.9   -8.7     0.24    47.95
+IS 2010-17      0.88   2.9   -4.9     0.28    56.21
+OOS 2018-26     1.60   6.6   -3.5     0.36    75.54
+FULL 2010-26    1.29   4.8   -4.9     0.32    66.33
+
+--- core3+ms_all5
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09     0.43   2.1   -9.0     0.44    60.47
+IS 2010-17      0.73   3.2   -8.0     0.47    59.34
+OOS 2018-26     1.29   6.6   -7.1     0.53    74.74
+FULL 2010-26    1.04   5.0   -8.0     0.50    67.47
+
+--- core3+ms_all3
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09     0.53   2.4   -9.0     0.36    66.40
+IS 2010-17      0.92   3.7   -7.2     0.41    74.11
+OOS 2018-26     1.19   5.8   -7.0     0.47    91.57
+FULL 2010-26    1.07   4.8   -7.2     0.44    83.32
+
+--- me3+fomc+ms_all5
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09     0.55   2.7   -8.9     0.41    58.32
+IS 2010-17      0.72   3.1   -6.0     0.42    57.08
+OOS 2018-26     1.01   4.6   -5.9     0.41    56.97
+FULL 2010-26    0.87   3.9   -6.0     0.42    57.15
+
+--- me3+fomc+preauc5d
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09     0.40   1.7  -13.2     0.32    49.43
+IS 2010-17      0.78   3.4   -6.9     0.45    56.21
+OOS 2018-26     1.01   4.7   -6.5     0.44    56.17
+FULL 2010-26    0.91   4.1   -6.9     0.45    56.25
+
+--- me3+ms_all5
+              Sharpe  CAGR  MaxDD  AvgExpo  Turn/yr
+PRE 2002-09     0.42   1.8  -10.0     0.38    47.81
+IS 2010-17      0.50   2.0   -7.1     0.38    47.82
+OOS 2018-26     0.76   3.3   -6.7     0.38    48.21
+FULL 2010-26    0.64   2.6   -7.1     0.38    48.14
+
+--- walk-forward on IEF
+  WF IEF thr=0.5: 2010-26 Sharpe 0.57 | -2017 1.03 | 2018- 0.26 | CAGR 2.5% MaxDD -10.5% | last-year set ['month_end3', 'month_start_short_all5', 'mid_month_settle', 'fomc_1b+0', 'pre_auc_10y20y_2d', 'post_auc_10y30y_12']
+  WF IEF thr=1.0: 2010-26 Sharpe 0.78 | -2017 1.03 | 2018- 0.60 | CAGR 3.3% MaxDD -10.5% | last-year set ['month_end3', 'mid_month_settle', 'fomc_1b+0', 'pre_auc_10y20y_2d', 'post_auc_10y30y_12']
+  WF IEF thr=1.5: 2010-26 Sharpe 0.69 | -2017 0.90 | 2018- 0.53 | CAGR 2.8% MaxDD -10.5% | last-year set ['month_end3', 'fomc_1b+0', 'pre_auc_10y20y_2d']
