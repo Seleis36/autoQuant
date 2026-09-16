@@ -1,0 +1,48 @@
+share of reaction bars with vol ratio>1.5: 0.79
+
+== unconditional windows (sector-residual, bp)
+pre[-10,-6]                      N= 27888 mean     +3bp t=  1.5 | IS     +7bp t= 2.9 | OOS     -0bp t=-0.2 | hit 0.51
+pre[-5,-2]                       N= 27908 mean     +4bp t=  2.8 | IS     +2bp t= 0.8 | OOS     +6bp t= 2.8 | hit 0.51
+pre[-1]                          N= 27920 mean     +4bp t=  5.4 | IS     +5bp t= 4.7 | OOS     +4bp t= 3.3 | hit 0.52
+pre[-5,-1]                       N= 27908 mean     +9bp t=  5.0 | IS     +7bp t= 3.0 | OOS    +10bp t= 4.0 | hit 0.52
+react[0]                         N= 27922 mean     -2bp t= -0.5 | IS     +0bp t= 0.1 | OOS     -3bp t=-0.7 | hit 0.50
+react[0,+1]                      N= 27922 mean     -3bp t= -0.8 | IS     -2bp t=-0.4 | OOS     -3bp t=-0.6 | hit 0.50
+post[+1]                         N= 28243 mean     -1bp t= -0.8 | IS     -2bp t=-1.6 | OOS     +0bp t= 0.1 | hit 0.49
+post[+2,+5]                      N= 28231 mean     +0bp t=  0.0 | IS     -0bp t=-0.0 | OOS     +0bp t= 0.1 | hit 0.49
+post[+2,+10]                     N= 28218 mean     -0bp t= -0.0 | IS     +2bp t= 0.6 | OOS     -1bp t=-0.4 | hit 0.49
+post[+2,+21]                     N= 28166 mean     +1bp t=  0.3 | IS     -4bp t=-0.9 | OOS     +5bp t= 0.9 | hit 0.50
+post[+2,+42]                     N= 27695 mean     -4bp t= -0.9 | IS     -9bp t=-1.5 | OOS     -0bp t=-0.1 | hit 0.50
+
+== PEAD: post windows conditional on reaction-bar residual return quintile (cross-sectional within reaction bars)
+react1 z>+2 post[+1,+5]          N=  6516 mean     +2bp t=  0.6 | IS     -0bp t=-0.0 | OOS     +4bp t= 0.7 | hit 0.50
+react1 z>+2 post[+2,+21]         N=  6502 mean     +6bp t=  0.9 | IS     +3bp t= 0.3 | OOS     +8bp t= 0.9 | hit 0.51
+react1 z>+2 post[+2,+42]         N=  6402 mean     -5bp t= -0.5 | IS    +11bp t= 0.8 | OOS    -16bp t=-1.1 | hit 0.50
+react1 z in(1,2) post[+1,+5]     N=  3251 mean     -1bp t= -0.1 | IS     +1bp t= 0.1 | OOS     -2bp t=-0.2 | hit 0.50
+react1 z in(1,2) post[+2,+21]    N=  3244 mean     -6bp t= -0.5 | IS     -2bp t=-0.2 | OOS     -8bp t=-0.5 | hit 0.50
+react1 z in(1,2) post[+2,+42]    N=  3182 mean    -13bp t= -1.0 | IS     +4bp t= 0.2 | OOS    -26bp t=-1.3 | hit 0.50
+react1 z in(-1,1) post[+1,+5]    N=  8420 mean     +3bp t=  0.8 | IS     +7bp t= 1.6 | OOS     -1bp t=-0.1 | hit 0.50
+react1 z in(-1,1) post[+2,+21]   N=  8410 mean     +9bp t=  1.4 | IS    -10bp t=-1.2 | OOS    +22bp t= 2.5 | hit 0.50
+react1 z in(-1,1) post[+2,+42]   N=  8272 mean     +4bp t=  0.5 | IS    -26bp t=-2.2 | OOS    +27bp t= 2.1 | hit 0.50
+react1 z in(-2,-1) post[+1,+5]   N=  3258 mean     -5bp t= -0.9 | IS    -20bp t=-2.6 | OOS     +6bp t= 0.7 | hit 0.48
+react1 z in(-2,-1) post[+2,+21]  N=  3244 mean     +4bp t=  0.4 | IS     -3bp t=-0.3 | OOS     +9bp t= 0.6 | hit 0.49
+react1 z in(-2,-1) post[+2,+42]  N=  3176 mean    +13bp t=  0.9 | IS    -12bp t=-0.6 | OOS    +32bp t= 1.6 | hit 0.50
+react1 z<-2 post[+1,+5]          N=  6308 mean     -7bp t= -1.6 | IS    -10bp t=-1.7 | OOS     -5bp t=-0.7 | hit 0.48
+react1 z<-2 post[+2,+21]         N=  6288 mean    -12bp t= -1.6 | IS     -2bp t=-0.2 | OOS    -18bp t=-1.7 | hit 0.49
+react1 z<-2 post[+2,+42]         N=  6185 mean    -19bp t= -1.8 | IS    -14bp t=-1.0 | OOS    -23bp t=-1.5 | hit 0.49
+
+react2 z>+2 post[+1,+5]          N=  6704 mean     +4bp t=  1.1 | IS     +4bp t= 0.7 | OOS     +5bp t= 0.8 | hit 0.51
+react2 z>+2 post[+2,+21]         N=  6690 mean     +7bp t=  1.1 | IS    +12bp t= 1.3 | OOS     +4bp t= 0.5 | hit 0.51
+react2 z>+2 post[+2,+42]         N=  6586 mean     -1bp t= -0.1 | IS    +21bp t= 1.6 | OOS    -16bp t=-1.1 | hit 0.50
+react2 z in(1,2) post[+1,+5]     N=  3269 mean     -7bp t= -1.3 | IS    -10bp t=-1.3 | OOS     -6bp t=-0.7 | hit 0.49
+react2 z in(1,2) post[+2,+21]    N=  3263 mean     +0bp t=  0.0 | IS     -7bp t=-0.5 | OOS     +6bp t= 0.4 | hit 0.50
+react2 z in(1,2) post[+2,+42]    N=  3201 mean    -16bp t= -1.2 | IS     -8bp t=-0.4 | OOS    -23bp t=-1.1 | hit 0.50
+react2 z in(-1,1) post[+1,+5]    N=  8243 mean     +1bp t=  0.3 | IS     +5bp t= 1.1 | OOS     -2bp t=-0.4 | hit 0.49
+react2 z in(-1,1) post[+2,+21]   N=  8228 mean     -1bp t= -0.1 | IS    -15bp t=-1.9 | OOS    +10bp t= 1.1 | hit 0.50
+react2 z in(-1,1) post[+2,+42]   N=  8098 mean     +0bp t=  0.0 | IS    -25bp t=-2.1 | OOS    +19bp t= 1.5 | hit 0.50
+react2 z in(-2,-1) post[+1,+5]   N=  3131 mean     -1bp t= -0.1 | IS    -14bp t=-1.9 | OOS    +10bp t= 1.1 | hit 0.48
+react2 z in(-2,-1) post[+2,+21]  N=  3125 mean    +18bp t=  1.7 | IS     -0bp t=-0.0 | OOS    +32bp t= 2.1 | hit 0.50
+react2 z in(-2,-1) post[+2,+42]  N=  3072 mean    +28bp t=  1.9 | IS     -6bp t=-0.3 | OOS    +54bp t= 2.6 | hit 0.50
+react2 z<-2 post[+1,+5]          N=  6404 mean     -5bp t= -1.2 | IS     -9bp t=-1.5 | OOS     -3bp t=-0.4 | hit 0.48
+react2 z<-2 post[+2,+21]         N=  6380 mean    -11bp t= -1.4 | IS     -4bp t=-0.4 | OOS    -15bp t=-1.4 | hit 0.49
+react2 z<-2 post[+2,+42]         N=  6258 mean    -24bp t= -2.3 | IS    -24bp t=-1.7 | OOS    -24bp t=-1.6 | hit 0.48
+
