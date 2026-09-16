@@ -1,0 +1,20 @@
+dec1 rev5      none             gross 0.84 net -0.34 IS -1.02 OOS -0.06 turn 195 avgGross 0.99
+dec1 rev5      vix/20 cap2      gross 0.85 net 0.04 IS -0.53 OOS 0.24 turn 187 avgGross 0.90
+dec1 rev5      vix>20 only      gross 0.78 net 0.28 IS -0.03 OOS 0.42 turn 67 avgGross 0.28
+dec1 rev5      vix>25 only      gross 0.80 net 0.52 IS 0.47 OOS 0.61 turn 32 avgGross 0.13
+dec1 rev5      mvol/15 cap2     gross 0.82 net 0.01 IS -0.52 OOS 0.21 turn 194 avgGross 0.95
+dec1 rev5      (vix/20)^2 cap3  gross 0.84 net 0.24 IS -0.18 OOS 0.41 turn 194 avgGross 0.90
+
+== event study: sector-residual z-score events (fwd sector-residual returns, bp)
+win1 z<2.0: N=28344 (1697/yr) | h1: -4bp t=-2.9 IS -8 OOS -1 | h3: -1bp t=-0.5 IS -7 OOS +3 | h5: -0bp t=-0.0 IS -4 OOS +2 | h10: +3bp t=0.9 IS +3 OOS +2
+win1 z<2.5: N=15793 (946/yr) | h1: -4bp t=-2.3 IS -11 OOS -0 | h3: -3bp t=-1.1 IS -10 OOS +1 | h5: -4bp t=-1.1 IS -7 OOS -2 | h10: -2bp t=-0.4 IS +4 OOS -5
+win1 z<3.0: N=9881 (592/yr) | h1: -3bp t=-1.3 IS -8 OOS -0 | h3: -5bp t=-1.5 IS -12 OOS -1 | h5: -5bp t=-1.4 IS -7 OOS -4 | h10: -2bp t=-0.4 IS +6 OOS -7
+win1 z>2.0: N=28436 (1703/yr) | h1: -4bp t=-3.2 IS -3 OOS -4 | h3: -7bp t=-3.8 IS -3 OOS -10 | h5: -8bp t=-3.6 IS -6 OOS -9 | h10: -12bp t=-3.7 IS -10 OOS -13
+win1 z>2.5: N=15234 (912/yr) | h1: -3bp t=-1.8 IS -3 OOS -3 | h3: -8bp t=-3.0 IS -5 OOS -10 | h5: -6bp t=-2.0 IS -5 OOS -8 | h10: -12bp t=-2.8 IS -7 OOS -15
+win1 z>3.0: N=9357 (560/yr) | h1: -3bp t=-1.4 IS -3 OOS -3 | h3: -10bp t=-2.9 IS -3 OOS -14 | h5: -8bp t=-2.0 IS -3 OOS -12 | h10: -15bp t=-2.8 IS -12 OOS -17
+win3 z<2.0: N=33416 (2001/yr) | h1: +0bp t=0.3 IS -2 OOS +2 | h3: +3bp t=1.9 IS -0 OOS +6 | h5: +5bp t=2.5 IS +5 OOS +6 | h10: +6bp t=1.9 IS +9 OOS +3
+win3 z<2.5: N=18684 (1119/yr) | h1: +1bp t=0.3 IS -3 OOS +3 | h3: +3bp t=1.2 IS -6 OOS +9 | h5: +7bp t=2.4 IS -0 OOS +12 | h10: +6bp t=1.4 IS -1 OOS +10
+win3 z<3.0: N=11282 (676/yr) | h1: -0bp t=-0.2 IS -3 OOS +1 | h3: -0bp t=-0.0 IS -5 OOS +3 | h5: +3bp t=0.8 IS -4 OOS +7 | h10: +2bp t=0.3 IS -3 OOS +5
+win3 z>2.0: N=33170 (1986/yr) | h1: -6bp t=-5.3 IS -3 OOS -7 | h3: -14bp t=-8.3 IS -6 OOS -20 | h5: -16bp t=-7.4 IS -8 OOS -21 | h10: -17bp t=-6.0 IS -11 OOS -21
+win3 z>2.5: N=18116 (1085/yr) | h1: -6bp t=-4.4 IS -3 OOS -9 | h3: -14bp t=-6.1 IS -2 OOS -22 | h5: -13bp t=-4.6 IS -2 OOS -21 | h10: -15bp t=-4.0 IS -4 OOS -23
+win3 z>3.0: N=10889 (652/yr) | h1: -6bp t=-3.2 IS -1 OOS -10 | h3: -10bp t=-3.3 IS +5 OOS -20 | h5: -9bp t=-2.6 IS +7 OOS -20 | h10: -8bp t=-1.6 IS +4 OOS -16

@@ -149,3 +149,41 @@ Equities, ETFs, futures and rates remain daily yfinance OHLCV back to 2010. yfin
 intraday history at ~730 days, so there is no long intraday for those classes, and no
 delisted tickers — which is why the `us-large-cap` survivorship brief cannot be fully
 honoured on this data. That needs a paid vendor (Polygon or Databento) and is not wired up.
+
+---
+
+## 4. US large-cap panel — `code/us-large-cap/shared/`
+
+Added 2026-09-16 by the `us-large-cap` research. Everything below reads and writes the
+**flat daily cache** (one `data/<TICKER>_d.parquet` per name), so the sim book can price
+any of it.
+
+```python
+import sys; sys.path.insert(0, "code/us-large-cap/shared")
+from panel import load_panel          # dict: open/high/low/close/volume (wide), member (PIT bool), sector
+from universe import membership_matrix, all_tickers_since   # fja05680/sp500 start/end spans, 1996+
+from earnings import load_earnings, reaction_day_matrix     # data/SP500_earnings_dates.parquet
+from xs_lib import xs_backtest, decile_weights, linear_weights, group_demean, ic_series
+```
+
+* **Membership** is point-in-time from `sp500_ticker_start_end.csv` (fja05680/sp500, cross-
+  checked with Wikipedia's *Historical components* page). `sp500_current_raw.csv` carries
+  GICS sectors for current names; `sectors_hist.csv` (yfinance `.info`) for past ones.
+* **Survivorship**: yfinance serves *no delisted tickers*. Of 813 names that were members
+  at some point since 2010, 646 are priced; coverage of the live index is 75 % in 2010,
+  90 % in 2019, 98 % in 2026. Missing names are overwhelmingly acquisitions (BK, EA, MMC
+  in 2026), not bankruptcies, but any long-only or long-loser result on this panel is
+  biased upward. Refresh with `fetch_universe.py <tickers.txt>`.
+* **Recycled tickers — trap.** yfinance answers an old symbol with whatever company holds
+  it *today* (TIE, MEE, CBE, CPWR, EP, BMC …), producing 1000× fake moves. `load_panel`
+  drops any ticker with ≥3 daily |returns| > 50 % and masks a ±1-day window around isolated
+  ones. Do not read those files raw.
+* **Earnings dates**: `data/SP500_earnings_dates.parquet` — ~100 announcements per ticker
+  back to 2002 from `Ticker.get_earnings_dates(limit=100)`, with the Yahoo hour (16:00 ET
+  = after close, ≤ 09:00 = before open) so the *reaction bar* can be placed. 79 % of
+  reaction bars show volume > 1.5× the 20-day average (median 2.1×), i.e. the dates are
+  right to the day for most events. Refresh with `fetch_earnings.py <tickers.txt>` (slow:
+  one request per ticker, ~40 min for the universe).
+* **pandas 3 `stack()` keeps NaN** — every event count computed with `.stack()` on a
+  masked frame is the whole panel unless you `.dropna()`. It cost this research one wrong
+  table before it was caught.
