@@ -216,3 +216,60 @@ def fmt(df, cols=None):
         else:
             df[c] = df[c].round(2)
     return df[cols] if cols else df
+
+
+# ---------------------------------------------------------------- cross-sectional (multi-asset) helpers
+# Added 2026-09-17 by crypto-alts research. Asset-agnostic: pass `ann` for the calendar.
+
+def rank_xs(sig, mask=None):
+    """Cross-sectional percentile rank in [-0.5, 0.5] per row over the masked universe."""
+    s = sig.where(mask) if mask is not None else sig
+    r = s.rank(axis=1, pct=True)
+    return r.sub(r.mean(axis=1), axis=0)
+
+
+def quantile_weights(sig, mask, q=0.3, gross=1.0, long_only=False):
+    """Long top-q / short bottom-q, equal weight per side, each side gross/2 (dollar-neutral).
+    With long_only=True: long top-q only, total gross."""
+    s = sig.where(mask)
+    n = s.notna().sum(axis=1)
+    k = (n * q).round().clip(lower=1)
+    r_hi = s.rank(axis=1, ascending=False)
+    long = r_hi.le(k, axis=0) & s.notna()
+    if long_only:
+        return long.astype(float).div(long.sum(axis=1).replace(0, np.nan), axis=0).fillna(0.0) * gross
+    r_lo = s.rank(axis=1, ascending=True)
+    short = r_lo.le(k, axis=0) & s.notna()
+    w = long.astype(float).div(long.sum(axis=1).replace(0, np.nan), axis=0) * (gross / 2) \
+        - short.astype(float).div(short.sum(axis=1).replace(0, np.nan), axis=0) * (gross / 2)
+    return w.fillna(0.0)
+
+
+def linear_weights(sig, mask, gross=1.0):
+    """Weights proportional to the demeaned signal, scaled to total |w| = gross. Dollar-neutral."""
+    s = sig.where(mask)
+    s = s.sub(s.mean(axis=1), axis=0)
+    denom = s.abs().sum(axis=1).replace(0, np.nan)
+    return s.div(denom, axis=0).fillna(0.0) * gross
+
+
+def backtest_xs(weights, close, cost_bps=10.0, ann=ANN, name="xs"):
+    """Multi-asset version of `backtest`.
+
+    weights : DataFrame of TARGET weights known at the close of day t (date x ticker).
+    close   : DataFrame of closes on the same tickers.
+    Weight is shifted by one bar; cost charged on sum |w_t - w_{t-1}| per side.
+    Returns (net daily returns, stats). Missing returns (delisted/NaN) earn 0.
+    """
+    ret = close.pct_change()
+    w = weights.reindex(index=ret.index, columns=ret.columns).fillna(0.0)
+    w_eff = w.shift(1).fillna(0.0)
+    gross = (w_eff * ret.fillna(0.0)).sum(axis=1)
+    turn = (w_eff - w_eff.shift(1).fillna(0.0)).abs().sum(axis=1)
+    net = gross - turn * (cost_bps / 1e4)
+    net.name = name
+    stats = perf_stats(net, ann=ann, name=name)
+    stats["Turnover_ann"] = turn.sum() / (len(turn) / ann)
+    stats["AvgGross"] = w_eff.abs().sum(axis=1).mean()
+    stats["AvgNet"] = w_eff.sum(axis=1).mean()
+    return net, stats
