@@ -200,3 +200,114 @@ def test_once_still_forces_a_rebalance_on_a_traded_bar(tmp_path):
     r._tick()
     r.cli(["--once"])
     assert len(rebalances(tmp_path)) == 2, "--once must ignore the gate"
+
+
+# ------------------------------------------------- re-checking a bar that is late
+
+class FakeStop:
+    """Stands in for the runner's threading.Event so `run()` is drivable in a test.
+
+    Records every sleep the loop asks for and ends the loop after `iterations`.
+    """
+
+    def __init__(self, iterations):
+        self.left = iterations
+        self.waits = []
+
+    def is_set(self):
+        return self.left <= 0
+
+    def wait(self, seconds):
+        self.waits.append(seconds)
+        self.left -= 1
+        return False
+
+    def set(self):
+        self.left = 0
+
+
+def test_waiting_for_a_bar_is_recorded_on_the_runner(tmp_path):
+    q = StubQuotes(bar="2026-09-09")
+    r = make_runner(tmp_path, q)
+    r._tick()
+    assert r._waiting_for_bar is False, "it just traded this bar"
+    r._tick()
+    assert r._waiting_for_bar is True, "same bar again: now waiting"
+    q.bar = "2026-09-10"
+    r._tick()
+    assert r._waiting_for_bar is False, "a new bar clears the wait"
+
+
+def test_the_wait_is_logged_once_per_bar_not_once_per_recheck(tmp_path, capsys):
+    """The loop now re-checks every recheck_s while it waits. Logging each one would
+    bury a weekend's worth of real entries under identical lines.
+
+    Read off stdout rather than caplog: _setup_logging uses basicConfig(force=True),
+    which drops caplog's handler the moment a runner is constructed.
+    """
+    q = StubQuotes(bar="2026-09-09")
+    r = make_runner(tmp_path, q)
+    r._tick()
+    for _ in range(5):
+        r._tick()
+    q.bar = "2026-09-10"
+    r._tick()              # trades
+    for _ in range(5):
+        r._tick()          # waits on the new bar
+    waits = [l for l in capsys.readouterr().out.splitlines() if "already traded" in l]
+    assert len(waits) == 2, f"one line per bar waited on, got {waits}"
+    assert "2026-09-09" in waits[0] and "2026-09-10" in waits[1]
+
+
+def test_a_late_vendor_is_rechecked_long_before_the_next_daily_boundary(tmp_path):
+    """The bug this fixes: on a 1d schedule the next boundary is up to 24h away, so a
+    vendor that had not published by the wake-up meant the session's decision was
+    skipped in silence -- TLT skipped 2026-09-16 and 2026-09-17 that way."""
+    q = StubQuotes(bar="2026-09-09")
+    r = make_runner(tmp_path, q)
+    r.recheck_s = 60.0
+    r._stop = FakeStop(iterations=2)
+    r.run()
+
+    assert len(r._stop.waits) == 2
+    assert r._stop.waits[0] > 3600, "just traded: sleep to the next daily boundary"
+    assert r._stop.waits[1] <= 60.0, "waiting on a late bar: come back soon"
+
+
+def test_a_recheck_that_finds_the_new_bar_trades_it(tmp_path):
+    q = StubQuotes(bar="2026-09-09")
+    r = make_runner(tmp_path, q)
+    r.recheck_s = 60.0
+    r._stop = FakeStop(iterations=2)
+
+    real_wait = r._stop.wait
+
+    def publish_then_wait(seconds):          # the vendor catches up mid-sleep
+        out = real_wait(seconds)
+        q.bar = "2026-09-10"
+        return out
+
+    r._stop.wait = publish_then_wait
+    r.run()
+    traded = [b["bar"] for b in rebalances(tmp_path)]
+    assert traded == ["2026-09-09", "2026-09-10"], traded
+
+
+def test_recheck_can_be_switched_off(tmp_path):
+    """recheck_s=0 restores the old behaviour: one look per boundary."""
+    q = StubQuotes(bar="2026-09-09")
+    r = make_runner(tmp_path, q)
+    r.recheck_s = 0.0
+    r._stop = FakeStop(iterations=2)
+    r.run()
+    assert all(w > 3600 for w in r._stop.waits), r._stop.waits
+
+
+def test_a_continuous_market_never_waits_and_keeps_its_boundary_sleep(tmp_path):
+    """Crypto is unaffected: bar_key() is None, so every wake-up trades."""
+    r = make_runner(tmp_path, StubQuotes(bar=None), schedule="1h")
+    r._stop = FakeStop(iterations=2)
+    r.run()
+    assert r._waiting_for_bar is False
+    assert all(w > 60 for w in r._stop.waits), r._stop.waits
+    assert len(rebalances(tmp_path)) == 3

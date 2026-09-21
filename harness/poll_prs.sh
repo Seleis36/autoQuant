@@ -60,7 +60,10 @@ watchdog() {
     "$REPO/harness/launch_live.sh" start "$name"
   done
   if systemctl --user is-enabled autoquant-dashboard.service >/dev/null 2>&1; then
-    : # systemd owns the dashboard
+    # systemd owns the dashboard, so do not restart it -- but do let dashboard.sh refresh
+    # the pidfile from the process table. The unit execs dashboard.py directly and never
+    # writes that file, so without this it keeps whatever a long-gone hand-start left.
+    "$REPO/harness/dashboard.sh" status >/dev/null 2>&1 || true
   elif ! "$REPO/harness/dashboard.sh" status | grep -q RUNNING; then
     # Ask the script, which consults the process table. Reading the pidfile here meant a
     # dashboard whose pidfile went stale was "restarted" every 30 minutes forever, each
