@@ -10,7 +10,8 @@
 #
 # Two queues, swept in that order:
 #
-#   review    open, not a draft, no terminal label      -> deploy_agent.sh
+#   review    open, not a draft, no terminal label,     -> deploy_agent.sh
+#             pushed from a research/* branch
 #   revision  labelled needs-revision, not exhausted    -> revise_agent.sh
 #
 # Revision runs first: it drains PRs back into the review queue, and the slot gate in
@@ -60,7 +61,10 @@ watchdog() {
     "$REPO/harness/launch_live.sh" start "$name"
   done
   if systemctl --user is-enabled autoquant-dashboard.service >/dev/null 2>&1; then
-    : # systemd owns the dashboard
+    # systemd owns the dashboard, so do not restart it -- but do let dashboard.sh refresh
+    # the pidfile from the process table. The unit execs dashboard.py directly and never
+    # writes that file, so without this it keeps whatever a long-gone hand-start left.
+    "$REPO/harness/dashboard.sh" status >/dev/null 2>&1 || true
   elif ! "$REPO/harness/dashboard.sh" status | grep -q RUNNING; then
     # Ask the script, which consults the process table. Reading the pidfile here meant a
     # dashboard whose pidfile went stale was "restarted" every 30 minutes forever, each
@@ -123,14 +127,29 @@ sweep() {
   local grc=$?
   if [ $grc -ne 0 ]; then say "gh pr list failed (rc=$grc)"; return 1; fi
 
+  # The deployment agent reviews research: a spec, a backtest, a runner to daemonise.
+  # Handing it a harness or docs PR burns a session and ends with a bogus `invalid` on a
+  # PR that was never a strategy. The label filter above cannot tell the difference --
+  # an ordinary PR carries no labels at all -- so scope the queue to the branches the
+  # research commands actually open (every one of them does `git checkout -b research/...`).
+  #
+  # Skipped PRs are named rather than dropped in silence: a research PR pushed from an
+  # off-convention branch would otherwise sit in the queue forever with nothing saying
+  # why, which is the same silent-skip failure this filter exists to prevent elsewhere.
+  local skipped=""
   while IFS=$'\t' read -r num branch title; do
     [ -z "${num:-}" ] && continue
+    case "$branch" in
+      research/*) ;;
+      *) skipped="$skipped #$num($branch)"; continue ;;
+    esac
     n=$((n + 1))
     say "-> DEPLOY PR #$num ($branch): $title"
     "$REPO/harness/deploy_agent.sh" "$num"
     say "<- PR #$num finished with rc=$?"
   done <<< "$prs"
 
+  [ -n "$skipped" ] && say "not on a research/* branch, left alone:$skipped"
   [ "$n" -eq 0 ] && say "no eligible open PRs"
   say "sweep done, $n PR(s) handled"
 }

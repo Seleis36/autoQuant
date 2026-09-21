@@ -265,3 +265,80 @@ def test_an_archived_pr_awaiting_its_merge_returns_to_the_review_queue(tmp_path)
     review = src.split("--- review queue")[1]
     assert '"wontfix"' not in review, "wontfix must no longer park a PR in the review queue"
     assert '. == "deployed"' in review
+
+
+# ------------------------------------------------- review queue is research-only
+
+def _review_loop_source():
+    """The real review-queue loop, sliced out of poll_prs.sh.
+
+    Running the actual block keeps this honest -- a grep would pass against a comment --
+    while leaving out the `gh pr list` above it, so no test touches GitHub.
+    """
+    src = open(os.path.join(HARNESS, "poll_prs.sh")).read()
+    start = src.index('  local skipped=""')
+    end = src.index('  [ "$n" -eq 0 ]')
+    return src[start:end]
+
+
+def _sweep_review(tmp_path, rows):
+    """Drive that loop over `rows` of (number, branch, title); report what it did."""
+    (tmp_path / "harness").mkdir(exist_ok=True)
+    agent = tmp_path / "harness" / "deploy_agent.sh"
+    agent.write_text('#!/usr/bin/env bash\necho "AGENT_RAN $1"\n')
+    agent.chmod(0o755)
+
+    prs = "\n".join("\t".join(r) for r in rows)
+    script = textwrap.dedent("""\
+        set -uo pipefail
+        REPO="$1"
+        say() {{ echo "SAY $*"; }}
+        sweep() {{
+          local n=0
+          local prs
+          prs="$(cat)"
+        {loop}
+          echo "HANDLED $n"
+        }}
+        sweep <<'PRS'
+        {prs}
+        PRS
+        """).format(loop=_review_loop_source(), prs=prs)
+    p = subprocess.run(["bash", "-c", script, "bash", str(tmp_path)],
+                       capture_output=True, text=True, timeout=60)
+    assert p.returncode == 0, p.stderr
+    return p.stdout
+
+
+def test_a_research_pr_is_handed_to_the_deployment_agent(tmp_path):
+    out = _sweep_review(tmp_path, [("11", "research/crypto-perps-funding-carry", "carry")])
+    assert "AGENT_RAN 11" in out
+    assert "HANDLED 1" in out
+
+
+def test_a_harness_pr_is_left_alone_and_said_so(tmp_path):
+    """The defect this closes: the label filter cannot tell a harness PR from a research
+    one -- an ordinary PR carries no labels at all -- so the deployment agent was handed
+    PRs that were never strategies."""
+    out = _sweep_review(tmp_path, [("12", "fix/live-runner-late-bar", "poller fix")])
+    assert "AGENT_RAN" not in out, "a harness PR must not reach the deployment agent"
+    assert "HANDLED 0" in out
+    assert "#12(fix/live-runner-late-bar)" in out, "a skipped PR must be named, not dropped"
+
+
+def test_a_mixed_sweep_deploys_only_the_research_prs(tmp_path):
+    out = _sweep_review(tmp_path, [
+        ("11", "research/crypto-perps-funding-carry", "carry"),
+        ("12", "fix/live-runner-late-bar", "poller fix"),
+        ("13", "research/sector-etf-thing", "sector"),
+        ("14", "docs/readme", "docs"),
+    ])
+    assert "AGENT_RAN 11" in out and "AGENT_RAN 13" in out
+    assert "AGENT_RAN 12" not in out and "AGENT_RAN 14" not in out
+    assert "HANDLED 2" in out
+    assert "#12(fix/live-runner-late-bar)" in out and "#14(docs/readme)" in out
+
+
+def test_a_quiet_sweep_says_nothing_about_skipping(tmp_path):
+    out = _sweep_review(tmp_path, [("11", "research/a-b", "x")])
+    assert "left alone" not in out

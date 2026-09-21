@@ -1232,7 +1232,8 @@ class StrategyRunner:
                  state_dir: Optional[str] = None,
                  offset_s: float = 20.0,
                  flatten_on_stop: bool = False,
-                 max_consecutive_errors: int = 10):
+                 max_consecutive_errors: int = 10,
+                 recheck_s: float = 1800.0):
         self.name = name
         self.symbol = symbol
         self.schedule = schedule
@@ -1241,6 +1242,7 @@ class StrategyRunner:
         self.offset_s = offset_s
         self.flatten_on_stop = flatten_on_stop
         self.max_consecutive_errors = max_consecutive_errors
+        self.recheck_s = float(recheck_s)
         self.dir = state_dir or os.path.join(LIVE_DIR, name)
         os.makedirs(self.dir, exist_ok=True)
         if self.broker.state_file is None:
@@ -1249,6 +1251,11 @@ class StrategyRunner:
         self.journal_path = os.path.join(self.dir, "journal.jsonl")
         self.state_path = os.path.join(self.dir, "state.json")
         self._last_bar = self._restore_last_bar()
+        # Set by _tick: True when the last wake-up found no new bar. The run loop uses
+        # it to re-check sooner than the next boundary; _bar_waited_on keeps the log
+        # from repeating the same "already traded" line at every re-check.
+        self._waiting_for_bar = False
+        self._bar_waited_on: Optional[str] = None
         self._stop = threading.Event()
         self._setup_logging()
 
@@ -1359,13 +1366,20 @@ class StrategyRunner:
         now = now or datetime.now(timezone.utc)
         bar = self.broker.bar_key()
         if bar is not None and bar == self._last_bar:
-            log.info("bar %s already traded; waiting for the next one", bar)
+            # Once per bar, not once per re-check: the loop now comes back every
+            # recheck_s while it waits, and a whole weekend of identical lines would
+            # bury the one entry that matters when reading back why a day was missed.
+            if bar != self._bar_waited_on:
+                log.info("bar %s already traded; waiting for the next one", bar)
+                self._bar_waited_on = bar
+            self._waiting_for_bar = True
             # Still a successful poll: the daemon is alive and up to date, and the
             # staleness watchdog reads `last_run`. Leaving it at the last TRADE would
             # make every equity strategy look hung from Friday evening to Monday.
             self._save_state(status="running", last_run=now.isoformat(), last_bar=bar,
                              waiting_for_new_bar=True)
             return None
+        self._waiting_for_bar = False
         return self.step_once(now, bar=bar)
 
     def check(self) -> dict:
@@ -1440,6 +1454,19 @@ class StrategyRunner:
 
         while not self._stop.is_set():
             nxt = next_boundary(self.schedule, offset_s=self.offset_s)
+            # A tick that found no new bar is either a genuine non-session (weekend,
+            # holiday, half-day) or a data vendor running late, and _tick deliberately
+            # cannot tell them apart -- that is what keeps a market calendar out of this
+            # loop. The cost was paid on the second case: on a 1d schedule the next
+            # boundary is 24h away, so a vendor that has not published by 20:00 New York
+            # meant the whole session's decision was skipped in silence, and TLT skipped
+            # 2026-09-16 and 2026-09-17 exactly that way. Coming back every recheck_s
+            # makes the late-vendor case recover on its own, while the non-session case
+            # stays a cheap no-op: bar_key is memoised and the daily cache is hourly, so
+            # a weekend of re-checks is a handful of reads, not a poll storm.
+            if self._waiting_for_bar and self.recheck_s > 0:
+                nxt = min(nxt, datetime.now(timezone.utc)
+                          + timedelta(seconds=self.recheck_s))
             wait = max(1.0, (nxt - datetime.now(timezone.utc)).total_seconds())
             log.info("sleeping %.0fs until %s", wait, nxt.isoformat())
             if self._stop.wait(wait):

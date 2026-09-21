@@ -94,7 +94,20 @@ case "${1:-status}" in
     echo "stopped ($(echo "$pids" | tr '\n' ' '))" ;;
   restart) "$0" stop; "$0" start ;;
   status)
-    if alive; then echo "dashboard RUNNING (pid $(running_pids | tr '\n' ' '), port $PORT)"
-    else echo "dashboard STOPPED"; fi ;;
+    # Re-adopt into the pidfile, the same way `start` does. systemd runs dashboard.py
+    # directly and never writes the pidfile, so once the unit owns the dashboard the file
+    # keeps naming whatever pid the last hand-start left there -- dead, and pointing at a
+    # pid the kernel is free to reissue to something else entirely. Everything in this
+    # script reads the process table instead, so nothing here broke, but the file is on
+    # disk for operators and future scripts to read and it should not be a lie. `status`
+    # is the one command every path already calls, so correcting it here keeps it correct
+    # no matter who started the dashboard.
+    if alive; then
+      running_pids | head -1 > "$PIDFILE"
+      echo "dashboard RUNNING (pid $(running_pids | tr '\n' ' '), port $PORT)"
+    else
+      rm -f "$PIDFILE"
+      echo "dashboard STOPPED"
+    fi ;;
   *) echo "usage: $0 {start|stop|restart|status}" >&2; exit 2 ;;
 esac
