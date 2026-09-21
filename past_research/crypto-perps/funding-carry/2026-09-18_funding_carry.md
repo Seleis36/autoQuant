@@ -280,3 +280,40 @@ are the selection-free evidence.
 - code: `code/crypto-perps/funding-carry/` — `fetch_data.py`, `carry_lib.py`, `strategy.py`,
   `exp01_btc_carry.py`, `exp02_multicoin.py`, `exp03_validate.py`, `exp04_figures.py`,
   `exp05_horizon.py`, `exp06_final.py`, result CSVs
+
+## 11. Deployment review (PR #11, 2026-09-21) — merged as a research record, nothing deployed
+
+The research is accepted as a complete, honest **Working** result: IS/OOS split declared before
+the fact, costs charged at 20 bp per switch with a sensitivity to 80 bp, turnover stated, the
+horizon dependence of the Sharpe disclosed in §6 rather than buried, and the variant count (29
+timing rules, 6 vol-target cells, 6 funding-scaling cells, 8 coins, cross-sectional top-n)
+accounted for with rolling-window and bootstrap evidence rather than a single best-of-N figure.
+Nothing in it needs revising.
+
+It is **not deployable in either book**, and no further research would change that — the
+obstacle is the execution harness, not the alpha:
+
+* **Neither quote source prices a USD-M perpetual.** `harness/live_lib.QUOTE_SOURCES` offers
+  exactly three: `binance-testnet` and `binance-public` (both `/api/v3/ticker/price`, spot only)
+  and `yahoo-daily` (the shared daily `data/` cache). There is no mark for the short leg.
+  `MarketData(source="futures")` fetches real perp klines, but that is the *signal* path; no
+  broker can hold or mark a perp position.
+* **No broker accrues funding.** `LedgerBroker._execute` (`harness/live_lib.py`) and
+  `SimPortfolioBroker.set_target_weights` (`harness/portfolio.py`) move quantity against price
+  and charge `fee_bps`; there is no 8-hourly cash-flow anywhere in either ledger.
+* Those two together are fatal *because all of this strategy's return is funding* — §7 shows the
+  basis nets to approximately zero over the sample. A price-only paper book holding +1 spot and
+  −1 perp would track the basis alone and report a Sharpe near zero. That would not be a failed
+  strategy; it would be an unimplemented ledger misread as a result.
+* The `venue` book is additionally long/flat spot only, so it cannot hold the short leg at all.
+
+Deploying this needs a funding-aware perp book in `harness/` — a quote source on `fapi`, a
+position that can be short a perp, and a ledger that credits `rate × notional` at 00/08/16 UTC —
+plus the margin/collateral treatment §8 calls for. That is harness engineering, and it is the
+one thing that would have to exist before this spec could be put to work. Until it does, the
+verdict is `wontfix`: structurally undeployable here, not defective.
+
+Two caveats an implementer would inherit from §8 and the spec, beyond the ledger itself: the
+spot leg must be posted as collateral for the perp short (at L=1 without it, the +79 % month of
+Feb 2021 liquidates), and the ~4 %/yr return on capital is a yield whose unmodelled risks —
+exchange counterparty, auto-deleveraging, funding cap changes — dominate its 0.37 % modelled vol.
