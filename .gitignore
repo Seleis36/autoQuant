@@ -236,3 +236,10 @@ live/**/ledger.json.tmp
 data/*_live.parquet
 live/**/meta.json.tmp
 harness/web/*.local.html
+
+# Per-run return series written into code/ by research scripts. The result CSVs that
+# back a report's tables are committed deliberately; these are regenerable by rerunning
+# the experiment that wrote them, and only show up as untracked noise after a PR merges.
+code/**/combo_returns.parquet
+code/**/walkforward_returns.parquet
+code/**/exp0*_daily.parquet
