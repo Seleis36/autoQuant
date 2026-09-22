@@ -1,0 +1,34 @@
+=== IS 1990-2009, smoothed + banded, 2bp/side ===
+                    CAGR    Vol  Sharpe  MaxDD  Calmar   t_NW  Turnover_ann  AvgGross
+carry_level        0.027  0.114   0.290 -0.361   0.075  1.223        12.124     2.419
+carry_sign         0.027  0.109   0.301 -0.349   0.078  1.206        10.313     2.822
+trend              0.049  0.108   0.497 -0.215   0.228  1.951        22.718     2.662
+carry_level+trend  0.065  0.114   0.605 -0.197   0.328  2.320        19.305     2.340
+carry_sign+trend   0.050  0.111   0.491 -0.265   0.188  1.901        21.512     2.115
+
+=== IS: smoothing / band sensitivity on carry_sign+trend ===
+              Sharpe    ann      TO
+sm1_tol0.0     0.392  0.044  70.551
+sm1_tol0.05    0.388  0.044  69.457
+sm1_tol0.1     0.377  0.043  68.737
+sm5_tol0.0     0.477  0.054  32.437
+sm5_tol0.05    0.472  0.053  31.244
+sm5_tol0.1     0.473  0.053  29.916
+sm10_tol0.0    0.499  0.056  22.618
+sm10_tol0.05   0.491  0.055  21.512
+sm10_tol0.1    0.484  0.054  20.262
+sm21_tol0.0    0.528  0.059  15.168
+sm21_tol0.05   0.526  0.058  14.245
+sm21_tol0.1    0.520  0.058  13.381
+
+=== IS: per-maturity, carry_sign+trend ===
+  2y: SR  0.51  ann  2.00%  avg|w| 1.43
+  10y: SR  0.51  ann  2.15%  avg|w| 0.41
+  30y: SR  0.40  ann  1.74%  avg|w| 0.28
+
+=== IS: sleeves separately, 5-year blocks ===
+  carry_sign         1990-1994: 0.30  1995-1999: 0.68  2000-2004: 0.18  2005-2009: 0.03
+  trend              1990-1994: 1.12  1995-1999: 0.78  2000-2004: 0.25  2005-2009: 0.18
+  carry_sign+trend   1990-1994: 0.74  1995-1999: 0.98  2000-2004: 0.23  2005-2009: 0.13
+
+IS corr carry_sign vs trend: 0.293
