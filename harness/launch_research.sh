@@ -4,7 +4,7 @@
 #   ./harness/launch_research.sh spot-btc
 #   ./harness/launch_research.sh fx-majors "carry unwind around NFP"
 #   ./harness/launch_research.sh spot-btc "" --require "OOS Sharpe >= 2.0 after 10bp/side"
-#   ./harness/launch_research.sh fx-majors "" --model claude-sonnet-5
+#   ./harness/launch_research.sh fx-majors "" --model sonnet
 #
 # A seed says where to look; --require says what counts as having found something. The
 # seed has never been a gate -- PR #3 was launched with the seed "2+ sharpe strat", the
@@ -35,13 +35,12 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-# Pinned model IDs, not the short names. `claude --model sonnet` resolves to Sonnet 4.6 and
-# `opus` to Opus 4.7 on this CLI build, so the short names quietly select a previous
-# generation -- and `fable` is not accepted at all. An id makes the transcript say exactly
-# what ran, which matters when comparing two research sessions months apart.
-MODEL="${MODEL:-${RESEARCH_AGENT_MODEL:-claude-opus-5}}"
+# An alias by default, so a new Opus is picked up the day the CLI learns about it. The
+# model it actually resolved to is recorded in the session's result JSON and shown on the
+# dashboard, which is what keeps two runs months apart comparable. A full id still works.
+MODEL="${MODEL:-${RESEARCH_AGENT_MODEL:-opus}}"
 case "$MODEL" in
-  -*|"") echo "ERROR: --model needs a model id (e.g. claude-opus-5), got '$MODEL'" >&2; exit 2 ;;
+  -*|"") echo "ERROR: --model needs a model alias or id (e.g. opus, sonnet), got '$MODEL'" >&2; exit 2 ;;
 esac
 # Deliberately uncapped: this runs on a Claude subscription, not metered API credit.
 # The timeout below is the safety net -- it reaps a hung agent, not an expensive one.

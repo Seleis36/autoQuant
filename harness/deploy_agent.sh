@@ -24,10 +24,9 @@ LOGS="$REPO/harness/logs"
 mkdir -p "$STATE" "$LOGS"
 
 PR="${1:?usage: deploy_agent.sh <pr-number>}"
-# Pinned model id, not the `opus` short name: on this CLI `--model opus` resolves to Opus
-# 4.7, so the alias quietly ran a previous generation. An id also makes the session
-# registry say exactly what produced a decision.
-MODEL="${DEPLOY_AGENT_MODEL:-claude-opus-5}"
+# The `opus` alias: the newest Opus the CLI knows (see CLAUDE_BIN in session_lib.sh). The
+# model it resolved to lands in the session's result JSON and on the dashboard.
+MODEL="${DEPLOY_AGENT_MODEL:-opus}"
 TIMEOUT="${DEPLOY_AGENT_TIMEOUT:-3600}"
 MAX_ATTEMPTS="${DEPLOY_AGENT_MAX_ATTEMPTS:-3}"
 # No spend cap: this runs on a Claude subscription, not metered API credit, so a dollar

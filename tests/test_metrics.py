@@ -231,3 +231,103 @@ def test_single_instrument_turnover_is_unchanged(live_dir):
                  delta_qty=2.0, price=50.0)]
     write_strategy(live_dir, "spot-btc/t", journal_rows=rows * 2)
     assert metrics.compute("spot-btc/t", "1d")["turnover_usdt"] == 200.0
+
+
+# ---------------------------------------------------- series payload for charting
+
+def test_equity_series_carries_epoch_timestamps_alongside_iso(live_dir):
+    write_strategy(live_dir, "spot-btc/x",
+                   journal_rows=[rebalance(i, 200.0 + i) for i in range(4)])
+    s = metrics.equity_series("spot-btc/x")
+    assert len(s["ts"]) == len(s["t"]) == 4
+    assert all(isinstance(v, int) for v in s["ts"])
+    assert s["ts"] == sorted(s["ts"])
+
+
+def test_equity_series_keeps_every_fill_through_downsampling(live_dir):
+    """Markers are read off `trades`, not off the plotted points. Downsampling keeps
+    every Nth bar whether or not it traded, so a fill list derived from the thinned
+    series would drop most fills and date the survivors to the wrong bar."""
+    rows = []
+    for i in range(300):
+        r = rebalance(0, 100.0 + i, traded=(i % 7 == 0), side="BUY", delta_qty=1.0)
+        r["ts"] = f"2026-01-01T00:00:{i % 60:02d}.{i:06d}+00:00"
+        rows.append(r)
+    write_strategy(live_dir, "spot-btc/x", journal_rows=rows)
+    s = metrics.equity_series("spot-btc/x", max_points=20)
+    assert len(s["equity"]) <= 22                      # the curve IS thinned
+    assert len(s["trades"]) == len(range(0, 300, 7))   # the fills are not
+    assert s["points_total"] == 300
+
+
+def test_a_basket_fill_is_marked_neutral_not_given_a_side(live_dir):
+    rows = [_row(f"2026-01-{i + 1:02d}T00:00:00+00:00", 100.0 + i, weight=0.0,
+                 traded=True, turnover_usdt=10.0, legs=[{"symbol": "A"}])
+            for i in range(3)]
+    write_strategy(live_dir, "sector-etf/b", journal_rows=rows)
+    assert {t["side"] for t in metrics.equity_series("sector-etf/b")["trades"]} == {"REBAL"}
+
+
+def test_benchmark_is_forward_filled_across_a_missing_quote(live_dir):
+    """A bar that journalled no price is a gap in the quote. Substituting the FIRST
+    price there snapped the benchmark back to its starting value mid-chart."""
+    rows = [rebalance(0, 100.0, price=50.0), rebalance(1, 101.0, price=60.0),
+            rebalance(2, 102.0, price=None), rebalance(3, 103.0, price=70.0)]
+    s_rows = []
+    for r in rows:
+        if r["price"] is None:
+            del r["price"]
+        s_rows.append(r)
+    write_strategy(live_dir, "spot-btc/gap", journal_rows=s_rows)
+    b = metrics.equity_series("spot-btc/gap")["benchmark"]
+    assert b == [100.0, 120.0, 120.0, 140.0]           # held, not reset to 100
+
+
+# ------------------------------------------------------------------- portfolio
+
+def _book(start_day, equities, mode="live", capital=1000.0):
+    return [{"ts": f"2026-01-{start_day + i:02d}T00:00:00+00:00", "event": "rebalance",
+             "equity": e, "price": 100.0, "weight": 1.0, "shadow": mode != "live",
+             "mode": mode, "capital_usdt": capital}
+            for i, e in enumerate(equities)]
+
+
+def test_portfolio_never_adds_a_simulated_book_to_a_funded_one(live_dir):
+    write_strategy(live_dir, "spot-btc/real", journal_rows=_book(1, [1000.0, 1100.0]))
+    write_strategy(live_dir, "spot-btc/fake",
+                   journal_rows=_book(1, [1000.0, 5000.0], mode="sim"))
+    out = metrics.portfolio_series([{"name": "spot-btc/real", "capital_usdt": 1000.0},
+                                    {"name": "spot-btc/fake", "capital_usdt": 1000.0}])
+    assert out["live"]["books"] == ["spot-btc/real"]
+    assert out["paper"]["books"] == ["spot-btc/fake"]
+    assert out["live"]["equity_usdt"] == 1100.0        # the sim book is nowhere in it
+
+
+def test_a_book_not_yet_started_is_carried_at_its_capital(live_dir):
+    """Otherwise the total steps up on the day a new strategy is deployed, and the
+    curve reports a gain the desk never made."""
+    write_strategy(live_dir, "spot-btc/old", journal_rows=_book(1, [1000.0] * 4))
+    write_strategy(live_dir, "spot-btc/new", journal_rows=_book(3, [1000.0, 1000.0]))
+    out = metrics.portfolio_series([{"name": "spot-btc/old", "capital_usdt": 1000.0},
+                                    {"name": "spot-btc/new", "capital_usdt": 1000.0}])
+    live = out["live"]
+    assert live["capital_usdt"] == 2000.0
+    assert live["usd"] == [2000.0] * len(live["usd"])   # flat: no step on day 3
+    assert live["index"][0] == 100.0 and live["index"][-1] == 100.0
+
+
+def test_portfolio_forward_fills_a_book_that_stopped_reporting(live_dir):
+    write_strategy(live_dir, "spot-btc/a", journal_rows=_book(1, [1000.0, 1200.0]))
+    write_strategy(live_dir, "spot-btc/b", journal_rows=_book(1, [1000.0] * 4))
+    out = metrics.portfolio_series([{"name": "spot-btc/a", "capital_usdt": 1000.0},
+                                    {"name": "spot-btc/b", "capital_usdt": 1000.0}])
+    # `a` has no bar after day 2; it is held at 1200, never dropped to zero.
+    assert out["live"]["usd"][-1] == 2200.0
+
+
+def test_portfolio_skips_a_book_with_too_little_history(live_dir):
+    write_strategy(live_dir, "spot-btc/a", journal_rows=_book(1, [1000.0, 1200.0]))
+    write_strategy(live_dir, "spot-btc/one", journal_rows=_book(1, [1000.0]))
+    out = metrics.portfolio_series([{"name": "spot-btc/a", "capital_usdt": 1000.0},
+                                    {"name": "spot-btc/one", "capital_usdt": 1000.0}])
+    assert out["live"]["books"] == ["spot-btc/a"]

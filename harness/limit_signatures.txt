@@ -16,3 +16,6 @@ rate.?limit(ed)? .{0,40}(retry|reset|try again)
 resets at [0-9]
 upgrade to (a )?(higher|pro|max)
 insufficient (credit|quota)
+# Observed verbatim 2026-09-24 (Fable, no purchased credits left):
+# "You're out of usage credits. Switch to another model, or manage usage credits ..."
+out of usage credits

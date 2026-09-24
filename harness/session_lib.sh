@@ -26,7 +26,16 @@ AGENT_MAX_CONCURRENT="${AGENT_MAX_CONCURRENT:-2}"
 # Which claude binary every agent runs on. Pin it here rather than relying on whatever is
 # first on PATH, so a shell difference between the poller, systemd and an interactive
 # terminal cannot silently change what the agents are.
-CLAUDE_BIN="${CLAUDE_BIN:-claude}"
+#
+# The user-owned native install (~/.local/bin/claude, from `claude install`) wins over a
+# system one. The agents launch on model aliases, which the CLI resolves to the newest
+# model IT knows -- so the CLI's age is the models' age. The root-owned npm build this
+# machine used to run could not self-update, sat on 2.1.269 while Opus 5.5 shipped, and
+# kept resolving `opus` to Opus 5. The native install updates itself without sudo.
+if [ -z "${CLAUDE_BIN:-}" ]; then
+  if [ -x "$HOME/.local/bin/claude" ]; then CLAUDE_BIN="$HOME/.local/bin/claude"
+  else CLAUDE_BIN=claude; fi
+fi
 
 # Resolve the interpreter ONCE. The old form was `venv/python "$@" || python3 "$@"`, which
 # looks like a harmless fallback but breaks any caller that relies on the exit code: a
@@ -92,8 +101,8 @@ PY
 
 # --- classification ---------------------------------------------------------
 #
-# No usage-limit abort has ever been observed on this machine, so the exact wording is
-# unverified and layer 2 below WILL need correcting the first time a real one lands --
+# The only limit wording observed on this machine so far is Fable's "out of usage credits"
+# (2026-09-24); the subscription-limit wording is still unverified and layer 2 below WILL need correcting the first time a real one lands --
 # that is why the patterns live in an editable text file rather than in this script.
 # Layer 3 (the caller's side-effect check) is the part that does not depend on knowing
 # Anthropic's error strings, and it is what actually makes this safe.
@@ -116,7 +125,11 @@ term = str(d.get("terminal_reason") or "")
 err  = bool(d.get("is_error"))
 blob = (sub + " " + term + " " + str(d.get("result") or "")).lower()
 if any(s in blob for s in ("usage limit", "rate_limit", "rate limit",
-                           "quota", "limit reached", "upgrade to")):
+                           "quota", "limit reached", "upgrade to",
+                           # Observed 2026-09-24 on a Fable run with no credits left. It
+                           # arrives as subtype "success" with is_error set, so without this
+                           # it fell through to layer 2 and was filed as a crash.
+                           "out of usage credits", "usage credits")):
     print("usage_limit")
 elif not err and (term == "completed" or sub == "success"):
     print("clean")

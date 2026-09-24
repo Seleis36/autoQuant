@@ -15,7 +15,13 @@ from conftest import REPO_ROOT
 
 UNIT_DIR = os.path.join(REPO_ROOT, "harness", "systemd")
 UNITS = sorted(glob.glob(os.path.join(UNIT_DIR, "*.service")) +
-               glob.glob(os.path.join(UNIT_DIR, "*.target")))
+               glob.glob(os.path.join(UNIT_DIR, "*.target")) +
+               glob.glob(os.path.join(UNIT_DIR, "*.timer")))
+
+
+def timer_triggered(path):
+    """A service started by a timer of the same name is not enabled itself."""
+    return path.endswith(".service") and os.path.exists(path[:-len(".service")] + ".timer")
 
 
 def parse(path):
@@ -34,7 +40,23 @@ def test_units_exist():
 def test_unit_parses_and_has_an_install_section(path):
     cp = parse(path)
     assert "Unit" in cp
-    assert "Install" in cp, "a unit with no [Install] cannot be enabled"
+    if timer_triggered(path):
+        # Enabling a timer's service would ALSO start it at every boot -- for the
+        # nightly batch, a research run each time WSL comes up.
+        assert "Install" not in cp, "a timer-triggered service must not be enableable"
+    else:
+        assert "Install" in cp, "a unit with no [Install] cannot be enabled"
+
+
+def test_nightly_batch_survives_its_own_script_exiting():
+    """The agents it launches are detached but share the unit's cgroup; the default
+    KillMode would kill a running research agent when the batch script stops."""
+    cp = parse(os.path.join(UNIT_DIR, "autoquant-nightly.service"))
+    assert cp["Service"]["Type"] == "oneshot"
+    assert cp["Service"]["KillMode"] == "process"
+    t = parse(os.path.join(UNIT_DIR, "autoquant-nightly.timer"))
+    assert t["Timer"]["OnCalendar"].strip()
+    assert t["Timer"]["Persistent"] == "true"
 
 
 def test_start_limit_directives_are_in_the_unit_section():

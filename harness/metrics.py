@@ -188,24 +188,139 @@ def compute(name: str, schedule: str = "1h") -> dict:
     return out
 
 
+def _empty_series() -> dict:
+    return {"t": [], "ts": [], "equity": [], "benchmark": [], "weight": [], "trades": [],
+            "points_total": 0, "capital_usdt": None, "equity_usdt": None,
+            "start": None, "end": None, "mode": None}
+
+
 def equity_series(name: str, max_points: int = 600) -> dict:
-    """Downsampled equity + benchmark series for charting."""
+    """Downsampled equity + benchmark series for charting.
+
+    Both curves are indexed to 100 at the segment's first bar, so a book risking $2,500
+    and one risking $25,000 can share an axis.
+    """
     seg = current_segment(read_journal(name))
     if len(seg) < 2:
-        return {"t": [], "equity": [], "benchmark": []}
+        out = _empty_series()
+        out["points_total"] = len(seg)
+        return out
     step = max(1, len(seg) // max_points)
     pts = seg[::step]
     if pts[-1] is not seg[-1]:
         pts.append(seg[-1])
     p0 = float(pts[0].get("price") or 0) or None
     e0 = float(pts[0]["equity"])
+
+    # Fills are read off the FULL segment, never off `pts`.  Downsampling keeps every
+    # `step`-th bar whether or not it traded, so markers taken from the thinned series
+    # would drop most fills and date the survivors to a bar they did not happen on.
+    trades = []
+    for r in seg:
+        if not r.get("traded"):
+            continue
+        trades.append({
+            "ts": int(_ts(r).timestamp()),
+            # A basket rebalances many legs at once and has no single side, so it is
+            # marked neutral rather than guessing a direction from one leg.
+            "side": r.get("side") or ("REBAL" if r.get("legs") else None),
+            "price": r.get("fill_price") or r.get("price"),
+            "qty": r.get("filled_qty") or r.get("delta_qty"),
+            "turnover_usdt": _row_turnover(r),
+            "equity": round(float(r["equity"]) / e0 * 100, 4),
+        })
+
+    # Forward-fill the benchmark rather than substituting the first price: a bar that
+    # journalled no price is a gap in the quote, and falling back to p0 drew the
+    # benchmark snapping back to its starting value for the length of the outage.
+    bench, last_px = [], p0
+    if p0:
+        for r in pts:
+            px = float(r.get("price") or 0) or last_px
+            last_px = px
+            bench.append(round(px / p0 * 100, 4))
+
     return {
         "t": [_ts(r).isoformat() for r in pts],
+        # Epoch seconds as well: a chart's x-scale wants a number, and re-parsing 600
+        # ISO strings in the browser on every 10s refresh repeats work done here.
+        "ts": [int(_ts(r).timestamp()) for r in pts],
         "equity": [round(float(r["equity"]) / e0 * 100, 4) for r in pts],
-        "benchmark": ([round(float(r.get("price") or p0) / p0 * 100, 4) for r in pts]
-                      if p0 else []),
+        "benchmark": bench,
         "weight": [round(float(r.get("weight") or 0), 4) for r in pts],
+        "trades": trades,
+        # Pre-downsample count, so a chart can draw point markers when the curve is a
+        # handful of observations and six rebalances cannot pose as a smooth line.
+        "points_total": len(seg),
+        "capital_usdt": seg[-1].get("capital_usdt"),
+        "equity_usdt": float(seg[-1]["equity"]),
+        "start": _ts(seg[0]).isoformat(),
+        "end": _ts(seg[-1]).isoformat(),
+        "mode": seg[-1].get("mode"),
     }
+
+
+def portfolio_series(books: list, max_points: int = 900) -> dict:
+    """Combined equity across several books, grouped by how real their fills are.
+
+    A third thing this module refuses to do: add a simulated book to a funded one.  A
+    `sim` or `shadow` book never sent an order to a venue, so folding its equity into
+    the venue total would report money that was never at risk.  Books are grouped by
+    the mode of their CURRENT segment and each group is summed on its own.
+
+    Within a group the books start on different days, and a book is worth its capital
+    before its first bar -- idle cash, not nothing.  Carrying it at capital from the
+    start of the grid is what stops the total stepping up on the day a new strategy is
+    deployed, which would otherwise read as a gain the desk never made.
+
+    `books` is a list of {"name", "capital_usdt"}; the capital falls back to whatever
+    the journal recorded.
+    """
+    loaded = []
+    for b in books:
+        seg = current_segment(read_journal(b["name"]))
+        if len(seg) < 2:
+            continue
+        cap = float(b.get("capital_usdt") or seg[-1].get("capital_usdt") or 0)
+        if cap <= 0:
+            continue
+        loaded.append({
+            "name": b["name"], "capital": cap,
+            "mode": seg[-1].get("mode") or ("sim" if seg[-1].get("shadow") else "live"),
+            "pts": sorted((int(_ts(r).timestamp()), float(r["equity"])) for r in seg),
+        })
+
+    groups = {}
+    for bk in loaded:
+        groups.setdefault("live" if bk["mode"] == "live" else "paper", []).append(bk)
+
+    out = {}
+    for gname, bks in groups.items():
+        grid = sorted({t for bk in bks for t, _ in bk["pts"]})
+        if len(grid) < 2:
+            continue
+        total = [0.0] * len(grid)
+        for bk in bks:
+            i, cur = 0, bk["capital"]      # idle cash until this book's first bar
+            for j, t in enumerate(grid):
+                while i < len(bk["pts"]) and bk["pts"][i][0] <= t:
+                    cur = bk["pts"][i][1]
+                    i += 1
+                total[j] += cur
+        step = max(1, len(grid) // max_points)
+        idx = list(range(0, len(grid), step))
+        if idx[-1] != len(grid) - 1:
+            idx.append(len(grid) - 1)
+        base = total[0] or 1.0
+        out[gname] = {
+            "ts": [grid[k] for k in idx],
+            "index": [round(total[k] / base * 100, 4) for k in idx],
+            "usd": [round(total[k], 2) for k in idx],
+            "books": sorted(bk["name"] for bk in bks),
+            "capital_usdt": sum(bk["capital"] for bk in bks),
+            "equity_usdt": total[-1],
+        }
+    return out
 
 
 def _bucket(ts: datetime, step_s: int) -> int:

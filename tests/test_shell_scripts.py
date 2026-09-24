@@ -28,7 +28,7 @@ def run(script, *args, env=None, timeout=60, cwd=None):
 @pytest.mark.parametrize("script", [
     "dashboard.sh", "launch_live.sh", "poll_prs.sh", "launch_research.sh",
     "deploy_agent.sh", "revise_agent.sh", "resume_aborted.sh", "agent_exec.sh",
-    "session_lib.sh", "gh_lib.sh", "install_autostart.sh",
+    "session_lib.sh", "gh_lib.sh", "install_autostart.sh", "nightly_research.sh",
 ])
 def test_script_parses(script):
     p = subprocess.run(["bash", "-n", os.path.join(HARNESS, script)],

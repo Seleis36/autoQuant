@@ -35,6 +35,7 @@ from urllib.parse import parse_qs, urlsplit
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import metrics  # noqa: E402
+import transcript  # noqa: E402
 from live_lib import (BASE_URL, LIVE_DIR, REPO_ROOT, PaperBroker,  # noqa: E402
                       allocations_summary, load_env)
 
@@ -53,6 +54,8 @@ SESSIONS_DIR = os.path.join(STATE_DIR, "sessions")
 # one place because the HTTP layer and the action layer must agree on what is addressable.
 STRATEGY_RE = r"[\w.-]+/[\w.-]+"
 LOGFILE_RE = r"[\w.-]+\.log"
+# Session ids are minted by uuidgen in session_lib.sh; nothing else may name a transcript.
+SESSION_RE = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 MAX_BODY_BYTES = 1 << 20
 
 ASSET_CLASSES = ["spot-btc", "spot-eth", "crypto-perps", "crypto-alts", "us-large-cap",
@@ -60,17 +63,23 @@ ASSET_CLASSES = ["spot-btc", "spot-eth", "crypto-perps", "crypto-alts", "us-larg
                  "commodities", "vol-complex"]
 
 # Models a research agent may be launched on. The dashboard is the only caller that needs
-# an allowlist -- it is reachable over the tailnet, and this value reaches a subprocess
-# argv -- but pinning ids here also fixes a quieter problem: `claude --model opus` resolves
-# to Opus 4.7 and `sonnet` to Sonnet 4.6 on this CLI build, so the short names silently ran
-# a previous generation. Ids make the session registry say exactly what produced a result.
+# an allowlist -- it is reachable over the tailnet, and this value reaches a subprocess argv.
+#
+# Aliases, not pinned ids, so a new release is picked up without editing this file: the CLI
+# maps `opus` to the newest Opus it knows. That makes the CLI version the thing that decides
+# how current the models are -- a root-owned install that cannot self-update was still
+# resolving `opus` to Opus 5 after Opus 5.5 shipped, and rejected `claude-opus-5-5` outright.
+# CLAUDE_BIN therefore prefers the user-owned native install (see session_lib.sh), the
+# nightly job runs `claude update` first, and the registry records the model the alias
+# actually resolved to (read back from the result JSON), so a session still says exactly
+# what produced it.
 RESEARCH_MODELS = {
-    "opus":   {"id": "claude-opus-5",   "label": "Opus 5"},
-    "sonnet": {"id": "claude-sonnet-5", "label": "Sonnet 5"},
+    "opus":   {"id": "opus",   "label": "Opus (latest)"},
+    "sonnet": {"id": "sonnet", "label": "Sonnet (latest)"},
     # Fable is NOT covered by the Claude subscription the rest of this harness runs on --
     # it bills purchased usage credits, so a long research session on it costs real money
     # where an Opus or Sonnet one does not. Offered, flagged, and never the default.
-    "fable":  {"id": "claude-fable-5-1", "label": "Fable 5.1", "min_cli": "2.1.251",
+    "fable":  {"id": "fable",  "label": "Fable (latest)", "min_cli": "2.1.251",
                "note": "bills usage credits, not the subscription"},
 }
 DEFAULT_RESEARCH_MODEL = "opus"
@@ -95,6 +104,15 @@ def _tier(model: str) -> str:
     return "sonnet"
 
 
+def claude_bin() -> str:
+    """The binary agents run on -- the same rule as CLAUDE_BIN in session_lib.sh."""
+    env = os.environ.get("CLAUDE_BIN")
+    if env:
+        return env
+    native = os.path.expanduser("~/.local/bin/claude")
+    return native if os.access(native, os.X_OK) else "claude"
+
+
 @functools.lru_cache(maxsize=1)
 def _cli_version() -> str:
     """Version of the `claude` the agents actually run on (CLAUDE_BIN selects it).
@@ -103,7 +121,7 @@ def _cli_version() -> str:
     costs a subprocess. A `claude update` is therefore picked up at the next dashboard
     restart, which is also when the agents would start using the new binary.
     """
-    rc, out, _ = sh([os.environ.get("CLAUDE_BIN", "claude"), "--version"], 20)
+    rc, out, _ = sh([claude_bin(), "--version"], 20)
     return out.split()[0] if rc == 0 and out else ""
 
 
@@ -127,6 +145,11 @@ def research_model_options() -> list:
                "default": key == DEFAULT_RESEARCH_MODEL}
         if m.get("note"):
             row["note"] = m["note"]
+        # What the alias last resolved to on this machine, so "latest" is checkable.
+        seen = next((r["model_resolved"] for r in CACHE.get("sessions", [])
+                     if r.get("model_resolved") and _tier(r["model_resolved"]) == key), None)
+        if seen:
+            row["resolved"] = seen
         need = m.get("min_cli")
         if need and cli and _version_below(cli, need):
             row["unavailable"] = (f"needs Claude Code >= {need}; this machine has {cli}. "
@@ -396,13 +419,32 @@ def refresh_git():
     CACHE.set("git", {"branch": branch, "head": head, "url": url})
 
 
+def transcript_path(reg: dict) -> str:
+    """Where Claude Code wrote this registry entry's conversation."""
+    return transcript.path_for(reg.get("id") or "", reg.get("cwd") or REPO_ROOT)
+
+
+def _sessions_by_log() -> dict:
+    """Log basename -> session id, so a row in the agent-runs list can open the
+    conversation behind it and not only the launcher's log."""
+    out = {}
+    for f in glob.glob(os.path.join(SESSIONS_DIR, "*.json")):
+        if f.endswith(".result.json"):
+            continue
+        d = _read_json(f) or {}
+        if d.get("log") and d.get("id"):
+            out[os.path.basename(d["log"])] = d["id"]
+    return out
+
+
 def refresh_agents():
+    by_log = _sessions_by_log()
     runs = []
     for f in sorted(glob.glob(os.path.join(LOGS_DIR, "*.log")), key=os.path.getmtime,
                     reverse=True)[:25]:
         base = os.path.basename(f)
         runs.append({"log": base, "mtime": os.path.getmtime(f),
-                     "size": os.path.getsize(f),
+                     "size": os.path.getsize(f), "session": by_log.get(base),
                      "kind": "deploy" if base.startswith("pr-") else
                              ("research" if base.startswith("research-") else "other")})
     CACHE.set("agents", runs)
@@ -412,6 +454,20 @@ def _repo_slug():
     rc, out, _ = sh(["gh", "repo", "view", "--json", "nameWithOwner",
                      "--jq", ".nameWithOwner"], 20)
     return out.strip() if rc == 0 else ""
+
+
+def resolved_model(result_json: str):
+    """The model an alias such as `opus` actually ran as, read off the run's result.
+
+    `modelUsage` also lists the small model Claude Code uses for housekeeping, so the
+    main model is the non-haiku key -- or haiku itself if that is all there is.
+    """
+    d = _read_json(result_json)
+    if isinstance(d, list):
+        d = d[-1] if d else None
+    keys = [k.split("[")[0] for k in ((d or {}).get("modelUsage") or {})]
+    main = [k for k in keys if "haiku" not in k] or keys
+    return main[0] if main else None
 
 
 def refresh_sessions():
@@ -435,7 +491,10 @@ def refresh_sessions():
                 d["status"], d["reason"] = "aborted", "orphaned"
         out.append({k: d.get(k) for k in
                     ("id", "kind", "target", "status", "reason", "launched_at",
-                     "ended_at", "log", "model")} | {"resumes": len(d.get("resumes") or [])})
+                     "ended_at", "log", "model")}
+                   | {"resumes": len(d.get("resumes") or []),
+                      "model_resolved": resolved_model(f[:-5] + ".result.json"),
+                      "has_transcript": os.path.exists(transcript_path(d))})
     out.sort(key=lambda r: r.get("launched_at") or "", reverse=True)
     CACHE.set("sessions", out[:40])
 
@@ -635,6 +694,15 @@ class Handler(BaseHTTPRequestHandler):
             if not re.fullmatch(STRATEGY_RE, name or ""):
                 return self._send(400, {"error": "bad strategy"})
             return self._send(200, metrics.equity_series(name))
+        if path == "/api/portfolio":
+            # Capital comes from meta.json where the deploy agent recorded it, and from
+            # the journal otherwise; a book with neither is left out rather than summed
+            # at an assumed size.
+            books = [{"name": s["name"],
+                      "capital_usdt": (s["meta"].get("capital_usdt")
+                                       or s["state"].get("capital_usdt"))}
+                     for s in build_strategies()]
+            return self._send(200, metrics.portfolio_series(books))
         if path == "/api/journal":
             name = qs.get("strategy", "")
             if not re.fullmatch(STRATEGY_RE, name or ""):
@@ -660,6 +728,20 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(404, {"error": "no log"})
             _, out, _ = sh(["tail", "-n", str(n), f], 20)
             return self._send(200, {"text": out})
+        if path == "/api/transcript":
+            sid = qs.get("session", "")
+            if not re.fullmatch(SESSION_RE, sid or ""):
+                return self._send(400, {"error": "bad session"})
+            reg = _read_json(os.path.join(SESSIONS_DIR, sid + ".json")) or {"id": sid}
+            f = transcript_path(reg)
+            if not os.path.exists(f):
+                return self._send(404, {"error": "no transcript for this session -- it may "
+                                                 "predate the registry or have been cleaned up"})
+            out = transcript.render(f)
+            # `model` stays what the transcript says ran; the registry holds the alias.
+            out.update({k: reg.get(k) for k in ("kind", "target", "status")})
+            out["model_alias"] = reg.get("model")
+            return self._send(200, out)
         return self._send(404, {"error": "not found"})
 
     def do_POST(self):

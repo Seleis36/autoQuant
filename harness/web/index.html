@@ -2,15 +2,30 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>autoQuant</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uplot@1.6.32/dist/uPlot.min.css">
+<script src="https://cdn.jsdelivr.net/npm/uplot@1.6.32/dist/uPlot.iife.min.js"></script>
 <style>
 :root{
   --bg:#0f1115; --panel:#161a21; --panel2:#1c2029; --line:#262c37;
   --fg:#e6e9ef; --dim:#8d97a8; --dim2:#5e6878;
   --up:#3fb950; --down:#f85149; --warn:#d29922; --accent:#58a6ff; --shadow:#a371f7;
+  /* Chart tokens are separate from --up/--down on purpose. Those two mean "this
+     number went up" on text; a series colour means "this is the equity line", and
+     reusing one for the other repaints the chart every time a book turns negative.
+     These three are a categorical set, validated for contrast and colour-vision
+     separation against both the page and the card surface in both themes. */
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+  --dd:rgba(208,59,59,.20);            /* underwater shading (status: critical) */
+  --grid:#222833; --axis:#39414f; --neutral:#383835;
+  --pos:#d03b3b; --neg:#3987e5;        /* diverging poles for the correlation matrix */
 }
 @media (prefers-color-scheme:light){
   :root{--bg:#f6f7f9;--panel:#fff;--panel2:#f0f2f5;--line:#e1e4e8;--fg:#1a1f27;
-        --dim:#5b6472;--dim2:#8b95a4;--accent:#0969da;--shadow:#8250df}
+        --dim:#5b6472;--dim2:#8b95a4;--accent:#0969da;--shadow:#8250df;
+        --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a;
+        --dd:rgba(208,59,59,.14);
+        --grid:#eceef1;--axis:#c8ccd3;--neutral:#f0efec;
+        --pos:#d03b3b;--neg:#2a78d6}
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);
@@ -30,7 +45,10 @@ main{padding:16px;max-width:1500px;margin:0 auto}
 section{margin-bottom:22px}
 h2{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);
   margin:0 0 10px;font-weight:600}
-.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(390px,1fr))}
+/* align-items:start, or one tall card stretches every card beside it to match and the
+   row fills with dead space. */
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(390px,1fr));
+  align-items:start}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
 .card h3{margin:0;font-size:14px;font-weight:640}
 .card .desc{color:var(--dim);font-size:12px;margin:6px 0 10px}
@@ -42,7 +60,7 @@ h2{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim)
 .b-stale{background:rgba(210,153,34,.18);color:var(--warn)}
 .b-stop{background:var(--panel2);color:var(--dim)}
 .b-shadow{background:rgba(163,113,247,.15);color:var(--shadow)}
-    .b-sim{background:rgba(88,166,255,.15);color:var(--accent)}
+.b-sim{background:rgba(88,166,255,.15);color:var(--accent)}
 .b-paper{background:rgba(88,166,255,.13);color:var(--accent)}
 table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 th,td{text-align:right;padding:3px 0;font-size:12px}
@@ -51,6 +69,7 @@ thead th{color:var(--dim2);font-weight:600;font-size:10.5px;text-transform:upper
   letter-spacing:.05em;border-bottom:1px solid var(--line);padding-bottom:5px}
 .note{background:var(--panel2);border-left:2px solid var(--warn);padding:7px 10px;
   border-radius:0 6px 6px 0;color:var(--dim);font-size:11.5px;margin:10px 0}
+.note.quiet{border-left-color:var(--line)}
 button{background:var(--panel2);color:var(--fg);border:1px solid var(--line);
   border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;font-family:inherit}
 button:hover{border-color:var(--accent);color:var(--accent)}
@@ -59,7 +78,6 @@ button.danger:hover{border-color:var(--down);color:var(--down)}
 select,input[type=text]{background:var(--panel2);color:var(--fg);border:1px solid var(--line);
   border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit}
 input[type=text]{min-width:220px}
-.spark{display:block;width:100%;height:56px;margin:10px 0 4px}
 pre{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px;
   overflow:auto;max-height:340px;font-size:11.5px;line-height:1.45;margin:0;
   font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-word}
@@ -78,6 +96,43 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
   box-shadow:0 6px 24px rgba(0,0,0,.35);opacity:0;transition:opacity .2s;pointer-events:none;z-index:50;
   max-width:90vw;white-space:pre-wrap}
 #toast.on{opacity:1}
+
+/* ---- charts ---- */
+.c-chart{margin:10px 0 2px;cursor:pointer}
+.c-chart .ph{height:118px;display:flex;align-items:center;justify-content:center;
+  text-align:center;color:var(--dim2);font-size:11.5px;border:1px dashed var(--line);
+  border-radius:8px;padding:0 14px}
+.spark{display:block;width:100%;height:56px;margin:10px 0 4px}
+.hero{font-size:26px;font-weight:660;letter-spacing:-.02em;font-variant-numeric:tabular-nums;
+  line-height:1.15}
+.hero-sub{color:var(--dim);font-size:11.5px}
+/* uPlot ships its own legend table; these pull it into the page's type scale and
+   make it read as a legend (swatch + name) rather than a data grid. */
+.uplot{font-family:inherit}
+.u-legend{font-size:11px;margin-top:4px;text-align:left}
+.u-legend .u-series{display:inline-flex;align-items:center;gap:5px;margin-right:12px;
+  color:var(--dim);vertical-align:top}
+.u-legend .u-series>*{padding:0}
+.u-legend .u-marker{width:11px;height:2px;border-radius:1px;margin-right:2px}
+.u-legend .u-value{color:var(--fg);font-variant-numeric:tabular-nums}
+.u-legend tr.u-series th{font-weight:500;border:0}
+.u-select{background:rgba(88,166,255,.10)}
+.u-cursor-pt{display:none}
+.hm text{font-size:9.5px;fill:var(--dim);font-variant-numeric:tabular-nums}
+.hm text.val{fill:var(--fg);font-size:10px}
+/* ---- agent transcript ---- */
+.tx-head{display:flex;gap:12px;flex-wrap:wrap;align-items:baseline;margin-bottom:10px;font-size:11.5px}
+.tx{max-height:70vh;overflow:auto;display:flex;flex-direction:column;gap:8px}
+.tx-e{border-left:2px solid var(--line);padding-left:10px}
+.tx-e .who{font-size:10.5px;color:var(--dim2);text-transform:uppercase;letter-spacing:.05em;
+  margin-bottom:3px}
+.tx-e.assistant{border-left-color:var(--accent)}
+.tx-e.user{border-left-color:var(--shadow)}
+.tx-e.tool_use{border-left-color:var(--dim2)}
+.tx-e.err{border-left-color:var(--down)}
+.tx-e .body{white-space:pre-wrap;word-break:break-word;font-size:12.5px;line-height:1.5}
+.tx-e pre{max-height:260px}
+.tx-e summary{cursor:pointer;font-size:11.5px;color:var(--dim)}
 @media (max-width:560px){main{padding:10px}.grid{grid-template-columns:1fr}header{gap:8px}}
 </style>
 
@@ -94,6 +149,15 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 </header>
 
 <main>
+  <section id="sec-portfolio" style="display:none">
+    <h2>Portfolio</h2>
+    <div class="card">
+      <div class="row" id="pf-stats" style="gap:26px;align-items:flex-start"></div>
+      <div id="pf-chart"></div>
+      <div id="pf-note"></div>
+    </div>
+  </section>
+
   <section>
     <h2>Strategies</h2>
     <div class="grid" id="strategies"></div>
@@ -156,6 +220,17 @@ const dur = s => { if(s==null) return '—'; s=Math.floor(s);
   const d=Math.floor(s/86400), h=Math.floor(s%86400/3600), m=Math.floor(s%3600/60);
   return d?`${d}d ${h}h`: h?`${h}h ${m}m`: `${m}m`; };
 const tok = n => n>=1e6 ? (n/1e6).toFixed(1)+'M' : n>=1e3 ? (n/1e3).toFixed(0)+'k' : String(n||0);
+const short = n => String(n||'').split('/').pop();
+/* A basket journals every leg into `symbol` -- crypto-alts' is 521 characters of
+   "SOL-USD+XRP-USD+...", which printed in full pushed its card several screens tall
+   and stretched every card beside it. The count is what the reader wants; the legs
+   themselves are a tooltip. */
+const legCount = s => (s.symbols||[]).length
+  || String(s.symbol||'').split(/[+,\s]+/).filter(Boolean).length;
+const symLabel = s => {
+  const sy = String(s.symbol||'');
+  return sy.length <= 30 ? (sy || '?') : `${legCount(s)} instruments`;
+};
 
 let STATE = null;
 // In flight, keyed by action+target. A single global "busy" flag used to live here, and
@@ -191,8 +266,206 @@ async function act(body, label){
   refresh();
 }
 
-function sparkline(series, bench){
-  if(!series || series.length<2) return '<div class="dim" style="height:56px;display:flex;align-items:center">no history yet</div>';
+/* ===================================================================== charts ===
+ * uPlot draws to a canvas and canvas has no var(), so the page's custom properties
+ * are resolved to concrete colours at render time. Reading them live (rather than
+ * hard-coding two palettes here) is also what lets the charts follow an OS
+ * light/dark switch without a reload.
+ */
+const TOKENS = ['s1','s2','s3','dd','grid','axis','dim','dim2','fg','line','panel2',
+                'pos','neg','neutral'];
+function theme(){
+  const cs = getComputedStyle(document.documentElement), t = {};
+  for(const k of TOKENS) t[k] = cs.getPropertyValue('--'+k).trim();
+  return t;
+}
+const hasUplot = () => typeof uPlot !== 'undefined';
+
+/* Every curve used to be auto-fitted to its own box, which made BULT's +1.4% and
+   eth-trend's +9.6% draw as the same squiggle. Forcing at least MIN_SPAN points of
+   range keeps a quiet book looking quiet, and clamping the ends around 100 keeps the
+   start-of-book baseline on screen no matter how far the curve has travelled. */
+const MIN_SPAN = 6;
+function indexRange(lo, hi){
+  lo = Math.min(lo==null?100:lo, 100);
+  hi = Math.max(hi==null?100:hi, 100);
+  const mid = (lo+hi)/2, span = Math.max(hi-lo, MIN_SPAN), pad = span*0.14;
+  return [mid-span/2-pad, mid+span/2+pad];
+}
+function runningPeak(a){
+  let p = -Infinity;
+  return a.map(v => (v==null ? (p===-Infinity?null:p) : (p = Math.max(p, v))));
+}
+const signedPct = (v,d=1) => v==null ? '—' : (v>=100?'+':'')+(v-100).toFixed(d)+'%';
+/* Axis ticks carry one decimal only when they need it, so a flat book gets
+   "-2.5% / +0% / +2.5%" instead of three ticks that all round to "+0%". */
+const axisPct = v => (v>=100?'+':'')+(v-100).toFixed(1).replace(/\.0$/,'')+'%';
+
+/* uPlot's live legend reads "—" whenever the pointer is away, which is most of the
+   time and looks like a chart that failed to load. Parking it on the last sample
+   turns it into the "where does this book stand now" readout it should have been. */
+function pinLegend(u){
+  const n = u.data[0] ? u.data[0].length : 0;
+  if(n) u.setLegend({idx:n-1}, false);
+}
+
+/* Underwater shading, drawn rather than declared as a uPlot band: the fill has to
+   run between the equity line and its own running peak, which is a derived series
+   that should not appear in the legend or under the cursor. Max DD is a headline
+   row in the table below; this is that row, drawn. */
+function drawUnderwater(u, idx, fill){
+  const xs = u.data[0], eq = u.data[idx];
+  if(!eq || eq.length < 2) return;
+  const pk = runningPeak(eq), ctx = u.ctx;
+  const px = i => u.valToPos(xs[i], 'x', true), py = v => u.valToPos(v, 'y', true);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(u.bbox.left, u.bbox.top, u.bbox.width, u.bbox.height);
+  ctx.clip();
+  ctx.beginPath();
+  for(let i=0;i<eq.length;i++) ctx.lineTo(px(i), py(pk[i]));
+  for(let i=eq.length-1;i>=0;i--) ctx.lineTo(px(i), py(eq[i]==null?pk[i]:eq[i]));
+  ctx.closePath();
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawBaseline(u, stroke){
+  const y = u.valToPos(100, 'y', true), ctx = u.ctx;
+  if(!isFinite(y)) return;
+  ctx.save();
+  ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.setLineDash([3,4]);
+  ctx.beginPath(); ctx.moveTo(u.bbox.left, y);
+  ctx.lineTo(u.bbox.left+u.bbox.width, y); ctx.stroke();
+  ctx.restore();
+}
+
+/* Fills, from the journal's own trade list rather than from the plotted points --
+   the series is downsampled and most fills do not survive that. A basket has no
+   single side, so it gets a neutral tick instead of an invented direction. */
+function drawTrades(u, trades, tk){
+  if(!trades || !trades.length) return;
+  const ctx = u.ctx, x0 = u.scales.x.min, x1 = u.scales.x.max;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(u.bbox.left, u.bbox.top-4, u.bbox.width, u.bbox.height+8);
+  ctx.clip();
+  for(const t of trades){
+    if(t.ts < x0 || t.ts > x1) continue;
+    const x = u.valToPos(t.ts, 'x', true), y = u.valToPos(t.equity, 'y', true);
+    if(!isFinite(x) || !isFinite(y)) continue;
+    ctx.beginPath();
+    if(t.side === 'BUY' || t.side === 'SELL'){
+      const d = t.side === 'BUY' ? -1 : 1, top = y + d*9;
+      ctx.moveTo(x, top); ctx.lineTo(x-4, top - d*5); ctx.lineTo(x+4, top - d*5);
+      ctx.closePath();
+      ctx.fillStyle = t.side === 'BUY' ? tk.s3 : tk.s2;
+      ctx.fill();
+    }else{
+      ctx.moveTo(x, y-4); ctx.lineTo(x, y+4);
+      ctx.strokeStyle = tk.dim2; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function axesFor(tk, opts){
+  const base = {stroke:tk.dim2, font:'10px ui-sans-serif, system-ui, sans-serif',
+                grid:{stroke:tk.grid, width:1}, ticks:{stroke:tk.grid, width:1, size:3}};
+  return [
+    // 34, not 28: uPlot's date axis puts the year on a second row beneath the day,
+    // and the shorter gutter cut it in half.
+    {...base, size:34, space:70},
+    {...base, size:opts.wide?50:46, space:30, values:(u,vals)=>vals.map(axisPct)},
+  ];
+}
+
+/* One equity chart: the strategy indexed to 100, buy & hold beside it when such a
+   thing exists, its drawdown shaded, and its fills marked. */
+function equityChart(el, ser, opts){
+  const tk = theme(), o = opts||{};
+  const hasBench = ser.benchmark && ser.benchmark.length === ser.equity.length;
+  const sparse = (ser.points_total||0) < 8;
+  const data = hasBench ? [ser.ts, ser.equity, ser.benchmark] : [ser.ts, ser.equity];
+  const all = ser.equity.concat(hasBench ? ser.benchmark : []).filter(v=>v!=null);
+  const mk = (label, stroke) => ({
+    label, stroke, width:2, spanGaps:true,
+    points:{show:sparse, size:8, stroke, fill:stroke},
+    value:(u,v)=>signedPct(v,2),
+  });
+  const u = new uPlot({
+    width: Math.max(el.clientWidth||360, 180),
+    height: o.height || 118,
+    padding:[8,6,0,0],
+    cursor:{x:true, y:true, points:{show:false},
+            sync:o.sync ? {key:o.sync} : undefined},
+    legend:{show:o.legend !== false, live:true},
+    scales:{x:{time:true},
+            y:{range:()=>indexRange(all.length?Math.min(...all):null,
+                                    all.length?Math.max(...all):null)}},
+    axes: axesFor(tk, o),
+    series:[
+      {value:(u,v)=>v==null?'—':new Date(v*1000).toISOString().slice(0,16).replace('T',' ')},
+      mk('strategy', tk.s1),
+      ...(hasBench ? [mk('buy & hold', tk.s2)] : []),
+    ],
+    hooks:{
+      drawClear:[u=>drawUnderwater(u, 1, tk.dd)],
+      draw:[u=>{ drawBaseline(u, tk.axis); if(o.markers!==false) drawTrades(u, ser.trades, tk); }],
+      ready:[pinLegend],
+      setCursor:[u=>{ if(u.cursor.idx == null) pinLegend(u); }],
+    },
+  }, data, el);
+  u._ser = ser;
+  return u;
+}
+
+/* Exposure lives in its own chart under the equity one, never on a second y-axis of
+   the same chart: two scales in one frame is the single most misread thing in a
+   financial chart. The cursor is shared, so reading one reads the other. */
+function weightChart(el, ser, opts){
+  const tk = theme(), o = opts||{};
+  const w = ser.weight || [];
+  const lo = Math.min(0, ...w), hi = Math.max(0, ...w);
+  const u = new uPlot({
+    width: Math.max(el.clientWidth||360, 180),
+    height: o.height || 92,
+    padding:[8,6,0,0],
+    cursor:{x:true, y:false, points:{show:false}, sync:o.sync ? {key:o.sync} : undefined},
+    legend:{show:true, live:true},
+    scales:{x:{time:true}, y:{range:()=>[lo-0.08, hi+0.08]}},
+    axes:[
+      {stroke:tk.dim2, font:'10px ui-sans-serif, system-ui, sans-serif',
+       grid:{stroke:tk.grid,width:1}, ticks:{stroke:tk.grid,width:1,size:3}, size:34, space:70},
+      {stroke:tk.dim2, font:'10px ui-sans-serif, system-ui, sans-serif',
+       grid:{stroke:tk.grid,width:1}, ticks:{stroke:tk.grid,width:1,size:3}, size:46, space:26,
+       values:(u,vals)=>vals.map(v=>v.toFixed(2))},
+    ],
+    series:[
+      {value:(u,v)=>v==null?'—':new Date(v*1000).toISOString().slice(0,16).replace('T',' ')},
+      {label:'exposure', stroke:tk.s3, width:2, fill:'rgba(25,158,112,.13)',
+       spanGaps:true, value:(u,v)=>v==null?'—':v.toFixed(3)},
+    ],
+    hooks:{
+      draw:[u=>{
+        const y = u.valToPos(0,'y',true), ctx = u.ctx;
+        if(!isFinite(y)) return;
+        ctx.save(); ctx.strokeStyle = tk.axis; ctx.lineWidth = 1; ctx.setLineDash([3,4]);
+        ctx.beginPath(); ctx.moveTo(u.bbox.left,y); ctx.lineTo(u.bbox.left+u.bbox.width,y);
+        ctx.stroke(); ctx.restore();
+      }],
+      ready:[pinLegend],
+      setCursor:[u=>{ if(u.cursor.idx == null) pinLegend(u); }],
+    },
+  }, [ser.ts, w], el);
+  return u;
+}
+
+/* The pre-uPlot renderer, kept as the offline path. The library comes off a CDN, and
+   a dashboard that cannot reach it should still draw the shape of the curve. */
+function fallbackSparkline(series, bench){
+  if(!series || series.length<2) return '<div class="ph">no history yet</div>';
   const all = series.concat(bench&&bench.length?bench:[]);
   const lo = Math.min(...all), hi = Math.max(...all), rng = (hi-lo)||1;
   const W=100, H=100;
@@ -206,8 +479,26 @@ function sparkline(series, bench){
       vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
 }
 
-function card(s){
-  const m = s.meta||{}, bt = m.backtest||{}, lv = s.live||{}, st = s.state||{};
+/* ================================================================ strategy cards ===
+ * Cards are kept and updated in place rather than rebuilt from innerHTML each tick.
+ * A uPlot instance owns a canvas and a set of listeners, so a wholesale rebuild every
+ * 10s would leak one per strategy per tick and throw away any cursor the reader had
+ * their mouse on. The text regions around the chart are still cheap innerHTML swaps.
+ */
+const CARDS = new Map();
+let RESIZER = null;
+
+function chartPlaceholder(s){
+  const n = (s._series && s._series.points_total) || 0;
+  const sw = s.live && s.live.mode_switched;
+  const why = n === 0 ? 'no rebalance recorded yet'
+            : `1 rebalance so far — the curve starts at the second, about ${esc(s.schedule)} from now`;
+  return `<div class="ph">${why}${sw ? '<br>the book switched between shadow and live, '
+          + 'so the clock restarted there' : ''}</div>`;
+}
+
+function cardTop(s){
+  const m = s.meta||{}, st = s.state||{};
   const badge = {RUNNING:'b-run',DEAD:'b-dead',STALE:'b-stale',STOPPED:'b-stop'}[s.status]||'b-stop';
   // Three states, not two. `sim` is a self-contained simulated book and is working
   // as designed; `shadow` is a venue book that could NOT reach the venue and is a
@@ -223,44 +514,65 @@ function card(s){
     prov.spec && gh ? `<a href="${gh}/blob/main/${prov.spec}" target="_blank" rel="noopener">spec</a>` : '',
     prov.report && gh ? `<a href="${gh}/blob/main/${prov.report}" target="_blank" rel="noopener">report</a>` : '',
   ].filter(Boolean).join(' · ');
-
-  const cmp = (label, live, back, d=2, suffix='') => `<tr><td>${label}</td>
-    <td class="${sgn(live)}">${live==null?'—':fmt(live,d)+suffix}</td>
-    <td class="dim">${back==null?'—':fmt(back,d)+suffix}</td></tr>`;
-
-  return `<div class="card" data-name="${esc(s.name)}">
-    <div class="row" style="justify-content:space-between">
+  return `<div class="row" style="justify-content:space-between">
       <h3>${esc(m.title||s.name)}</h3>
       <div class="row"><span class="badge ${badge}">${s.status}</span>${mode}</div>
     </div>
     <div class="desc">${esc(m.description||'No meta.json — deploy agent did not write one.')}</div>
-    <div class="row" style="gap:14px;font-size:11.5px" class="dim">
-      <span class="dim mono">${esc(s.symbol||'?')} · ${esc(s.schedule)}</span>
-      <span class="dim">pid ${s.pid||'—'}</span>
-      <span class="dim">up ${dur(s.uptime_s)}</span>
-      <span class="dim">cap $${fmt(m.capital_usdt||st.capital_usdt,0)}</span>
+    <div class="row dim" style="gap:14px;font-size:11.5px">
+      <span class="mono" title="${esc(s.symbol||'')}">${esc(symLabel(s))} · ${esc(s.schedule)}</span>
+      <span>pid ${s.pid||'—'}</span>
+      <span>up ${dur(s.uptime_s)}</span>
+      <span>cap $${fmt(m.capital_usdt||st.capital_usdt,0)}</span>
       ${links?`<span>${links}</span>`:''}
     </div>
     ${s.stale?`<div class="note">Stale: last rebalance ${dur(s.last_run_age_s)} ago, longer than
-       two ${esc(s.schedule)} bars. The process is up but not working.</div>`:''}
-    ${sparkline(s._series&&s._series.equity, s._series&&s._series.benchmark)}
-    ${lv.mode_switched&&!(s._series&&s._series.equity&&s._series.equity.length>1)
-      ? `<div class="note">${esc(lv.reason||'the shadow/live book changed')}</div>` : ''}
-    <div class="row dim" style="font-size:11px;justify-content:space-between;margin-bottom:8px">
-      <span>strategy</span><span>— — buy &amp; hold</span></div>
-    <table><thead><tr><th></th><th>live</th><th>backtest</th></tr></thead><tbody>
-      ${cmp('Sharpe', lv.sufficient?lv.sharpe:null, bt.sharpe)}
-      ${cmp('Return', lv.total_return_pct, null, 2, '%')}
-      ${cmp('CAGR', lv.sufficient?lv.cagr_pct:null, bt.cagr_pct, 1, '%')}
-      ${cmp('Max DD', lv.maxdd_pct, bt.maxdd_pct, 1, '%')}
-      ${cmp('Vol', lv.sufficient?lv.vol_pct:null, bt.vol_pct, 1, '%')}
-      ${cmp('Avg exposure', lv.avg_exposure, bt.avg_exposure, 2)}
-      ${cmp('RT / year', lv.round_trips_per_year, bt.round_trips_per_year, 0)}
-      <tr><td>Weight now</td><td colspan="2" style="text-align:right">
+       two ${esc(s.schedule)} bars. The process is up but not working.</div>`:''}`;
+}
+
+function cardNote(s){
+  const lv = s.live||{}, ser = s._series||{};
+  const drawn = (ser.equity||[]).length > 1;
+  const out = [];
+  // A basket has no single instrument to hold, so there is no buy & hold line to
+  // draw. Saying so beats a legend that promises one and a chart that has none.
+  if(drawn && !(ser.benchmark && ser.benchmark.length === ser.equity.length))
+    out.push(`<div class="note quiet">No buy &amp; hold line: this book trades a basket,
+      with no single price to hold against it.</div>`);
+  // Only when the table below will NOT already be carrying it: `lv.reason` folds the
+  // switch into its "not enough history" sentence, and printing both put the same
+  // paragraph above and below the same table.
+  if(lv.mode_switched && lv.sufficient)
+    out.push(`<div class="note">${esc(lv.reason||'the shadow/live book changed')}</div>`);
+  return out.join('');
+}
+
+function cardBottom(s){
+  const m = s.meta||{}, bt = m.backtest||{}, lv = s.live||{}, st = s.state||{};
+  const bh = lv.benchmark||{};
+  // A basket holds no single position, so "0.00000 <symbol>" is a number about
+  // nothing; the leg count is the honest version of that cell.
+  const basket = legCount(s) > 1;
+  const cmp = (label, live, back, hold, d=2, suffix='') => `<tr><td>${label}</td>
+    <td class="${sgn(live)}">${live==null?'—':fmt(live,d)+suffix}</td>
+    <td class="dim">${back==null?'—':fmt(back,d)+suffix}</td>
+    <td class="dim">${hold==null?'—':fmt(hold,d)+suffix}</td></tr>`;
+  return `<table><thead><tr><th></th><th>live</th><th>backtest</th>
+      <th title="Buy &amp; hold over exactly the same live bars">buy &amp; hold</th></tr></thead><tbody>
+      ${cmp('Sharpe', lv.sufficient?lv.sharpe:null, bt.sharpe, lv.sufficient?bh.sharpe:null)}
+      ${cmp('Return', lv.total_return_pct, null, bh.total_return_pct, 2, '%')}
+      ${cmp('CAGR', lv.sufficient?lv.cagr_pct:null, bt.cagr_pct, null, 1, '%')}
+      ${cmp('Max DD', lv.maxdd_pct, bt.maxdd_pct, bh.maxdd_pct, 1, '%')}
+      ${cmp('Vol', lv.sufficient?lv.vol_pct:null, bt.vol_pct, null, 1, '%')}
+      ${cmp('Avg exposure', lv.avg_exposure, bt.avg_exposure, null, 2)}
+      ${cmp('RT / year', lv.round_trips_per_year, bt.round_trips_per_year, null, 0)}
+      <tr><td>Weight now</td><td colspan="3" style="text-align:right">
         <b>${fmt(lv.current_weight ?? st.last_weight, 3)}</b>
-        <span class="dim">· ${fmt(st.position,5)} ${esc((s.symbol||'').replace('USDT',''))}
+        <span class="dim">· ${basket
+          ? legCount(s)+' legs'
+          : fmt(st.position,5)+' '+esc((s.symbol||'').replace('USDT',''))}
         · $${fmt(st.equity,2)}</span></td></tr>
-      <tr><td>Fees paid</td><td colspan="2" style="text-align:right" class="dim">
+      <tr><td>Fees paid</td><td colspan="3" style="text-align:right" class="dim">
         $${fmt(lv.fees_paid,2)} over ${lv.trades||0} trade(s)
         · assumed ${bt.cost_bps_per_side??'?'}bp ${esc(bt.cost_type||'')}</td></tr>
     </tbody></table>
@@ -273,7 +585,209 @@ function card(s){
       <button data-act="flatten" class="danger">Flatten</button>
       <button data-act="log">Log</button>
       <button data-act="journal">Trades</button>
-    </div></div>`;
+    </div>`;
+}
+
+function buildCard(s){
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.dataset.name = s.name;
+  el.innerHTML = '<div class="c-top"></div><div class="c-chart"></div>'
+               + '<div class="c-note"></div><div class="c-bot"></div>';
+  return {el, chart:null,
+          top:el.querySelector('.c-top'), chartEl:el.querySelector('.c-chart'),
+          note:el.querySelector('.c-note'), bot:el.querySelector('.c-bot')};
+}
+
+function updateCard(rec, s){
+  rec.top.innerHTML = cardTop(s);
+  rec.note.innerHTML = cardNote(s);
+  rec.bot.innerHTML = cardBottom(s);
+  const ser = s._series||{};
+  const drawable = (ser.equity||[]).length > 1 && (ser.ts||[]).length === ser.equity.length;
+  if(!drawable){
+    if(rec.chart){ rec.chart.destroy(); rec.chart = null; }
+    rec.chartEl.innerHTML = chartPlaceholder(s);
+    rec.chartEl.dataset.empty = '1';
+    return;
+  }
+  delete rec.chartEl.dataset.empty;
+  // setData keeps the instance -- and with it the reader's cursor -- alive across a
+  // refresh. A new instance is built only when the shape of the chart changes (a
+  // benchmark appearing, or a book that has just produced its second bar).
+  const wantBench = !!(ser.benchmark && ser.benchmark.length === ser.equity.length);
+  if(rec.chart && rec.chart._hasBench === wantBench){
+    rec.chart._ser = ser;
+    rec.chart.setData(wantBench ? [ser.ts, ser.equity, ser.benchmark] : [ser.ts, ser.equity]);
+    pinLegend(rec.chart);
+    return;
+  }
+  if(rec.chart) rec.chart.destroy();
+  rec.chartEl.innerHTML = '';
+  if(!hasUplot()){
+    rec.chartEl.innerHTML = fallbackSparkline(ser.equity, ser.benchmark);
+    rec.chart = null;
+    return;
+  }
+  rec.chart = equityChart(rec.chartEl, ser, {});
+  rec.chart._hasBench = wantBench;
+}
+
+function ensureResizer(){
+  if(RESIZER || typeof ResizeObserver === 'undefined') return;
+  // uPlot does not track its container; without this the charts keep their
+  // build-time width while the auto-fill grid reflows around them.
+  RESIZER = new ResizeObserver(entries=>{
+    for(const e of entries){
+      const rec = CARDS.get(e.target.closest('.card').dataset.name);
+      if(rec && rec.chart){
+        const w = Math.max(e.contentRect.width|0, 180);
+        if(w !== rec.chart.width) rec.chart.setSize({width:w, height:rec.chart.height});
+      }
+    }
+  });
+}
+
+function renderStrategies(list){
+  const host = $('#strategies');
+  if(!list.length){
+    for(const [, rec] of CARDS){ if(rec.chart) rec.chart.destroy(); }
+    CARDS.clear();
+    host.innerHTML = '<div class="card dim">Nothing deployed yet. Merge a research PR '
+                   + 'and the deployment agent will put it here.</div>';
+    return;
+  }
+  if(!CARDS.size) host.innerHTML = '';
+  ensureResizer();
+  const seen = new Set();
+  for(const s of list){
+    seen.add(s.name);
+    let rec = CARDS.get(s.name);
+    if(!rec){
+      rec = buildCard(s);
+      CARDS.set(s.name, rec);
+      host.appendChild(rec.el);
+      if(RESIZER) RESIZER.observe(rec.chartEl);
+    }
+    updateCard(rec, s);
+  }
+  for(const [name, rec] of Array.from(CARDS)){
+    if(seen.has(name)) continue;
+    if(rec.chart) rec.chart.destroy();
+    rec.el.remove();
+    CARDS.delete(name);
+  }
+}
+
+/* ==================================================================== portfolio ===
+ * Funded and simulated books are summed separately. Adding a `sim` book's equity to
+ * a venue book's would report money that was never at risk, which is the same splice
+ * the metrics module refuses to make across a shadow/live switch.
+ */
+function renderPortfolio(){
+  const pf = STATE._pf || {};
+  const live = pf.live, paper = pf.paper;
+  const sec = $('#sec-portfolio');
+  if(!live && !paper){ sec.style.display = 'none'; return; }
+  sec.style.display = '';
+  const head = live || paper;
+  const ret = head.index[head.index.length-1] - 100;
+  $('#pf-stats').innerHTML = `
+    <div>
+      <div class="hero ${sgn(ret)}">$${fmt(head.equity_usdt,2)}</div>
+      <div class="hero-sub">${live?'funded (live paper)':'simulated'} ·
+        ${head.books.length} book(s) · $${fmt(head.capital_usdt,0)} committed</div>
+    </div>
+    <div>
+      <div class="hero ${sgn(ret)}">${pct(ret)}</div>
+      <div class="hero-sub">since the earliest book started</div>
+    </div>`;
+  const el = $('#pf-chart');
+  const series = [['live','funded'],['paper','simulated']].filter(([k])=>pf[k]);
+  // Two groups on one grid only if they share one; they do not, so the combined
+  // chart plots whichever groups exist against their own union of timestamps.
+  const ts = head.ts;
+  const data = [ts, ...series.map(([k])=>alignTo(ts, pf[k].ts, pf[k].index))];
+  if(!hasUplot() || ts.length < 2){
+    el.innerHTML = hasUplot() ? '<div class="ph">not enough history yet</div>'
+                              : fallbackSparkline(head.index, null);
+    $('#pf-note').innerHTML = '';
+    return;
+  }
+  if(PF.chart && PF.keys === series.map(([k])=>k).join(',')){
+    PF.chart.setData(data);
+    pinLegend(PF.chart);
+  }else{
+    if(PF.chart) PF.chart.destroy();
+    el.innerHTML = '';
+    const tk = theme();
+    const all = data.slice(1).flat().filter(v=>v!=null);
+    PF.chart = new uPlot({
+      width: Math.max(el.clientWidth||700, 200), height: 168, padding:[8,6,0,0],
+      cursor:{x:true,y:true,points:{show:false}},
+      legend:{show:true, live:true},
+      scales:{x:{time:true}, y:{range:()=>indexRange(Math.min(...all), Math.max(...all))}},
+      axes: axesFor(tk, {wide:true}),
+      series:[
+        {value:(u,v)=>v==null?'—':new Date(v*1000).toISOString().slice(0,16).replace('T',' ')},
+        ...series.map(([k,label],i)=>({
+          label, stroke:i===0?tk.s1:tk.s2, width:2, spanGaps:true,
+          value:(u,v)=>signedPct(v,2),
+        })),
+      ],
+      hooks:{drawClear:[u=>drawUnderwater(u, 1, tk.dd)],
+             draw:[u=>drawBaseline(u, tk.axis)],
+             ready:[pinLegend],
+             setCursor:[u=>{ if(u.cursor.idx == null) pinLegend(u); }]},
+    }, data, el);
+    PF.keys = series.map(([k])=>k).join(',');
+  }
+  $('#pf-note').innerHTML = `<div class="note quiet">Each group is summed on its own and
+    indexed to 100: a simulated book never sent an order, so its equity is not added to
+    the funded total. A book not yet started is carried at its capital, so deploying a
+    new strategy does not step the curve up.
+    ${live?`<br><b>Funded:</b> ${live.books.map(b=>esc(short(b))).join(', ')}.`:''}
+    ${paper?`<br><b>Simulated:</b> ${paper.books.map(b=>esc(short(b))).join(', ')}.`:''}</div>`;
+}
+const PF = {chart:null, keys:''};
+
+/* Forward-fill one group's index onto another group's timestamp grid, so two books
+   that rebalance on different clocks can share an x axis without inventing points. */
+function alignTo(grid, ts, vals){
+  const out = []; let i = 0, cur = null;
+  for(const t of grid){
+    while(i < ts.length && ts[i] <= t){ cur = vals[i]; i++; }
+    out.push(cur);
+  }
+  return out;
+}
+
+/* ================================================================== detail modal === */
+const DLG = {charts:[]};
+function closeDetail(){ DLG.charts.forEach(c=>c.destroy()); DLG.charts = []; }
+
+function showChartModal(name){
+  const s = (STATE.strategies||[]).find(x=>x.name===name);
+  if(!s || !s._series || (s._series.equity||[]).length < 2) return;
+  closeDetail();
+  const ser = s._series, lv = s.live||{};
+  $('#modal-title').textContent = (s.meta&&s.meta.title) || name;
+  $('#modal-body').innerHTML = `
+    <div class="dim" style="font-size:11.5px;margin-bottom:6px">
+      ${esc(String(ser.start).slice(0,16).replace('T',' '))} →
+      ${esc(String(ser.end).slice(0,16).replace('T',' '))} ·
+      ${ser.points_total} bars · ${(ser.trades||[]).length} fill(s) ·
+      indexed to 100 at the first bar</div>
+    ${lv.mode_switched?`<div class="note">${esc(lv.reason||'the book switched between shadow and live')}
+      — the curve below begins at that switch; the two books cannot be spliced.</div>`:''}
+    <div id="dlg-eq"></div><div id="dlg-w"></div>
+    <div class="dim" style="font-size:11px;margin-top:6px">
+      ▲ buy · ▼ sell · │ basket rebalance. Shaded band is drawdown from the running peak.</div>`;
+  $('#modal').showModal();
+  if(!hasUplot()) return;
+  const sync = 'detail';
+  DLG.charts.push(equityChart($('#dlg-eq'), ser, {height:250, sync, wide:true}));
+  DLG.charts.push(weightChart($('#dlg-w'), ser, {height:96, sync}));
 }
 
 function renderPRs(){
@@ -288,6 +802,56 @@ function renderPRs(){
   }).join('');
 }
 
+/* Correlation as a matrix rather than a list of pairs: the point of the panel is
+   "is this portfolio one bet", and that is a shape, not seven numbers. The scale is
+   diverging with a neutral midpoint -- zero correlation must read as nothing, and a
+   wall of red must read as the warning it is. Cells are tinted toward the pole
+   rather than set to it, so the value stays legible in page ink. */
+function corrHeatmap(corr, tk){
+  const pairs = Object.entries(corr||{});
+  if(!pairs.length) return '';
+  const names = [...new Set(pairs.flatMap(([k])=>k.split('|')))].sort();
+  const val = (a,b) => a===b ? {corr:1, n:null, self:true}
+                     : corr[a+'|'+b] || corr[b+'|'+a] || null;
+  const C = 42, L = 96, PADT = 16;
+  const W = L + names.length*C, H = PADT + names.length*C;
+  const mix = (from,to,t)=>{
+    const p = h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+    const A = p(from), B = p(to);
+    return `rgb(${A.map((v,i)=>Math.round(v+(B[i]-v)*t)).join(',')})`;
+  };
+  const surface = (tk.panel2||'#1c2029').startsWith('#') ? tk.panel2 : '#1c2029';
+  let cells = '';
+  names.forEach((rn,r)=>{
+    cells += `<text x="${L-6}" y="${PADT+r*C+C/2+3}" text-anchor="end">${esc(short(rn))}</text>`;
+    names.forEach((cn,c)=>{
+      const x = L+c*C, y = PADT+r*C, v = val(rn,cn);
+      if(!v){
+        // No shared bar size, or too few shared bars: a blank cell, never a zero.
+        cells += `<rect x="${x+1}" y="${y+1}" width="${C-2}" height="${C-2}" rx="3"
+          fill="url(#nohatch)" stroke="${tk.line}" stroke-width="1"/>`;
+        return;
+      }
+      const t = Math.min(1, Math.abs(v.corr)) * (v.self ? 0.45 : 0.85);
+      const fill = mix(surface, v.corr >= 0 ? tk.pos : tk.neg, t);
+      cells += `<rect x="${x+1}" y="${y+1}" width="${C-2}" height="${C-2}" rx="3" fill="${fill}"/>
+        <text class="val" x="${x+C/2}" y="${y+C/2+3}" text-anchor="middle"
+          ${v.self?'opacity="0.5"':''}>${v.corr.toFixed(2)}</text>`;
+    });
+  });
+  const heads = names.map((n,c)=>
+    `<text x="${L+c*C+C/2}" y="${PADT-5}" text-anchor="middle">${esc(short(n).slice(0,7))}</text>`).join('');
+  return `<h3 style="font-size:12px;margin:12px 0 4px">Strategy correlation</h3>
+    <svg class="hm" viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;height:auto">
+      <defs><pattern id="nohatch" width="6" height="6" patternUnits="userSpaceOnUse"
+        patternTransform="rotate(45)">
+        <line x1="0" y1="0" x2="0" y2="6" stroke="${tk.line}" stroke-width="2"/></pattern></defs>
+      ${heads}${cells}</svg>
+    <div class="note">Everything this venue hosts is a long-only crypto book. High
+      correlation means the portfolio is one bet, not several. Hatched cells are pairs
+      with no shared bar size, or fewer than ten shared bars — not a correlation of zero.</div>`;
+}
+
 function renderHealth(){
   const a = STATE.account||{}, corr = STATE.correlation||{}, data = STATE.data||[];
   const books = a.books||{};
@@ -299,8 +863,6 @@ function renderHealth(){
       <span class="dim">· ${b.strategies} strategy(ies)</span></td></tr>`;
   }).join('');
   const stale = data.filter(d=>d.age_h>36).slice(0,4);
-  const corrRows = Object.entries(corr).map(([k,v])=>
-    `<tr><td>${esc(k.replace('|',' ↔ '))}</td><td>${fmt(v.corr,2)}</td><td class="dim">n=${v.n}</td></tr>`).join('');
   $('#health').innerHTML = `
     <table><tbody>
       <tr><td>Venue</td><td colspan="2" style="text-align:right">
@@ -309,10 +871,7 @@ function renderHealth(){
       <tr><td>Account free</td><td colspan="2" style="text-align:right">
         ${fmt(a.usdt_free,2)} USDT · ${fmt(a.btc_total,5)} BTC</td></tr>
     </tbody></table>
-    ${corrRows?`<h3 style="font-size:12px;margin:12px 0 4px">Strategy correlation</h3>
-      <table><tbody>${corrRows}</tbody></table>
-      <div class="note">Everything this venue hosts is a long-only crypto book. High
-        correlation means the portfolio is one bet, not several.</div>`:''}
+    ${corrHeatmap(corr, theme())}
     ${stale.length?`<div class="note">Stale market data:
       ${stale.map(d=>esc(d.file)+' ('+fmt(d.age_h,0)+'h)').join(', ')}</div>`:''}`;
 }
@@ -340,7 +899,8 @@ function renderAgents(){
   $('#agents').innerHTML = rows.length ? `<table><tbody>${rows.map(r=>
     `<tr><td><a href="#" data-log="${esc(r.log)}">${esc(r.log)}</a></td>
      <td class="dim">${esc(r.kind)}</td>
-     <td class="dim">${dur((Date.now()/1000)-r.mtime)} ago</td></tr>`).join('')}</tbody></table>`
+     <td class="dim">${dur((Date.now()/1000)-r.mtime)} ago</td>
+     <td>${r.session?`<a href="#" data-transcript="${esc(r.session)}">convo</a>`:''}</td></tr>`).join('')}</tbody></table>`
     : '<span class="dim">no agent runs yet</span>';
 }
 
@@ -362,7 +922,8 @@ function renderSessions(){
       <td>${esc(r.target||'')}</td>
       <td class="dim">${esc(r.status||'')}${r.reason&&r.status!=='done'?' &middot; '+esc(r.reason):''}</td>
       <td class="dim">${r.resumes?('&#8635;'+r.resumes):''}</td>
-      <td>${r.log?`<a href="#" data-log="${esc(r.log.split('/').pop())}">log</a>`:''}</td>
+      <td class="dim mono" title="launched as ${esc(r.model||'')}">${esc(r.model_resolved||r.model||'')}</td>
+      <td>${r.has_transcript?`<a href="#" data-transcript="${esc(r.id)}">convo</a> `:''}${r.log?`<a href="#" data-log="${esc(r.log.split('/').pop())}">log</a>`:''}</td>
       <td>${r.status==='aborted'?`<button data-resume="${esc(r.id)}">Resume</button>`:''}</td>
     </tr>`).join('')}</tbody></table>`
     : '<span class="dim">no agent sessions yet</span>';
@@ -379,14 +940,20 @@ async function _refresh(){
   try{
     const r = await fetch('/api/state'); STATE = await r.json();
   }catch(e){ return; }
-  await Promise.all((STATE.strategies||[]).map(async s=>{
-    try{ s._series = await (await fetch('/api/series?strategy='+encodeURIComponent(s.name))).json(); }
-    catch(e){ s._series = null; }
-  }));
-  $('#strategies').innerHTML = (STATE.strategies||[]).map(card).join('')
-    || '<div class="card dim">Nothing deployed yet. Merge a research PR and the deployment agent will put it here.</div>';
+  await Promise.all([
+    ...(STATE.strategies||[]).map(async s=>{
+      try{ s._series = await (await fetch('/api/series?strategy='+encodeURIComponent(s.name))).json(); }
+      catch(e){ s._series = null; }
+    }),
+    (async ()=>{
+      try{ STATE._pf = await (await fetch('/api/portfolio')).json(); }
+      catch(e){ STATE._pf = null; }
+    })(),
+  ]);
+  renderPortfolio();
+  renderStrategies(STATE.strategies||[]);
   renderHeader(); renderPRs(); renderHealth(); renderAgents(); renderSessions();
-  syncButtons();      // the cards were just rebuilt; re-disable anything still running
+  syncButtons();      // the bottom of each card was just rebuilt; re-disable what is running
   const sel = $('#ac');
   if(!sel.options.length) sel.innerHTML = (STATE.asset_classes||[]).map(a=>`<option>${a}</option>`).join('');
   // Built from the server's own allowlist, so the picker cannot offer a model the
@@ -396,12 +963,62 @@ async function _refresh(){
   if(msel && !msel.options.length && (STATE.research_models||[]).length){
     msel.innerHTML = STATE.research_models.map(m=>
       `<option value="${esc(m.key)}"${m.default&&!m.unavailable?' selected':''}`
-      + `${m.unavailable?' disabled':''} title="${esc(m.unavailable||m.note||m.id)}">`
-      + `${esc(m.label)}${m.unavailable?' (unavailable)':m.note?' ($)':''}</option>`).join('');
+      + `${m.unavailable?' disabled':''} title="${esc(m.unavailable||m.note||('alias '+m.id+(m.resolved?', last ran as '+m.resolved:'')))}">`
+      + `${esc(m.label)}${m.resolved?' · '+esc(m.resolved):''}`
+      + `${m.unavailable?' (unavailable)':m.note?' ($)':''}</option>`).join('');
   }
 }
 
+/* The full conversation behind an agent run, from Claude Code's own transcript. The
+   launcher's log only has the opening prompt and the final answer; this is everything
+   in between. Tool output and thinking are folded so the conversation itself reads
+   top to bottom; the opening brief is folded too, since it is the same long command
+   file on every run. */
+function renderTranscript(j, sid){
+  if(!j || !Array.isArray(j.entries))
+    return `<div class="down">${esc((j&&j.error)||'unexpected response')}</div>`;
+  const time = t => t ? esc(String(t).slice(11,19)) : '';
+  const fold = (label, text, open) =>
+    `<details${open?' open':''}><summary>${label}</summary><pre>${esc(text)}</pre></details>`;
+  let first = true;
+  const body = j.entries.map(e=>{
+    const cls = e.kind + (e.error ? ' err' : '');
+    let who, inner;
+    if(e.kind==='tool_use'){
+      who = esc(e.tool||'tool'); inner = `<pre>${esc(e.text)}</pre>`;
+    }else if(e.kind==='tool_result'){
+      who = esc(e.tool||'tool')+' result'+(e.error?' · error':'');
+      const n = e.text.split('\n').length;
+      inner = fold(`${n} line${n===1?'':'s'}`, e.text, e.error);
+    }else if(e.kind==='thinking'){
+      who = 'thinking'; inner = fold('show', e.text, false);
+    }else if(e.kind==='user' && first){
+      first = false; who = 'prompt';
+      inner = e.text.length > 600 ? fold(esc(e.text.slice(0,140))+'…', e.text, false)
+                                   : `<div class="body">${esc(e.text)}</div>`;
+    }else{
+      who = e.kind==='user' ? 'user' : 'assistant';
+      inner = `<div class="body">${esc(e.text)}</div>`;
+    }
+    return `<div class="tx-e ${cls}"><div class="who">${who} <span>${time(e.ts)}</span></div>${inner}</div>`;
+  }).join('');
+  const calls = j.entries.filter(e=>e.kind==='tool_use').length;
+  return `<div class="tx-head dim">
+      <span>${esc(j.kind||'')} ${esc(j.target||'')}</span>
+      <span>${esc(j.status||'')}</span>
+      <span class="mono">${esc(j.model||j.model_alias||'')}</span>
+      <span>${calls} tool call${calls===1?'':'s'} · ${(j.bytes/1e6).toFixed(1)} MB on disk</span>
+      <a href="#" data-transcript="${esc(sid)}">reload</a>
+    </div>
+    <div class="tx">${body || '<span class="dim">nothing recorded yet</span>'}</div>`;
+}
+function openTranscript(sid){
+  return showModal('session '+sid.slice(0,8)+' — full conversation',
+    '/api/transcript?session='+encodeURIComponent(sid), j=>renderTranscript(j, sid));
+}
+
 async function showModal(title, url, render){
+  closeDetail();
   $('#modal-title').textContent = title;
   $('#modal-body').innerHTML = '<div class="dim">loading…</div>';
   $('#modal').showModal();
@@ -431,17 +1048,25 @@ document.addEventListener('click', e=>{
     if(a==='flatten' && !confirm('Sell '+name+' down to flat?')) return;
     return act({action:a, strategy:name}, a+' '+name);
   }
+  const ch = e.target.closest('.c-chart');
+  if(ch && !ch.dataset.empty){
+    const card = ch.closest('.card');
+    if(card) return showChartModal(card.dataset.name);
+  }
   const rq = e.target.closest('button[data-requeue]');
   if(rq) return act({action:'requeue_pr', pr:rq.dataset.requeue}, 'requeue PR');
   const rs = e.target.closest('button[data-resume]');
   if(rs) return act({action:'resume_session', session:rs.dataset.resume}, 'resume session');
+  const tx = e.target.closest('a[data-transcript]');
+  if(tx){ e.preventDefault(); return openTranscript(tx.dataset.transcript); }
   const lg = e.target.closest('a[data-log]');
   if(lg){ e.preventDefault();
     return showModal(lg.dataset.log, '/api/log?file='+encodeURIComponent(lg.dataset.log)+'&n=500',
       j=>`<pre>${esc(j.text||j.error)}</pre>`); }
 });
 
-$('#modal-close').onclick = ()=>$('#modal').close();
+$('#modal-close').onclick = ()=>{ closeDetail(); $('#modal').close(); };
+$('#modal').onclose = ()=>closeDetail();
 $('#poller-toggle').onclick = ()=>act({action: STATE.poller.running?'poller_stop':'poller_start'});
 $('#poller-sweep').onclick  = ()=>act({action:'poller_sweep'}, 'sweeping (may take a while)');
 $('#go-research').onclick   = ()=>act({action:'launch_research', asset_class:$('#ac').value,

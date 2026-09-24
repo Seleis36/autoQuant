@@ -1,0 +1,11 @@
+[Unit]
+Description=Launch the autoQuant research batch every night
+
+[Timer]
+OnCalendar=*-*-* 01:00:00
+# A night missed because the machine was off runs at the next start instead.
+Persistent=true
+Unit=autoquant-nightly.service
+
+[Install]
+WantedBy=timers.target

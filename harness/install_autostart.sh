@@ -37,8 +37,9 @@ if [ "${1:-}" = "--uninstall" ]; then
   for s in $(strategies); do
     systemctl --user disable --now "autoquant-strategy@$(systemd-escape "$s").service" >/dev/null 2>&1
   done
-  systemctl --user disable --now autoquant-dashboard.service autoquant-poller.service >/dev/null 2>&1
-  rm -f "$UNIT_DST"/autoquant-*.service "$UNIT_DST"/autoquant.target
+  systemctl --user disable --now autoquant-dashboard.service autoquant-poller.service \
+    autoquant-nightly.timer >/dev/null 2>&1
+  rm -f "$UNIT_DST"/autoquant-*.service "$UNIT_DST"/autoquant-*.timer "$UNIT_DST"/autoquant.target
   systemctl --user daemon-reload
   rm -f "$VBS"
   say "units and Startup entry removed (linger left enabled)"
@@ -55,7 +56,7 @@ if ! systemctl --user is-system-running >/dev/null 2>&1; then
 fi
 
 mkdir -p "$UNIT_DST" "$REPO/harness/logs"
-cp "$UNIT_SRC"/autoquant-*.service "$UNIT_SRC"/autoquant.target "$UNIT_DST"/
+cp "$UNIT_SRC"/autoquant-*.service "$UNIT_SRC"/autoquant-*.timer "$UNIT_SRC"/autoquant.target "$UNIT_DST"/
 systemctl --user daemon-reload
 say "units installed in ${UNIT_DST/#$HOME/\~}"
 
@@ -87,6 +88,11 @@ done
 systemctl --user start autoquant.target
 sleep 4
 say "started autoquant.target"
+
+# The nightly research batch. Only the timer is enabled; the service it triggers has no
+# [Install] on purpose -- enabling it would also run a research batch at every boot.
+systemctl --user enable --now autoquant-nightly.timer >/dev/null 2>&1 \
+  && say "nightly research timer: $(systemctl --user list-timers autoquant-nightly.timer --no-legend --no-pager | awk '{print $1, $2, $3}')"
 
 # ---- 2. Windows logon hook -------------------------------------------------
 if [ -d "$STARTUP" ]; then

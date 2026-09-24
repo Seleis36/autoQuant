@@ -1,0 +1,17 @@
+[Unit]
+Description=autoQuant nightly research batch (see harness/nightly_research.sh)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/autoQuant
+ExecStart=%h/autoQuant/harness/nightly_research.sh
+# The batch waits for each agent in turn, so a night can legitimately run ~8h.
+TimeoutStartSec=14h
+# The agents are detached (setsid) but still in this unit's cgroup. The default
+# control-group kill mode would take a running agent down with the batch script if it
+# ever stopped early; `process` stops only the script and lets the agent finish.
+KillMode=process
+StandardOutput=append:%h/autoQuant/harness/logs/nightly-systemd.log
+StandardError=append:%h/autoQuant/harness/logs/nightly-systemd.log

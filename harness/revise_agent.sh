@@ -23,10 +23,9 @@ STATE="$REPO/harness/state"; LOGS="$REPO/harness/logs"
 mkdir -p "$STATE" "$LOGS"
 
 PR="${1:?usage: revise_agent.sh <pr-number>}"
-# Pinned model id, not the `opus` short name: on this CLI `--model opus` resolves to Opus
-# 4.7, so the alias quietly ran a previous generation. An id also makes the session
-# registry say exactly what produced a decision.
-MODEL="${REVISE_AGENT_MODEL:-claude-opus-5}"
+# The `opus` alias: the newest Opus the CLI knows (see CLAUDE_BIN in session_lib.sh). The
+# model it resolved to lands in the session's result JSON and on the dashboard.
+MODEL="${REVISE_AGENT_MODEL:-opus}"
 TIMEOUT="${REVISE_AGENT_TIMEOUT:-14400}"     # a revision is research, not packaging
 MAX_ROUNDS="${REVISE_MAX_ROUNDS:-2}"
 

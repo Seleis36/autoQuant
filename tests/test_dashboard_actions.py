@@ -166,26 +166,34 @@ def captured_launch(monkeypatch):
     return calls
 
 
-def test_the_default_model_is_pinned_not_an_alias(server, captured_launch):
-    """`claude --model opus` resolves to Opus 4.7 on this CLI build, so a short name
-    silently runs a previous generation."""
+def test_the_default_model_is_the_latest_opus_alias(server, captured_launch):
+    """A pinned id went stale the day Opus 5.5 shipped; the alias follows the CLI."""
     code, body = post(server, {"action": "launch_research", "asset_class": "spot-btc"})
     assert body["ok"] is True
-    assert captured_launch.launches[0][-2:] == ["--model", "claude-opus-5"]
+    assert captured_launch.launches[0][-2:] == ["--model", "opus"]
+
+
+def test_no_offered_model_is_pinned_to_a_version():
+    for m in dashboard.RESEARCH_MODELS.values():
+        assert not any(ch.isdigit() for ch in m["id"]), m["id"]
 
 
 @pytest.mark.parametrize("key,model_id", [
-    ("opus", "claude-opus-5"),
-    ("sonnet", "claude-sonnet-5"),
+    ("opus", "opus"),
+    ("sonnet", "sonnet"),
+    ("fable", "fable"),
 ])
-def test_each_offered_model_launches_on_its_pinned_id(server, captured_launch, key, model_id):
+def test_each_offered_model_launches_on_its_alias(server, captured_launch, key, model_id,
+                                                  monkeypatch):
+    monkeypatch.setattr(dashboard, "_cli_version", lambda: "2.2.0")
     code, body = post(server, {"action": "launch_research", "asset_class": "fx-majors",
                                "model": key})
     assert body["ok"] is True
     assert captured_launch.launches[0][-2:] == ["--model", model_id]
 
 
-@pytest.mark.parametrize("bad", ["haiku", "claude-opus-5", "", "--dangerously-skip-permissions"])
+@pytest.mark.parametrize("bad", ["haiku", "claude-opus-5", "opus[1m]", "",
+                                 "--dangerously-skip-permissions"])
 def test_a_model_outside_the_allowlist_is_refused(server, captured_launch, bad):
     code, body = post(server, {"action": "launch_research", "asset_class": "spot-btc",
                                "model": bad})
@@ -201,7 +209,7 @@ def test_a_model_the_installed_cli_cannot_run_is_refused_before_launching(
     """The agent is detached, so an unsupported model would otherwise surface as a session
     that died minutes later with the reason buried in a log."""
     monkeypatch.setattr(dashboard, "research_model_options", lambda: [
-        {"key": "fable", "id": "claude-fable-5-1", "label": "Fable 5.1",
+        {"key": "fable", "id": "fable", "label": "Fable (latest)",
          "unavailable": "needs Claude Code >= 2.1.251; this machine has 2.1.114."}])
     code, body = post(server, {"action": "launch_research", "asset_class": "spot-btc",
                                "model": "fable"})
@@ -234,10 +242,23 @@ def test_version_comparison_is_numeric_not_lexicographic(have, want, below):
 
 
 @pytest.mark.parametrize("model,tier", [
-    ("claude-fable-5-1", "fable"), ("claude-opus-5", "opus"),
+    ("claude-fable-5-1", "fable"), ("claude-opus-5", "opus"), ("claude-opus-5-5", "opus"),
+    ("opus", "opus"), ("sonnet", "sonnet"),
     ("claude-sonnet-5", "sonnet"), ("claude-haiku-4-5", "haiku"),
 ])
 def test_usage_is_priced_against_the_right_tier(model, tier):
     """Fable used to fall through to the sonnet fallback and be costed at a fifth."""
     assert dashboard._tier(model) == tier
     assert dashboard.PRICING[tier]["in"] > 0
+
+
+def test_the_picker_shows_what_an_alias_last_resolved_to(monkeypatch):
+    """"Latest" is only checkable if the page says what latest turned out to be."""
+    monkeypatch.setattr(dashboard, "_cli_version", lambda: "2.2.0")
+    monkeypatch.setattr(dashboard.CACHE, "get", lambda k, d=None: [
+        {"model": "opus", "model_resolved": "claude-opus-5-5"},
+        {"model": "opus", "model_resolved": "claude-opus-5"},      # older, listed later
+    ] if k == "sessions" else d)
+    opts = {o["key"]: o for o in dashboard.research_model_options()}
+    assert opts["opus"]["resolved"] == "claude-opus-5-5"
+    assert "resolved" not in opts["sonnet"]

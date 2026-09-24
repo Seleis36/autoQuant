@@ -101,31 +101,66 @@ Research agents can be launched directly (the dashboard does this for you):
 ./harness/launch_research.sh spot-btc                       # pick its own idea
 ./harness/launch_research.sh fx-majors "carry around NFP"   # with a seed
 ./harness/launch_research.sh spot-btc "" --require "OOS Sharpe >= 2.0 after 10bp/side"
-./harness/launch_research.sh sector-etf "" --model claude-sonnet-5
+./harness/launch_research.sh sector-etf "" --model sonnet
 ```
 
 ### Choosing the model
 
-`--model` takes a **pinned model id**, and the dashboard's launcher has a picker for the
-three that are offered: `claude-opus-5` (the default), `claude-sonnet-5` and
-`claude-fable-5-1`. The dashboard validates against that allowlist, so the picker cannot ask
-for something the launcher would refuse.
+`--model` takes a **model alias** — `opus` (the default), `sonnet` or `fable` — and the
+dashboard's picker offers exactly those three. The dashboard validates against that
+allowlist, so the picker cannot ask for something the launcher would refuse. A full id
+(`claude-opus-5-5`) still works from the command line.
 
-Ids rather than the short names on purpose: on this CLI build `--model opus` resolves to
-**Opus 4.7** and `sonnet` to **Sonnet 4.6**, so the short names quietly selected a previous
-generation, and `fable` is not accepted at all. An id also makes the session registry say
-exactly what produced a result, which is what you want when comparing two research runs
-months apart.
+Aliases, so a new model is picked up without editing the repo: the CLI resolves `opus` to
+the newest Opus **it knows about**. That makes the CLI version the thing that decides how
+current the agents are. Until 2026-09-24 this machine ran a root-owned npm install that could
+not update itself; it sat on 2.1.269 after Opus 5.5 shipped, kept resolving `opus` to Opus 5,
+and rejected `claude-opus-5-5` outright. So:
 
-**Fable 5.1 costs real money.** It is not covered by the Claude subscription the rest of this
+- `CLAUDE_BIN` (session_lib.sh) prefers the user-owned native install at
+  `~/.local/bin/claude` (`claude install`), which updates itself without sudo;
+- the nightly batch runs `claude update` before launching anything;
+- the registry records the model each alias **actually resolved to**, read back from the
+  run's result JSON. The sessions table shows it, and the picker shows what each alias last
+  ran as, so "latest" can be checked rather than assumed.
+
+**Fable costs real money.** It is not covered by the Claude subscription the rest of this
 harness runs on — it bills purchased usage credits, so a four-hour research session on it is a
 metered spend where the same session on Opus or Sonnet is not. The picker marks it `($)` and
 it is never the default. It also needs Claude Code >= 2.1.251; on an older binary the
 dashboard shows it disabled with the version it found and refuses to launch onto it, rather
-than letting a detached agent die on its first API call.
+than letting a detached agent die on its first API call. Running out of credits ("You're out
+of usage credits…") is classified as a usage limit, so the session parks as resumable.
 
-All three agents — research, deploy and revise — default to `claude-opus-5`, overridable with
+All three agents — research, deploy and revise — default to `opus`, overridable with
 `RESEARCH_AGENT_MODEL` / `DEPLOY_AGENT_MODEL` / `REVISE_AGENT_MODEL`.
+
+### Nightly research
+
+`autoquant-nightly.timer` runs `nightly_research.sh` at 01:00 local time: two asset classes
+per night, **one after the other**. Research holds one of the `AGENT_MAX_CONCURRENT` slots and
+a second concurrent launch is refused by design, so deploy/revise work can always start.
+Running back to back also spreads the night's usage across the subscription's rolling window.
+
+- **Rotation** — least recently researched first, judged by the newest
+  `logs/research-<class>-*.log`. A class you launch by hand counts as its turn; with 11
+  classes and two a night, each comes round about every six days.
+- **Guards** — skips the night when `NIGHTLY_MAX_OPEN_PRS` (4) PRs are already open; launches
+  nothing new after `NIGHTLY_DEADLINE_H` (10) hours; each run keeps the 4h agent timeout.
+- **Stranded-work check** — a run the registry calls `done` can still have left its work
+  uncommitted or its branch unpushed. The batch log (`logs/nightly-<ts>.log`) says so with a
+  `WARNING stranded work` line.
+- Knobs: `NIGHTLY_COUNT`, `NIGHTLY_CLASSES`, `NIGHTLY_MODEL` (e.g. `sonnet` to go easier on
+  the weekly limit).
+
+```bash
+./harness/nightly_research.sh --dry-run                 # what tonight would run
+systemctl --user list-timers autoquant-nightly.timer    # when
+systemctl --user disable --now autoquant-nightly.timer  # pause it
+```
+
+`Persistent=true` means a night missed because the PC was off or asleep runs at the next
+start. The timer only fires while WSL is up — the Windows logon hook keeps it up after logon.
 
 ### Seeds vs. acceptance criteria
 
@@ -176,7 +211,11 @@ harness/logs/<kind>-<target>-<ts>.log                    what it printed
 ~/.claude/projects/-home-seleis-autoQuant/<uuid>.jsonl   the resumable conversation
 ```
 
-which is what makes `claude --resume <uuid>` a recovery mechanism instead of a guess.
+which is what makes `claude --resume <uuid>` a recovery mechanism instead of a guess. It
+is also what the dashboard's **convo** links read: the launcher's log has only the opening
+prompt and the final answer, while the `.jsonl` has every message, tool call and tool output
+in between. `transcript.py` renders it (`/api/transcript?session=<uuid>`), with tool output
+and thinking folded and anything very long clipped — the full file stays on disk.
 
 ```bash
 ./harness/resume_aborted.sh --list     # what is parked, and why
@@ -206,8 +245,9 @@ transcript, and `--resume` reads it back.
    researcher opens a PR, a deployment agent applies a terminal label. Process gone + side
    effect absent = the run did not finish, whatever the log says.
 
-No real usage-limit abort has been observed on this machine yet, so layer 2's patterns are
-educated guesses and should be corrected the first time one lands. Layer 3 is what makes the
+The only limit wording observed on this machine so far is Fable's "You're out of usage
+credits" (2026-09-24); the subscription-limit patterns are still educated guesses and should
+be corrected the first time one lands. Layer 3 is what makes the
 loop safe without them. A supervisor that is itself killed leaves an entry stuck at `running`;
 that is reaped as `orphaned` on the next listing.
 
@@ -378,6 +418,8 @@ mode produced it.
 | `dashboard.py`, `dashboard.sh`, `web/` | The control dashboard |
 | `metrics.py` | Journal → live Sharpe/CAGR/MaxDD/turnover, and the equity series |
 | `launch_research.sh` | Start a quant-research agent, detached and uncapped |
+| `nightly_research.sh` | The nightly batch: rotate through asset classes, two a night, sequentially |
+| `transcript.py` | Renders an agent's full Claude Code transcript for the dashboard |
 | `install_autostart.sh`, `systemd/` | Reboot survival: systemd units + Windows logon hook |
 | `windows_autostart_task.ps1` | Optional true at-boot task (needs elevation) |
 | `state/`, `logs/` | Bookkeeping and session logs (gitignored) |

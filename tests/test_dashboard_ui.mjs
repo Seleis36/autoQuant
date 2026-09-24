@@ -1,5 +1,5 @@
 /*
- * Tests for the dashboard's action dispatch (harness/web/index.html).
+ * Tests for the dashboard's action dispatch and chart helpers (harness/web/index.html).
  *
  * Regression under test: a single module-level `busy` flag guarded act(), so while one
  * request was open every other button was a silent no-op. A restart holds the connection
@@ -20,9 +20,9 @@ const script = html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</scri
 
 const stubEl = () => ({
   textContent: '', innerHTML: '', title: '', href: '', value: '', disabled: false,
-  style: {}, options: { length: 1 }, dataset: {}, onclick: null,
+  style: {}, options: { length: 1 }, dataset: {}, onclick: null, onclose: null,
   classList: { add() {}, remove() {} },
-  closest: () => null,
+  closest: () => null, querySelector: stubEl, appendChild() {}, remove() {},
 });
 
 /* Evaluate the page script with a DOM stub, and hand back its internals. */
@@ -35,8 +35,14 @@ function loadPage(fetchImpl) {
     // must still load and fail on the behavioural assertion, not on a ReferenceError.
     + `\nreturn {
          act,
-         actKey:   typeof actKey   !== 'undefined' ? actKey   : null,
-         INFLIGHT: typeof INFLIGHT !== 'undefined' ? INFLIGHT : new Set(),
+         actKey:     typeof actKey     !== 'undefined' ? actKey     : null,
+         INFLIGHT:   typeof INFLIGHT   !== 'undefined' ? INFLIGHT   : new Set(),
+         runningPeak:typeof runningPeak!== 'undefined' ? runningPeak: null,
+         indexRange: typeof indexRange !== 'undefined' ? indexRange : null,
+         axisPct:    typeof axisPct    !== 'undefined' ? axisPct    : null,
+         symLabel:   typeof symLabel   !== 'undefined' ? symLabel   : null,
+         corrHeatmap:typeof corrHeatmap!== 'undefined' ? corrHeatmap: null,
+         renderTranscript: typeof renderTranscript !== 'undefined' ? renderTranscript : null,
        };`;
 
   const document = {
@@ -108,4 +114,86 @@ assert.notEqual(k({ action: 'resume_session', session: 'x' }),
 assert.equal(k({ action: 'poller_start' }), k({ action: 'poller_start' }));
 assert.notEqual(k({ action: 'stop', strategy: 'a/b' }), k({ action: 'start', strategy: 'a/b' }));
 
-console.log('ok - dashboard action dispatch (7 groups)');
+/* --- chart helpers -------------------------------------------------------------
+ * These are the pure parts of the chart layer: the scale clamp that stops every
+ * curve being auto-fitted to the same amplitude, the drawdown baseline, the axis
+ * formatter, and the correlation matrix. They run without uPlot or a canvas.
+ */
+const P = page;
+
+/* 8. The y scale never auto-fits a quiet book to the full box. */
+{
+  const [lo, hi] = P.indexRange(99.9, 100.1);
+  assert.ok(hi - lo >= 6, 'a flat book must still be drawn against a >=6pt range, '
+    + `got ${hi - lo}`);
+  const [wlo, whi] = P.indexRange(96.5, 109.6);
+  assert.ok(whi - wlo > hi - lo,
+    'a book that moved 13 points must occupy a wider range than one that moved 0.2');
+}
+
+/* 9. The start-of-book baseline is always on screen, however far the curve ran. */
+for (const [lo, hi] of [[100, 140], [60, 100], [99.99, 100.01], [101, 110]]) {
+  const [a, b] = P.indexRange(lo, hi);
+  assert.ok(a < 100 && b > 100, `100 must stay inside [${a}, ${b}]`);
+}
+
+/* 10. The running peak is monotone, and a gap does not reset it. */
+{
+  assert.deepEqual(P.runningPeak([100, 105, 102, 108, 103]), [100, 105, 105, 108, 108]);
+  assert.deepEqual(P.runningPeak([100, null, 90]), [100, 100, 100]);
+  assert.equal(P.runningPeak([null, 100])[0], null, 'a leading gap has no peak yet');
+}
+
+/* 11. Axis ticks carry a decimal only when they need one. */
+{
+  assert.equal(P.axisPct(100), '+0%');
+  assert.equal(P.axisPct(102.5), '+2.5%');
+  assert.equal(P.axisPct(110), '+10%');
+  assert.equal(P.axisPct(97.5), '-2.5%');
+}
+
+/* 12. A basket's 521-character symbol string is summarised, not printed. */
+{
+  assert.equal(P.symLabel({ symbol: 'BTCUSDT' }), 'BTCUSDT');
+  const legs = Array.from({ length: 62 }, (_, i) => `C${i}-USD`);
+  assert.equal(P.symLabel({ symbol: legs.join('+'), symbols: legs }), '62 instruments');
+  assert.equal(P.symLabel({ symbol: legs.join('+') }), '62 instruments',
+    'the count must still be derived when meta.json carries no symbols list');
+}
+
+/* 13. A pair with no shared bars is hatched, never reported as a correlation of 0. */
+{
+  const tk = { panel2: '#1c2029', line: '#262c37', pos: '#d03b3b', neg: '#3987e5' };
+  const html = P.corrHeatmap({
+    'spot-btc/x|spot-btc/y': { corr: 0.7, n: 20 },
+    'spot-btc/x|spot-eth/z': { corr: -0.4, n: 20 },
+  }, tk);
+  assert.ok(html.includes('0.70') && html.includes('-0.40'), 'both pairs are drawn');
+  assert.ok(!/>0\.00</.test(html), 'an absent pair must not be drawn as zero');
+  const hatched = (html.match(/url\(#nohatch\)/g) || []).length;
+  assert.equal(hatched, 2, 'y<->z is unmeasured, so both of its cells are hatched');
+  assert.equal(P.corrHeatmap({}, tk), '', 'no pairs at all renders nothing');
+}
+
+/* 14. An agent transcript is escaped, folds tool output, and flags failed calls. */
+{
+  const out = P.renderTranscript({
+    kind: 'research', target: 'spot-btc', status: 'done', model: 'claude-opus-5-5', bytes: 2e6,
+    entries: [
+      { kind: 'user', text: '/spot-btc-quant-research', ts: '2026-09-12T06:31:01Z' },
+      { kind: 'assistant', text: 'Plan: <script>alert(1)</script>' },
+      { kind: 'tool_use', tool: 'Bash', text: 'ls' },
+      { kind: 'tool_result', tool: 'Bash', text: 'a\nb\nc' },
+      { kind: 'tool_result', tool: 'Bash', text: 'boom', error: true },
+    ] }, '070f152b-1e09-4c67-879d-d5e6ababad96');
+  assert.ok(!out.includes('<script>alert'), 'agent text must be escaped, not rendered');
+  assert.ok(out.includes('&lt;script&gt;'));
+  assert.ok(out.includes('3 lines'), 'tool output is folded behind a line count');
+  assert.ok(/<details open><summary>1 line<\/summary>/.test(out), 'a failed call is unfolded');
+  assert.ok(out.includes('1 tool call'), 'header counts tool calls');
+  assert.ok(out.includes('claude-opus-5-5'), 'header shows the model that actually ran');
+  assert.ok(out.includes('data-transcript="070f152b-1e09-4c67-879d-d5e6ababad96"'), 'reload link');
+  assert.ok(P.renderTranscript({ error: 'no transcript' }, 'x').includes('no transcript'));
+}
+
+console.log('ok - dashboard action dispatch + chart helpers (14 groups)');
