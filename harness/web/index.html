@@ -133,6 +133,20 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 .tx-e .body{white-space:pre-wrap;word-break:break-word;font-size:12.5px;line-height:1.5}
 .tx-e pre{max-height:260px}
 .tx-e summary{cursor:pointer;font-size:11.5px;color:var(--dim)}
+/* ---- tabs ---- */
+nav.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:0 0 16px}
+nav.tabs button{background:none;border:0;border-bottom:2px solid transparent;border-radius:0;
+  padding:7px 12px;color:var(--dim);font-size:12.5px;font-weight:600}
+nav.tabs button:hover{color:var(--fg);border-color:transparent}
+nav.tabs button[aria-selected=true]{color:var(--fg);border-bottom-color:var(--accent)}
+nav.tabs .n{color:var(--dim2);font-weight:500;margin-left:4px}
+[data-tab-panel][hidden]{display:none}
+.sum td{padding:5px 0;vertical-align:middle}
+#strategies .card{scroll-margin-top:64px}
+.sum tbody tr{cursor:pointer;border-top:1px solid var(--line)}
+.sum tbody tr:hover td{color:var(--accent)}
+.sum td:first-child{color:var(--fg)}
+.sum .badge{font-size:9.5px}
 @media (max-width:560px){main{padding:10px}.grid{grid-template-columns:1fr}header{gap:8px}}
 </style>
 
@@ -149,6 +163,12 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 </header>
 
 <main>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
+    <button role="tab" data-tab="strategies" aria-selected="false">Strategies<span class="n" id="tab-n"></span></button>
+  </nav>
+
+  <div data-tab-panel="overview">
   <section id="sec-portfolio" style="display:none">
     <h2>Portfolio</h2>
     <div class="card">
@@ -160,7 +180,7 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 
   <section>
     <h2>Strategies</h2>
-    <div class="grid" id="strategies"></div>
+    <div class="card"><div id="strat-summary" class="dim">&mdash;</div></div>
   </section>
 
   <section>
@@ -203,6 +223,13 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
       </div>
     </div>
   </section>
+  </div>
+
+  <div data-tab-panel="strategies" hidden>
+  <section>
+    <div class="grid" id="strategies"></div>
+  </section>
+  </div>
 </main>
 
 <dialog id="modal"><div class="row" style="justify-content:space-between;margin-bottom:10px">
@@ -679,6 +706,44 @@ function renderStrategies(list){
   }
 }
 
+/* The overview carries one line per strategy -- enough to see what is up, down or
+   broken -- and the full cards (chart, live-vs-backtest table, controls) live on their
+   own tab. With a dozen books the cards pushed everything else screens down the page. */
+function renderSummary(list){
+  const n = $('#tab-n'); if(n) n.textContent = list.length ? String(list.length) : '';
+  const host = $('#strat-summary');
+  if(!list.length){ host.innerHTML = '<span class="dim">nothing deployed yet</span>'; return; }
+  const badge = {RUNNING:'b-run',DEAD:'b-dead',STALE:'b-stale',STOPPED:'b-stop'};
+  const cell = (v,d,suf='') => `<td class="${sgn(v)}">${v==null?'—':fmt(v,d)+suf}</td>`;
+  host.innerHTML = `<table class="sum"><thead><tr><th>strategy</th><th>status</th>
+      <th>book</th><th>return</th><th>Sharpe live</th><th>Sharpe bt</th><th>max DD</th>
+      <th>weight</th></tr></thead><tbody>${list.map(s=>{
+    const m = s.meta||{}, lv = s.live||{}, bt = m.backtest||{}, st = s.state||{};
+    const mode = s.mode==='sim' ? 'simulated' : s.shadow ? 'shadow' : 'live paper';
+    return `<tr data-goto="${esc(s.name)}"><td>${esc(m.title||short(s.name))}</td>
+      <td><span class="badge ${badge[s.status]||'b-stop'}">${esc(s.status)}</span></td>
+      <td class="dim">${mode}</td>
+      ${cell(lv.total_return_pct,2,'%')}
+      ${cell(lv.sufficient?lv.sharpe:null,2)}
+      <td class="dim">${bt.sharpe==null?'—':fmt(bt.sharpe,2)}</td>
+      <td class="dim">${lv.maxdd_pct==null?'—':fmt(lv.maxdd_pct,1)+'%'}</td>
+      <td>${fmt(lv.current_weight ?? st.last_weight,2)}</td></tr>`;
+  }).join('')}</tbody></table>`;
+}
+
+function showTab(name){
+  document.querySelectorAll('[data-tab-panel]').forEach(p=>{ p.hidden = p.dataset.tabPanel !== name; });
+  document.querySelectorAll('nav.tabs button').forEach(b=>
+    b.setAttribute('aria-selected', String(b.dataset.tab === name)));
+  try{ if(location.hash !== '#'+name) history.replaceState(null, '', '#'+name); }catch(e){}
+  // A chart built while its panel was hidden measured a zero-width box; the card
+  // charts are resized by the ResizeObserver, the portfolio chart is not observed.
+  if(name === 'overview' && PF.chart){
+    const w = Math.max($('#pf-chart').clientWidth|0, 200);
+    if(w !== PF.chart.width) PF.chart.setSize({width:w, height:PF.chart.height});
+  }
+}
+
 /* ==================================================================== portfolio ===
  * Funded and simulated books are summed separately. Adding a `sim` book's equity to
  * a venue book's would report money that was never at risk, which is the same splice
@@ -952,6 +1017,7 @@ async function _refresh(){
   ]);
   renderPortfolio();
   renderStrategies(STATE.strategies||[]);
+  renderSummary(STATE.strategies||[]);
   renderHeader(); renderPRs(); renderHealth(); renderAgents(); renderSessions();
   syncButtons();      // the bottom of each card was just rebuilt; re-disable what is running
   const sel = $('#ac');
@@ -1027,6 +1093,15 @@ async function showModal(title, url, render){
 }
 
 document.addEventListener('click', e=>{
+  const tb = e.target.closest('nav.tabs button');
+  if(tb) return showTab(tb.dataset.tab);
+  const go = e.target.closest('tr[data-goto]');
+  if(go){
+    showTab('strategies');
+    const rec = CARDS.get(go.dataset.goto);
+    if(rec) rec.el.scrollIntoView({behavior:'smooth', block:'start'});
+    return;
+  }
   const b = e.target.closest('button[data-act]');
   if(b){
     const name = b.closest('.card').dataset.name, a = b.dataset.act;
@@ -1078,5 +1153,6 @@ $('#killall').onclick = ()=>{
   act({action:'kill_all'}, 'kill all');
 };
 
+try{ if(location.hash === '#strategies') showTab('strategies'); }catch(e){}
 refresh(); setInterval(refresh, 10000);
 </script>

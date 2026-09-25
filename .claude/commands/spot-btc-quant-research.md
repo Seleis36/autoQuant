@@ -1,5 +1,5 @@
 ---
-description: Full quant research cycle on spot BTC/USD — review past ideas, pick one, backtest it with vectorbt, report the result and open a pull request.
+description: Full quant research cycle on spot BTC/USD — review past ideas, work through at least five of them with vectorbt, report the result and open a pull request.
 argument-hint: [optional idea, theme or paper to start from]
 ---
 
@@ -53,15 +53,17 @@ Create the subfolders as your first action in Phase 3, and keep using them for t
 
 **Phase 1 — Review.** Read `past_research/spot-btc/all_ideas.md` for what has already been tried in this asset class. If an entry looks interesting, open its report in `past_research/spot-btc/<short-name>/`. You may also skim another asset class's `all_ideas.md` for a mechanism worth porting — but your code, report and alpha still land under `spot-btc/`.
 
-**Phase 2 — Choice.** Find an idea to work on. It can be an idea from past research you want to extend or continue (if it is WIP). If nothing seems interesting, find a new one: Google is your best friend here. You are allowed to get creative — research papers are a great choice, but so are social media, forums and books. Fix the short name now; it names every folder you create from here on.
+**Phase 2 — Choice.** Build a **ranked shortlist of at least 5 ideas** before you write any code: distinct mechanisms, not five parameterisations of one. An entry can be an idea from past research you want to extend or continue (if it is WIP), or a new one: Google is your best friend here. You are allowed to get creative — research papers are a great choice, but so are social media, forums and books. Give each entry one line on the mechanism and why it might work in this asset class; the list goes into the PR body at the end. Take the top entry and fix its short name now; it names every folder you create for that idea.
 
 **Phase 3 — Code.** Create `code/spot-btc/<short-name>/` and write everything there. Using python and vectorbt, pull the data described above and test your idea. If it seems profitable, make sure it is free of lookahead bias, and of course test it out of sample. If it doesn't seem profitable, try to fine-tune it. If it's still not profitable, think creatively about how to change the setup context to make it profitable (maybe the time horizon is not adapted? maybe it needs another indicator to clean the entry points? maybe it only works in one regime?). This is an art as much as a science.
 
 **Phase 4 — Report.** Write a thorough, rigorous research report as a md file in `past_research/spot-btc/<short-name>/`, covering the idea and every variation you tried — including the ones that failed. If it works, write the deployable spec and its figures to `alphas/spot-btc/<short-name>/`. Alongside it, write `code/spot-btc/<short-name>/strategy.py` exposing one reusable function that turns raw market data into the target weight series, with every parameter defaulted to the value in the spec — the deployment agent imports that function instead of reimplementing your signal. Then sum up your work in one line in `past_research/spot-btc/all_ideas.md` with its status: **Failed** for an unprofitable idea, **Working** for a profitable one. That line must link to the report.
 
-**Phase 5 (optional) — Repeat.** If the idea is unprofitable and you have tried EVERYTHING you could, restart from Phase 2 with a new short name, and therefore a new set of subfolders. Everything you worked on in this session — every short name, working or failed — goes into the single pull request of Phase 6.
+**Phase 5 — Next idea (mandatory).** A session covers **at least 5 distinct ideas**. Failed is a complete result *for one idea*, not for the session: once an idea is written up (Phase 4), take the next entry on your shortlist and restart from Phase 3 with a new short name, and therefore a new set of subfolders. Refill the shortlist (Phase 2) whenever it runs dry. A Working idea does not end the session either — a second, uncorrelated edge in this asset class is worth more than more polish on the first. Depth still counts: give every idea a real attempt (the lookahead check, an out-of-sample test, the creative re-framings of Phase 3) before calling it Failed. Five shallow screens are not five ideas. Everything you worked on in this session — every short name, working or failed — goes into the single pull request of Phase 6.
 
-**Phase 6 — Pull request (mandatory).** Your cycle is not finished until your work is on a branch and a pull request is open against `main`. The deployment agent only ever looks at pull requests: work left sitting in the working tree is invisible to it and will eventually be wiped.
+The harness enforces the minimum. If you try to end the session before 5 ideas have their own folders, the stop is refused and you are sent back here.
+
+**Phase 6 — Pull request (mandatory).** Open it once, after your last idea is written up. Your cycle is not finished until your work is on a branch and a pull request is open against `main`. The deployment agent only ever looks at pull requests: work left sitting in the working tree is invisible to it and will eventually be wiped. With several ideas, name the branch after the most promising one.
 
 ```bash
 cd /home/seleis/autoQuant
@@ -80,7 +82,7 @@ git checkout main                                  # leave the tree on main for 
 
 Rules for this phase, none of them optional:
 
-- **Live paper-trading daemons run out of this working tree.** Creating your own branch and returning to `main` is the only history operation you may perform. Never check out an existing branch, never `git reset --hard`, `git clean`, `git stash`, `git rebase main` or `git merge`, and never modify `live/`, `harness/`, `.claude/`, or another asset class's files — a stray checkout deletes a running strategy's directory out from under its process.
+- **Live paper-trading daemons run out of this working tree.** Creating your own branch, checking that same branch out again later in this session, and returning to `main` are the only history operations you may perform. Never check out any other existing branch, never `git reset --hard`, `git clean`, `git stash`, `git rebase main` or `git merge`, and never modify `live/`, `harness/`, `.claude/`, or another asset class's files — a stray checkout deletes a running strategy's directory out from under its process.
 - **Stage your own paths only.** Never `git add -A`, `git add .` or `git commit -a`: up to two research agents share this tree and you would sweep up someone else's half-finished work. Repeat the `git add` block once per short name if you ran several cycles.
 - Market-data caches under `data/`, `__pycache__/` and `.pyc` files stay out of the commit.
 - If the push is rejected because `main` moved on, rebase **your own branch** onto `origin/main` (`git rebase origin/main` while on your branch) and push again. If that conflicts in a file you did not write, leave the branch alone and say so in the PR.
@@ -88,7 +90,8 @@ Rules for this phase, none of them optional:
 
 The PR body is the first thing the deployment agent reads, so make it self-contained:
 
-- short name, asset class, and status — **Working** or **Failed**;
+- short name, asset class, and status — **Working** or **Failed**; with several ideas, one line per short name;
+- your Phase 2 shortlist, marking which entries you covered;
 - for each working idea: the exact traded instrument, direction (long/flat vs long/short), maximum leverage, rebalance frequency, position sizing rule, and the bar/timezone convention;
 - headline numbers: full-sample and out-of-sample (or walk-forward) Sharpe, CAGR, max drawdown, annual turnover, average exposure, and the assumed cost in bp per side;
 - repo paths to the report, the alpha spec and `strategy.py`;
@@ -106,11 +109,7 @@ headline numbers miss its own declared criteria is sent straight back for revisi
 Treat it as separate from the seed idea. A seed says *where to look*; criteria say *what
 counts as having found something*.
 
-**You are expected to fail these criteria most of the time, and reporting that honestly is a
-complete, successful run of this command.** Genuine edges that clear a high bar are rare. If
-after real effort nothing meets the criteria, open the PR as **Failed**, say exactly how close
-you got and what the binding constraint was, and stop. That result is worth having: it stops
-the next agent spending a session on the same ground.
+**You are expected to fail these criteria most of the time, and reporting that honestly is a complete, successful result for that idea.** Genuine edges that clear a high bar are rare. If after real effort an idea does not meet the criteria, write it up as **Failed**, say exactly how close you got and what the binding constraint was, and move on to the next idea on your shortlist (Phase 5). That result is worth having: it stops the next agent spending a session on the same ground.
 
 **What you must not do to reach the number.** A criterion like "OOS Sharpe ≥ 2" is trivially
 satisfiable by a dishonest search, and doing so is worse than failing — capital gets reserved

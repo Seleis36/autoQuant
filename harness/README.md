@@ -162,6 +162,23 @@ systemctl --user disable --now autoquant-nightly.timer  # pause it
 `Persistent=true` means a night missed because the PC was off or asleep runs at the next
 start. The timer only fires while WSL is up — the Windows logon hook keeps it up after logon.
 
+### Effort floor on research sessions
+
+Left alone, a research agent would pick one idea, grid it, write it up as Failed and stop —
+the first nightly batch produced two PRs 6 and 17 minutes into the run. Two things now push
+back, applied by `agent_exec.sh` to every research session, resumes included:
+
+- **`--effort xhigh`** (`RESEARCH_AGENT_EFFORT`).
+- **A Stop hook**, `research_stop_hook.py`. It refuses to let the session end until
+  `RESEARCH_MIN_IDEAS` (5) distinct short names have been worked on, and gives up after
+  `RESEARCH_MAX_STOP_BLOCKS` (5) refusals so an agent with nothing left can still finish. An
+  idea counts once anything under `code/<class>/<name>/` or `past_research/<class>/<name>/`
+  was written since launch — in the working tree, or committed on a local branch. Refusals
+  are counted in `state/sessions/<uuid>.stop_blocks`.
+
+The command files say the same thing in words: a shortlist of five ideas up front, and
+Failed is a result for one idea, not for the session.
+
 ### Seeds vs. acceptance criteria
 
 These are different things and conflating them is how PR #3 happened. It was launched with the
