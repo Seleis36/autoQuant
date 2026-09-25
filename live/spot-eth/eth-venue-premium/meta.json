@@ -1,0 +1,53 @@
+{
+  "name": "spot-eth/eth-venue-premium",
+  "title": "ETH venue premium — Coinbase ETH-USD vs Binance ETHUSDT dislocation timer",
+  "asset_class": "spot-eth",
+  "short_name": "eth-venue-premium",
+  "description": "The Coinbase ETH-USD price relative to Binance ETHUSDT, z-scored against its trailing 30 days of hourly bars, is traded as a hysteresis state machine (long once z > 0, flat once z < −1.5) and sized by a 50-day trend filter and a 40% inverse-EWMA-vol scalar. A pre-registered port of spot-btc/coinbase-premium with every parameter unchanged; the driver is USDT/USD demand in the Binance leg.",
+  "symbol": "ETHUSDT",
+  "schedule": "1h",
+  "capital_usdt": 2500.0,
+  "direction": "long/flat",
+  "book": "sim",
+  "quotes": "binance-public",
+  "allow_short": false,
+  "max_weight": 1.0,
+  "deployed_at": "2026-09-25T12:30:00Z",
+  "provenance": {
+    "pr": 17,
+    "branch": "research/spot-eth-eth-venue-premium",
+    "commit": "5c9703fa232e97b0ec2b2d794b14b87e17fa318e",
+    "spec": "alphas/spot-eth/eth-venue-premium/2026-09-25_alpha_spec.md",
+    "report": "past_research/spot-eth/eth-venue-premium/2026-09-25_eth_venue_premium.md",
+    "strategy_code": "code/spot-eth/eth-venue-premium/strategy.py"
+  },
+  "backtest": {
+    "period": "2017-08 → 2026-09",
+    "bars": "hourly",
+    "cost_bps_per_side": 10.0,
+    "cost_type": "taker",
+    "sharpe": 1.38,
+    "sharpe_is": 1.33,
+    "sharpe_oos": 1.49,
+    "sharpe_walkforward": 1.34,
+    "sharpe_ci": [0.77, 1.96],
+    "cagr_pct": 38.9,
+    "vol_pct": 26.4,
+    "maxdd_pct": -29.2,
+    "sortino": 1.78,
+    "calmar": 1.33,
+    "avg_exposure": 0.23,
+    "round_trips_per_year": null,
+    "annual_turnover": 76,
+    "benchmark": {"name": "ETH buy & hold", "sharpe": 0.70, "cagr_pct": null, "maxdd_pct": -94.0}
+  },
+  "live_notes": [
+    "SIM BOOK, NOT VENUE. A long/flat spot-crypto strategy that belongs on the testnet, but the venue pool was fully subscribed (10000/10000 USDT across four strategies) at deployment. It is a SimBroker marked to REAL Binance spot last price (quotes=binance-public): no order book, no rejection, no partial fill. Weaker evidence than the venue sleeves. It can be moved to the venue if a venue sleeve is retired.",
+    "Costs match the research exactly: fee 10 bp/side, slippage 0 in the runner. The report's cost ladder is 0 bp 1.67 / 5 bp 1.52 / 10 bp 1.38 / 20 bp 1.08 / 30 bp 0.79 (full sample). A dashboard flatten rebuilds the broker from this file with the default 1 bp slippage, so that one trade costs 1 bp more.",
+    "Overlap. Daily-return correlation is 0.85 with the live spot-eth/eth-trend-filter and 0.60 with the live spot-btc/coinbase-premium, and the ETH and BTC premium states agree 91% of hours. The report calls this an upgrade of the ETH trend sleeve, not an independent edge; running both roughly doubles one ETH-long exposure. A USDT/USD regime change hits this sleeve and the BTC premium sleeve together.",
+    "Second data feed. The premium needs Coinbase ETH-USD hourly candles from api.exchange.coinbase.com, refreshed by the runner into data/COINBASE_ETHUSD_1h.parquet. If Coinbase falls more than 3 h behind Binance the runner raises rather than trading a frozen premium; a single missing bar makes z NaN and the hysteresis state carries over, per the spec.",
+    "Execution speed matters in-sample: an extra 1 h of delay costs ~0.15 of full-sample Sharpe (OOS unaffected, 1.55), 3 h costs ~0.3. The runner rebalances 20 s after each UTC hour.",
+    "Turnover: Σ|Δw| ≈ 76/yr at 0.23 average exposure. Turnover well above that means the state machine is chattering and the Coinbase feed should be checked first.",
+    "History window: 9000 hourly bars. The live weight matches the full-history weight to 8.5e-7 over the last 720 bars at that window (6000 bars: 2.3e-5; 3000: 3.1e-3)."
+  ]
+}
