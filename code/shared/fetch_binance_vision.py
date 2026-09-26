@@ -14,6 +14,9 @@ Datasets, and what each actually costs to pull:
                 Never cached raw: aggregated to 1m spread statistics as it streams.
   metrics       open interest and long/short ratios, 5-minutely. Daily files, ~12 KB.
   fundingRate   perp funding settlements. Monthly, under a kilobyte.
+  aggTrades     every trade, merged per (price, taker side). Spot and USD-M. BTCUSDT
+                is 0.4-1.3 GB zipped per month; stored as zstd parquet on the tick disk
+                at ~1/3 of that (see `ticks.py`), never in the bar store.
 
 Two traps live in this archive, both silent:
 
@@ -34,6 +37,7 @@ import os
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 
@@ -328,19 +332,217 @@ def fetch_funding(symbol="BTCUSDT", start="2019-09-01", end=None, verbose=True):
     return df
 
 
+# ------------------------------------------------------------------ aggTrades
+
+#: Spot files carry 8 unnamed columns; USD-M files carry 7 (no best-match flag) under a
+#: header row. Both are read positionally with these names.
+AGG_COLS = ["agg_id", "price", "qty", "first_id", "last_id", "ts", "buyer_maker",
+            "best_match"]
+
+S3_LIST = "https://s3-ap-northeast-1.amazonaws.com/data.binance.vision"
+
+
+def list_archive(prefix):
+    """[(key, bytes)] of every .zip under `prefix`, from the bucket listing behind the site."""
+    import re as _re
+    out, marker = [], ""
+    while True:
+        q = urllib.parse.urlencode({"delimiter": "/", "prefix": prefix, "marker": marker})
+        body = _get(f"{S3_LIST}?{q}").decode()
+        keys = _re.findall(r"<Key>(.*?)</Key>.*?<Size>(\d+)</Size>", body, _re.S)
+        out += [(k, int(s)) for k, s in keys if k.endswith(".zip")]
+        if "<IsTruncated>true" in body and keys:
+            marker = keys[-1][0]
+        else:
+            return out
+
+
+def _download(url, path, tries=5, chunk=8 << 20):
+    """Stream `url` to `path`, returning its sha256. Monthly BTC zips run past 1 GB."""
+    last = None
+    for attempt in range(tries):
+        try:
+            h = hashlib.sha256()
+            req = urllib.request.Request(url, headers=UA)
+            with urllib.request.urlopen(req, timeout=300) as r, open(path, "wb") as f:
+                while True:
+                    b = r.read(chunk)
+                    if not b:
+                        break
+                    h.update(b)
+                    f.write(b)
+            return h.hexdigest()
+        except Exception as e:  # noqa: BLE001 -- transient, retried
+            last = e
+            time.sleep(5 * (attempt + 1))
+    raise RuntimeError(f"download failed after {tries} tries: {url}") from last
+
+
+def _aggtrades_zip_to_parquet(zpath, out_path, verbose=False):
+    """Stream one aggTrades zip into a zstd parquet without holding the CSV in memory.
+
+    A BTCUSDT month is ~6 GB of CSV; pyarrow reads it in 64 MB blocks and each block is
+    written as it lands. Timestamps go through the same ms/us magnitude rule as
+    `_to_datetime`, per row, because the unit switch falls inside the archive.
+    Returns (rows, first_ts, last_ts, id_gaps).
+    """
+    import pyarrow as pa
+    import pyarrow.compute as pc
+    import pyarrow.csv as pacsv
+    import pyarrow.parquet as pq
+
+    with zipfile.ZipFile(zpath) as z:
+        member = z.namelist()[0]
+        with z.open(member) as f:
+            first = f.readline().decode().strip()
+    has_header = not first[:1].isdigit()
+    ncols = first.count(",") + 1
+    names = AGG_COLS[:ncols]
+    types = {"agg_id": pa.int64(), "price": pa.float64(), "qty": pa.float64(),
+             "first_id": pa.int64(), "last_id": pa.int64(), "ts": pa.int64(),
+             "buyer_maker": pa.bool_(), "best_match": pa.bool_()}
+    schema = pa.schema([("ts", pa.timestamp("us")), ("price", pa.float64()),
+                        ("qty", pa.float64()), ("buyer_maker", pa.bool_()),
+                        ("n_trades", pa.int32()), ("agg_id", pa.int64())])
+    rows, gaps, t0, t1, prev_id = 0, 0, None, None, None
+    tmp = out_path + f".{os.getpid()}.tmp"
+    try:
+        with zipfile.ZipFile(zpath) as z, z.open(member) as f, \
+                pq.ParquetWriter(tmp, schema, compression="zstd",
+                                 # Delta-packing the two monotone int columns cuts the
+                                 # file by ~30%; dictionary suits the repetitive rest.
+                                 use_dictionary=["price", "qty", "buyer_maker", "n_trades"],
+                                 column_encoding={"ts": "DELTA_BINARY_PACKED",
+                                                  "agg_id": "DELTA_BINARY_PACKED"}) as w:
+            reader = pacsv.open_csv(
+                f,
+                read_options=pacsv.ReadOptions(column_names=names,
+                                               skip_rows=1 if has_header else 0,
+                                               block_size=64 << 20),
+                convert_options=pacsv.ConvertOptions(
+                    column_types={k: types[k] for k in names}))
+            for batch in reader:
+                if batch.num_rows == 0:
+                    continue
+                raw = batch.column("ts")
+                us = pc.if_else(pc.greater(raw, 10 ** 14), raw, pc.multiply(raw, 1000))
+                ids = batch.column("agg_id")
+                n = pc.add(pc.subtract(batch.column("last_id"), batch.column("first_id")), 1)
+                tbl = pa.table({
+                    "ts": us.cast(pa.timestamp("us")),
+                    "price": batch.column("price"), "qty": batch.column("qty"),
+                    "buyer_maker": batch.column("buyer_maker"),
+                    "n_trades": n.cast(pa.int32()), "agg_id": ids}, schema=schema)
+                w.write_table(tbl, row_group_size=1 << 20)
+                a = ids.to_numpy()
+                if prev_id is not None:
+                    gaps += int(a[0] != prev_id + 1)
+                gaps += int((np.diff(a) != 1).sum())
+                prev_id = int(a[-1])
+                t0 = t0 if t0 is not None else tbl["ts"][0].as_py()
+                t1 = tbl["ts"][-1].as_py()
+                rows += batch.num_rows
+        os.replace(tmp, out_path)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    return rows, t0, t1, gaps
+
+
+def fetch_aggtrades(symbol="BTCUSDT", market="um", start=None, end=None, verify=True,
+                    workers=2, verbose=True):
+    """Every closed month of aggTrades for `symbol` into the tick store (see `ticks.py`).
+
+    Months are discovered from the bucket listing rather than generated, so a symbol that
+    listed in 2023 does not produce 70 404s, and months already on disk are skipped -- an
+    interrupted backfill resumes. The zip is streamed to the tick disk, checksum-verified,
+    converted, and deleted: the archive is permanent, so keeping it would only double the
+    footprint. Returns the number of months written.
+    """
+    import concurrent.futures as cf
+    import ticks
+
+    root = _market_root(market)
+    out_dir = ticks.aggtrades_dir(symbol, market)
+    tmp_dir = os.path.join(ticks.ticks_root(), ".tmp")
+    os.makedirs(out_dir, exist_ok=True)
+    os.makedirs(tmp_dir, exist_ok=True)
+    have = set(ticks.cached_months(out_dir))
+    lo = pd.Timestamp(start).strftime("%Y-%m") if start else "0000-00"
+    hi = pd.Timestamp(end).strftime("%Y-%m") if end else "9999-99"
+    todo = []
+    for key, size in list_archive(f"{root}/monthly/aggTrades/{symbol}/"):
+        m = key.rsplit("-aggTrades-", 1)[1][:7]
+        if lo <= m <= hi and m not in have:
+            todo.append((m, key, size))
+    if verbose:
+        print(f"  {symbol} {market}: {len(todo)} months to fetch "
+              f"({sum(s for *_, s in todo) / 1e9:.1f} GB zipped), {len(have)} cached",
+              flush=True)
+
+    def one(m, key):
+        url = f"{BASE}/{key}"
+        zpath = os.path.join(tmp_dir, os.path.basename(key))
+        try:
+            digest = _download(url, zpath)
+            if verify:
+                want = _get(url + ".CHECKSUM")
+                if want and want.decode().split()[0].strip() != digest:
+                    raise RuntimeError(f"checksum mismatch for {url}")
+            t = time.time()
+            rows, t0, t1, gaps = _aggtrades_zip_to_parquet(
+                zpath, os.path.join(out_dir, f"{m}.parquet"))
+            return m, rows, t0, t1, gaps, os.path.getsize(zpath), time.time() - t
+        finally:
+            if os.path.exists(zpath):
+                os.remove(zpath)
+
+    done = 0
+    with cf.ThreadPoolExecutor(max_workers=workers) as ex:
+        futs = {ex.submit(one, m, key): m for m, key, _ in todo}
+        for fut in cf.as_completed(futs):
+            try:
+                m, rows, t0, t1, gaps, zbytes, secs = fut.result()
+            except Exception as e:  # noqa: BLE001 -- one bad month must not end a backfill
+                print(f"    {symbol} {market} {futs[fut]}: FAILED {e}", flush=True)
+                continue
+            done += 1
+            if verbose:
+                pq_mb = os.path.getsize(os.path.join(out_dir, f"{m}.parquet")) / 1e6
+                print(f"    {symbol} {market} {m}: {rows:>11,} trades  {t0:%m-%d}->{t1:%m-%d}  "
+                      f"zip {zbytes / 1e6:6.0f} MB -> {pq_mb:6.0f} MB  "
+                      f"{'id gaps ' + str(gaps) + '  ' if gaps else ''}{secs:4.0f}s",
+                      flush=True)
+    return done
+
+
 # ------------------------------------------------------------------ cli
 
 def main():
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    p.add_argument("dataset", choices=["klines", "book", "metrics", "funding"])
-    p.add_argument("--symbol", default="BTCUSDT")
+    p.add_argument("dataset", choices=["klines", "book", "metrics", "funding",
+                                       "aggtrades", "flowbars"])
+    p.add_argument("--symbol", default="BTCUSDT",
+                   help="one symbol, or a comma-separated list for aggtrades/flowbars")
     p.add_argument("--freq", default="1m")
     p.add_argument("--market", default="spot", choices=["spot", "um", "cm"])
     p.add_argument("--start", default=None)
     p.add_argument("--end", default=None)
     p.add_argument("--days", type=int, default=90, help="bookTicker window length")
     p.add_argument("--no-verify", action="store_true")
+    p.add_argument("--workers", type=int, default=2, help="aggtrades: months in flight")
     a = p.parse_args()
+
+    if a.dataset in ("aggtrades", "flowbars"):
+        import ticks
+        for sym in [s.strip().upper() for s in a.symbol.split(",") if s.strip()]:
+            if a.dataset == "aggtrades":
+                fetch_aggtrades(sym, a.market, start=a.start, end=a.end,
+                                verify=not a.no_verify, workers=a.workers)
+            else:
+                n = ticks.build_flow_bars(sym, a.market, a.freq)
+                print(f"  {ticks.bar_symbol(sym, a.market)} {a.freq}: {n:,} new bars", flush=True)
+        return
 
     if a.dataset == "klines":
         n = fetch_klines(a.symbol, a.freq, a.market,

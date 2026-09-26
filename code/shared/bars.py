@@ -52,6 +52,7 @@ _SUM_COLS = {"Volume", "qv", "n", "tb", "tq", "Ticks", "BidVol", "AskVol"}
 _MEAN_COLS = {"Spread", "SpreadBps", "Bid", "Ask", "OpenInterest", "Mid"}
 
 _FREQ_SECONDS = {
+    "1s": 1, "5s": 5, "10s": 10, "15s": 15, "30s": 30,
     "1m": 60, "5m": 300, "15m": 900, "30m": 1800,
     "1h": 3600, "2h": 7200, "4h": 14400, "6h": 21600, "12h": 43200,
     "1d": 86400,
@@ -70,9 +71,9 @@ def freq_seconds(freq):
 
 
 def pandas_freq(freq):
-    """'1m' -> '1min'. pandas renamed the minute alias; 'T'/'M' are ambiguous."""
+    """'1m' -> '1min', '1s' -> '1s'. pandas renamed the minute alias; 'T'/'M' are ambiguous."""
     freq_seconds(freq)
-    n, unit = re.match(r"^(\d+)([mhd])$", freq).groups()
+    n, unit = re.match(r"^(\d+)([smhd])$", freq).groups()
     return f"{n}{'min' if unit == 'm' else unit}"
 
 

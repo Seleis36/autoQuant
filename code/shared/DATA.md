@@ -7,6 +7,7 @@ Two stores sit under `data/`, and they answer different questions.
 | **Flat daily cache** | one parquet per instrument, `<TICKER>_d.parquet` | `research_lib.load_series` | Daily studies, macro overlays, anything already written |
 | **Partitioned bar store** | `data/bars/<SYMBOL>/<freq>/<year>.parquet` | `bars.load_bars` | 1m and intraday, multi-year, multi-symbol |
 | **Vintage store** | `data/vintages/<SERIES>.parquet` | `fetch_alfred.as_of` | Point-in-time macro — what was *knowable* on a date |
+| **Tick store** | `data/ticks/...` (D: disk) | `ticks.load_aggtrades` | Every trade / quote: order flow, true costs, sub-minute bars |
 
 The flat cache is unchanged and still correct for daily work. Nothing below replaces it.
 
@@ -143,6 +144,62 @@ already correct for those, and they are deliberately absent from `PIT_SERIES`.
 
 ---
 
+## 4. Tick store — `ticks.py` (dedicated disk on D:)
+
+Raw trades and quotes are too big for the distro disk (its VHDX sits on C:, ~300 GB free,
+and never shrinks). They live on their own ext4 virtual disk:
+
+    D:\WSL\autoquant-ticks.vhdx  ->  /mnt/wsl/autoquant-ticks  <-  data/ticks (symlink)
+
+Set up once from an elevated prompt with `code/shared/ticks_disk.ps1` (creates, formats,
+mounts, links `data/ticks` to it, and registers the logon task **"autoQuant ticks disk"**
+that remounts it). After `wsl --shutdown` the disk is detached until next logon; remount
+without UAC:
+
+```bash
+schtasks.exe /run /tn "autoQuant ticks disk"
+```
+
+`ticks_root()` **refuses** to run when the disk is not mounted — `/mnt/wsl` is a tmpfs, so a
+write there fills RAM and a read sees an "empty" store. `AQ_TICKS_DIR` overrides for tests.
+
+| Data | Path | Kept size |
+|---|---|---|
+| Binance aggTrades, spot BTC/ETH | `ticks/binance/spot/aggTrades/<SYM>/<YYYY-MM>.parquet` | ~30 GB |
+| Binance aggTrades, USD-M perps BTC/ETH + 22 alts | `ticks/binance/um/aggTrades/...` | ~80 GB |
+| Dukascopy bid/ask ticks, 7 majors 2012+ | `ticks/dukascopy/<SYM>/<YYYY-MM>.parquet` | ~7 GB |
+
+```python
+from ticks import load_aggtrades, load_fx_ticks, flow_bars, summary
+t = load_aggtrades("BTCUSDT", "um", start="2024-03-12", end="2024-03-12 23:59:59")
+b = flow_bars(t, "1s")     # OHLCV + qv n tb tq -- same schema as klines, any freq down to 1s
+summary()                  # what is on the disk
+```
+
+aggTrades columns: `ts` (trade time, µs), `price`, `qty`, `buyer_maker` (**True = the taker
+sold**), `n_trades` (fills merged), `agg_id`. Flow bars rebuilt from them match Binance's
+own klines exactly (checked on LINKUSDT spot Dec-2024/Jan-2025, 1,488/1,488 hours, across the
+ms→µs switch). USD-M perps agree to ~1e-4, not exactly: on ATOMUSDT Jan-2024 H/L/C match on
+744/744 hours, but 5 opens are one tick off and ~0.02% of volume sits in the neighbouring hour
+around the 3-Jan crash -- Binance's kline engine buckets a few boundary fills differently.
+1m perp flow bars are materialised into the bar store as `<SYM>_PERP/1m`;
+sub-minute bars are built on demand, not cached.
+
+Backfill (resumable, detached, logs in `data/ticks/logs/`):
+
+```bash
+code/shared/tick_backfill.sh              # binance + dukascopy
+python code/shared/fetch_binance_vision.py aggtrades --market um --symbol SOLUSDT,XRPUSDT
+python code/shared/fetch_dukascopy.py ticks --symbols EURUSD --start 2012-01-01 --workers 1
+```
+
+Deliberately **not** stored: Binance raw `trades` (same fills as aggTrades, 1.5× the size),
+`1s` klines (rebuildable from aggTrades), full bookTicker history (~70 GB/yr zipped for
+BTC; keep using `fetch_binance_vision.py book` windows), and equity/futures ticks — no free
+full-history source exists (IEX HIST is one venue at ~2–3% of volume; CME/CBOE are paid).
+
+---
+
 ## Still daily-only
 
 Equities, ETFs, futures and rates remain daily yfinance OHLCV back to 2010. yfinance caps
@@ -152,7 +209,7 @@ honoured on this data. That needs a paid vendor (Polygon or Databento) and is no
 
 ---
 
-## 4. US large-cap panel — `code/us-large-cap/shared/`
+## 5. US large-cap panel — `code/us-large-cap/shared/`
 
 Added 2026-09-16 by the `us-large-cap` research. Everything below reads and writes the
 **flat daily cache** (one `data/<TICKER>_d.parquet` per name), so the sim book can price

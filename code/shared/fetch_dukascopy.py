@@ -219,6 +219,91 @@ def fetch_fx_bars(symbol="EURUSD", start=DEFAULT_START, end=None, freq="1m",
     return total
 
 
+# ------------------------------------------------------------------ raw ticks
+
+def _write_ticks(df, path):
+    """Ticks -> zstd parquet, delta-packed stamps. Empty frames are written too: an empty
+    day file is how a holiday is remembered as done rather than re-fetched forever."""
+    out = df.reset_index()
+    out["ts"] = out["ts"].astype("datetime64[us]")
+    out = out.astype({"bid": "float64", "ask": "float64",
+                      "bid_vol": "float32", "ask_vol": "float32"})
+    tmp = f"{path}.{os.getpid()}.tmp"
+    out.to_parquet(tmp, index=False, compression="zstd",
+                   use_dictionary=["bid", "ask", "bid_vol", "ask_vol"],
+                   column_encoding={"ts": "DELTA_BINARY_PACKED"})
+    os.replace(tmp, path)
+
+
+def fetch_fx_ticks(symbol="EURUSD", start=DEFAULT_START, end=None, freq="1m",
+                   workers=1, verbose=True):
+    """Every tick for `symbol` into the tick store, plus `freq` bars into the bar store.
+
+    One crawl, both products: the ~24 requests a day cost is the throttle, not the disk,
+    so the raw ticks are kept rather than thrown away after barring. Resumable at day
+    granularity -- each day lands in `<SYMBOL>/.partial/` as it is fetched, and a month is
+    consolidated into `<YYYY-MM>.parquet` (and barred) only once every weekday in it is
+    present. A day that exhausts the retries is logged and left missing, so the next run
+    picks it up instead of the crawl dying three weeks in.
+    """
+    import ticks as tickstore
+
+    sym = symbol.upper()
+    out_dir = tickstore.fx_ticks_dir(sym)
+    part_dir = os.path.join(out_dir, ".partial")
+    os.makedirs(part_dir, exist_ok=True)
+    today = pd.Timestamp.now("UTC").tz_convert(None).normalize()
+    end = min(pd.Timestamp(end), today - pd.Timedelta(days=1)) if end else today - pd.Timedelta(days=1)
+    have = set(tickstore.cached_months(out_dir))
+
+    # Newest first: at the throttled rate a full crawl takes months, and recent years
+    # are the ones research reaches for first.
+    months = pd.period_range(pd.Timestamp(start), end, freq="M")[::-1]
+    written = 0
+    for per in months:
+        m = str(per)
+        if m in have:
+            continue
+        days = pd.date_range(max(per.start_time, pd.Timestamp(start)),
+                             min(per.end_time.normalize(), end), freq="D")
+        days = days[days.dayofweek != 5]            # Saturday: the feed is closed all day
+        failed = 0
+        for day in days:
+            p = os.path.join(part_dir, f"{day:%Y-%m-%d}.parquet")
+            if os.path.exists(p):
+                continue
+            try:
+                t = fetch_day(sym, day, workers=workers)
+            except RuntimeError as e:
+                failed += 1
+                print(f"    {sym} {day.date()}: FAILED, will retry next run ({e})", flush=True)
+                continue
+            if t.empty:
+                t = decode_ticks(b"", sym, day)
+            _write_ticks(t, p)
+        month_closed = per.end_time.normalize() <= end
+        if failed or not month_closed:
+            continue
+        parts = [os.path.join(part_dir, f"{d:%Y-%m-%d}.parquet") for d in days]
+        frames = [pd.read_parquet(p) for p in parts]
+        month = pd.concat([f for f in frames if len(f)], ignore_index=True) \
+            if any(len(f) for f in frames) else frames[0]
+        month = month.set_index("ts").sort_index()
+        _write_ticks(month, os.path.join(out_dir, f"{m}.parquet"))
+        bar = ticks_to_bars(month.astype("float64"), freq) if len(month) else pd.DataFrame()
+        if len(bar):
+            barstore.write_bars(bar, sym, freq)
+        for p in parts:
+            os.remove(p)
+        written += 1
+        if verbose:
+            mb = os.path.getsize(os.path.join(out_dir, f"{m}.parquet")) / 1e6
+            med = bar["SpreadBps"].median() if len(bar) else float("nan")
+            print(f"    {sym} {m}: {len(month):>10,} ticks  {mb:6.1f} MB  "
+                  f"{len(bar):>6,} bars  median spread {med:.2f} bps", flush=True)
+    return written
+
+
 # ------------------------------------------------------------------ spread profile
 
 def sample_days(start, end, per_quarter=5, seed=7):
@@ -322,9 +407,11 @@ def spread_bps(symbol, when, profile=None):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    p.add_argument("mode", nargs="?", default="bars", choices=["bars", "profile"],
+    p.add_argument("mode", nargs="?", default="bars", choices=["bars", "ticks", "profile"],
                    help="'bars' backfills 1m bid/ask bars (slow: ~24 requests per pair "
-                        "per day); 'profile' samples days to measure the spread curve")
+                        "per day); 'ticks' does the same crawl but also keeps every tick "
+                        "in the tick store (see ticks.py); 'profile' samples days to "
+                        "measure the spread curve")
     p.add_argument("--symbols", default=",".join(MAJORS))
     p.add_argument("--start", default=DEFAULT_START)
     p.add_argument("--end", default=None)
@@ -342,6 +429,14 @@ def main():
             print("no data sampled")
             return
         print(prof.groupby("symbol")["median"].describe()[["mean", "50%", "max"]])
+        return
+
+    if a.mode == "ticks":
+        for sym in syms:
+            print(f"== {sym}", flush=True)
+            n = fetch_fx_ticks(sym, start=a.start, end=a.end, freq=a.freq,
+                               workers=a.workers)
+            print(f"   {sym}: {n} months consolidated", flush=True)
         return
 
     for sym in syms:
