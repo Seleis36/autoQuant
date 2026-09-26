@@ -1,0 +1,28 @@
+[Unit]
+Description=autoQuant tick store: mount the D: tick disk and keep the tick backfill running
+After=network-online.target
+Wants=network-online.target
+PartOf=autoquant.target
+# A disk that will not mount (VHDX moved, task deleted) must not retry every minute
+# forever; 5 failures in an hour and it waits for the next WSL start or a manual start.
+StartLimitIntervalSec=3600
+StartLimitBurst=5
+
+[Service]
+# Mounts the disk through the "autoQuant ticks disk" Windows task if it is not attached,
+# then runs both backfill jobs as children (see code/shared/tick_backfill.sh). Both are
+# resumable: every WSL start picks up where the last one stopped, and once caught up a
+# run only fetches the new months and exits.
+Type=simple
+WorkingDirectory=%h/autoQuant
+ExecStart=%h/autoQuant/code/shared/tick_backfill.sh --foreground
+Restart=on-failure
+RestartSec=300
+# Only the downloaders; nothing live depends on this. Stay out of the strategies' way.
+Nice=10
+IOSchedulingClass=idle
+StandardOutput=append:%h/autoQuant/harness/logs/ticks.log
+StandardError=append:%h/autoQuant/harness/logs/ticks.log
+
+[Install]
+WantedBy=autoquant.target

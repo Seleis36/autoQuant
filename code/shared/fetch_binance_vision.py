@@ -31,6 +31,7 @@ Two traps live in this archive, both silent:
 Writes into the partitioned store in `bars.py`; bar stamps are OPEN times, UTC, tz-naive.
 """
 import argparse
+import glob
 import hashlib
 import io
 import os
@@ -467,6 +468,11 @@ def fetch_aggtrades(symbol="BTCUSDT", market="um", start=None, end=None, verify=
     tmp_dir = os.path.join(ticks.ticks_root(), ".tmp")
     os.makedirs(out_dir, exist_ok=True)
     os.makedirs(tmp_dir, exist_ok=True)
+    # A run killed mid-month (service restart, reboot) leaves its zip and half-written
+    # parquet behind; nothing else writes this symbol, so they are safe to clear.
+    for stale in glob.glob(os.path.join(tmp_dir, f"{symbol}-aggTrades-*.zip")) + \
+            glob.glob(os.path.join(out_dir, "*.tmp")):
+        os.remove(stale)
     have = set(ticks.cached_months(out_dir))
     lo = pd.Timestamp(start).strftime("%Y-%m") if start else "0000-00"
     hi = pd.Timestamp(end).strftime("%Y-%m") if end else "9999-99"

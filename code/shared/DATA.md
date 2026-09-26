@@ -185,7 +185,11 @@ around the 3-Jan crash -- Binance's kline engine buckets a few boundary fills di
 1m perp flow bars are materialised into the bar store as `<SYM>_PERP/1m`;
 sub-minute bars are built on demand, not cached.
 
-Backfill (resumable, detached, logs in `data/ticks/logs/`):
+Mounting and backfilling are automatic: `autoquant-ticks.service` (installed by
+`harness/install_autostart.sh`) mounts the disk whenever WSL comes up and keeps the backfill
+running, resuming where it stopped and then fetching new data every 6 h. Service log:
+`harness/logs/ticks.log`; job logs: `data/ticks/logs/`. By hand (resumable; skips a job the
+service is already running):
 
 ```bash
 code/shared/tick_backfill.sh              # binance + dukascopy

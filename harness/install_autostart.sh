@@ -38,7 +38,7 @@ if [ "${1:-}" = "--uninstall" ]; then
     systemctl --user disable --now "autoquant-strategy@$(systemd-escape "$s").service" >/dev/null 2>&1
   done
   systemctl --user disable --now autoquant-dashboard.service autoquant-poller.service \
-    autoquant-nightly.timer >/dev/null 2>&1
+    autoquant-ticks.service autoquant-nightly.timer >/dev/null 2>&1
   rm -f "$UNIT_DST"/autoquant-*.service "$UNIT_DST"/autoquant-*.timer "$UNIT_DST"/autoquant.target
   systemctl --user daemon-reload
   rm -f "$VBS"
@@ -80,6 +80,9 @@ for s in $(strategies); do "$REPO/harness/launch_live.sh" stop "$s" >/dev/null 2
 
 systemctl --user enable autoquant.target >/dev/null 2>&1
 systemctl --user enable autoquant-dashboard.service autoquant-poller.service >/dev/null 2>&1
+# The tick store: mounts the D: tick disk through its Windows task and keeps the tick
+# backfill running (code/shared/tick_backfill.sh --foreground).
+systemctl --user enable autoquant-ticks.service >/dev/null 2>&1
 for s in $(strategies); do
   unit="autoquant-strategy@$(systemd-escape "$s").service"
   systemctl --user enable "$unit" >/dev/null 2>&1

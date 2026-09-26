@@ -67,6 +67,12 @@ Two halves, because neither works alone:
 2. **A `.vbs` in the Windows Startup folder** boots the WSL distro at logon — WSL does not
    start when Windows boots, so without this nothing comes up until you open a terminal.
 
+`autoquant-ticks.service` rides along: whenever WSL comes up it mounts the D: tick disk
+(through the elevated "autoQuant ticks disk" Windows task, so no UAC prompt) and keeps
+`code/shared/tick_backfill.sh --foreground` running — resuming the backfill, then fetching
+new data every 6 h. Its log is `harness/logs/ticks.log`; the jobs' own logs are in
+`data/ticks/logs/`. See `code/shared/DATA.md` §4.
+
 `launch_live.sh` and the dashboard buttons keep working unchanged: they detect a systemd unit
 and delegate `start`/`stop`/`restart` to `systemctl --user`.
 

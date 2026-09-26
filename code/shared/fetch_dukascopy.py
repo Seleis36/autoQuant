@@ -252,6 +252,10 @@ def fetch_fx_ticks(symbol="EURUSD", start=DEFAULT_START, end=None, freq="1m",
     out_dir = tickstore.fx_ticks_dir(sym)
     part_dir = os.path.join(out_dir, ".partial")
     os.makedirs(part_dir, exist_ok=True)
+    for d in (out_dir, part_dir):               # left by a run killed mid-write
+        for f in os.listdir(d):
+            if f.endswith(".tmp"):
+                os.remove(os.path.join(d, f))
     today = pd.Timestamp.now("UTC").tz_convert(None).normalize()
     end = min(pd.Timestamp(end), today - pd.Timedelta(days=1)) if end else today - pd.Timedelta(days=1)
     have = set(tickstore.cached_months(out_dir))
