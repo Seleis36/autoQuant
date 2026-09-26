@@ -243,3 +243,5 @@ harness/web/*.local.html
 code/**/combo_returns.parquet
 code/**/walkforward_returns.parquet
 code/**/exp0*_daily.parquet
+code/**/nets_0*.parquet
+code/**/spec_weights.parquet
