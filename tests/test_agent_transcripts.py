@@ -180,6 +180,15 @@ def test_a_clean_result_is_still_clean(tmp_path):
                     tmp_path, rc=0) == "clean"
 
 
+def test_limit_words_in_a_successful_answer_are_not_a_limit(tmp_path):
+    """Observed 2026-09-25: a finished spot-eth run was filed as usage_limit."""
+    msg = ("Treat it as an upgrade to the ETH trend strategy; the exchange API was "
+           "rate limited and the quota reset, so I retried.")
+    assert classify({"subtype": "success", "is_error": False,
+                     "terminal_reason": "completed", "result": msg},
+                    tmp_path, rc=0) == "clean"
+
+
 def test_claude_bin_prefers_the_self_updating_native_install(tmp_path):
     home = tmp_path / "home"
     (home / ".local" / "bin").mkdir(parents=True)

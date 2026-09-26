@@ -123,7 +123,10 @@ if isinstance(d, list): d = d[-1] if d else {}
 sub  = str(d.get("subtype") or "")
 term = str(d.get("terminal_reason") or "")
 err  = bool(d.get("is_error"))
-blob = (sub + " " + term + " " + str(d.get("result") or "")).lower()
+# The result text is the agent's own answer unless is_error is set. Scanning it on a
+# success filed a finished spot-eth run (2026-09-25) as usage_limit because its write-up
+# called a signal "an upgrade to the eth trend strategy".
+blob = (sub + " " + term + " " + (str(d.get("result") or "") if err else "")).lower()
 if any(s in blob for s in ("usage limit", "rate_limit", "rate limit",
                            "quota", "limit reached", "upgrade to",
                            # Observed 2026-09-24 on a Fable run with no credits left. It
