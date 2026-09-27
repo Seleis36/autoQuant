@@ -58,8 +58,12 @@ class SimPortfolioBroker(LedgerBroker):
                  max_gross: float = 1.0, slippage_bps: float = 1.0,
                  fee_bps: float = 10.0, state_file: Optional[str] = None,
                  quote: str = "USD", quotes=None, allow_short: bool = True,
-                 min_trade_usd: float = 1.0):
+                 min_trade_usd: float = 1.0, open_universe: bool = False):
         self.symbols = list(dict.fromkeys(symbols))     # de-duplicated, order kept
+        # An index book (the S&P 500) cannot name its legs up front: members join and
+        # leave every month. `open_universe` lets weights name new symbols and makes a
+        # ledger written under a different symbol list resume rather than restart.
+        self.open_universe = bool(open_universe)
         if not self.symbols:
             raise ValueError("a portfolio needs at least one symbol")
         self.quote = quote
@@ -98,12 +102,16 @@ class SimPortfolioBroker(LedgerBroker):
             with open(self.state_file) as fh:
                 st = json.load(fh)
             saved = st.get("symbols")
+            held = {s: float(q) for s, q in st.get("positions", {}).items() if float(q)}
             if saved is not None and list(saved) != self.symbols:
-                log.warning("ledger %s is for %s, not %s -- starting a fresh book",
-                            self.state_file, saved, self.symbols)
-                return
-            self._positions = {s: float(st.get("positions", {}).get(s, 0.0))
-                               for s in self.symbols}
+                if not self.open_universe:
+                    log.warning("ledger %s is for %s, not %s -- starting a fresh book",
+                                self.state_file, saved, self.symbols)
+                    return
+                # Keep every symbol the book still holds; a flat one that has left the
+                # universe is dropped so the list does not grow forever.
+                self._add_symbols(s for s in saved if s in held)
+            self._positions = {s: held.get(s, 0.0) for s in self.symbols}
             self._cash = float(st["cash"])
             log.info("resumed portfolio ledger: cash=%.2f positions=%s",
                      self._cash, {k: v for k, v in self._positions.items() if v})
@@ -121,6 +129,13 @@ class SimPortfolioBroker(LedgerBroker):
                        "shadow": self.shadow, "mode": self.mode,
                        "updated": datetime.now(timezone.utc).isoformat()}, fh, indent=2)
         os.replace(tmp, self.state_file)
+
+    def _add_symbols(self, symbols):
+        for s in symbols:
+            if s not in self._positions:
+                self.symbols.append(s)
+                self._positions[s] = 0.0
+        self.symbol = self.base = "+".join(self.symbols)
 
     # ---- state
 
@@ -196,6 +211,8 @@ class SimPortfolioBroker(LedgerBroker):
         strategy wearing the same name.
         """
         notes = {}
+        if self.open_universe:
+            self._add_symbols(s for s in weights if s not in self._positions)
         w = {}
         for s in self.symbols:
             v = float(weights.get(s, 0.0) or 0.0)

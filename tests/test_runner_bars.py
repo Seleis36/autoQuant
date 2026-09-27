@@ -176,6 +176,14 @@ def test_a_basket_meta_rebuilds_a_portfolio_broker(tmp_path):
     assert b.symbols == ["XLK", "XLE"] and b.max_gross == 2.0
 
 
+def test_a_basket_meta_carries_an_open_universe(tmp_path):
+    """Flatten must rebuild the book the daemon runs: a closed-universe rebuild of an
+    index book would read its ledger as another basket's and flatten nothing."""
+    b = live_lib.broker_from_meta({"symbols": ["XLK"], "book": "sim", "open_universe": True},
+                                  state_file=str(tmp_path / "l.json"))
+    assert b.open_universe
+
+
 def test_a_meta_naming_no_instrument_is_refused(tmp_path):
     with pytest.raises(ValueError, match="neither"):
         live_lib.broker_from_meta({"book": "sim"}, state_file=str(tmp_path / "l.json"))

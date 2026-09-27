@@ -248,3 +248,23 @@ from xs_lib import xs_backtest, decile_weights, linear_weights, group_demean, ic
 * **pandas 3 `stack()` keeps NaN** — every event count computed with `.stack()` on a
   masked frame is the whole panel unless you `.dropna()`. It cost this research one wrong
   table before it was caught.
+
+### 5.1 Point-in-time fundamentals, filings, insiders, index changes (added 2026-09-27)
+
+| Store | Built by | Content |
+|---|---|---|
+| `data/SP500_xbrl_facts.parquet` | `code/us-large-cap/shared/fetch_xbrl.py [--refresh]` | 3.3 M SEC companyfacts rows (55 us-gaap/dei concepts), 625 tickers, every filing's version with its EDGAR `filed` date |
+| `data/SP500_actions.parquet` | `fetch_actions.py` | 30 k split / cash-dividend ex-dates (Yahoo, split-adjusted amounts) |
+| `data/SP500_insider_trades.parquet` | `fetch_form345.py` | 829 k Form 4 open-market P/S transactions 2006+, filing dates, owner roles |
+| `data/SP500_filing_similarity.parquet` | `fetch_filing_text.py [--update]` | 41.5 k 10-K/10-Q: YoY TF / log-TF cosine, Jaccard, length ratio vs the same form a year earlier |
+| `code/us-large-cap/shared/sp500_*.csv` | `fetch_sp500_changes.py` | Wikipedia constituents + changes table (moved to *Historical components of the S&P 500* in 2026) and PIT spans rolled forward |
+
+Read fundamentals only through `code/us-large-cap/shared/xbrl.py` (`Fundamentals().ttm/instant/latest_avg/daily`). Traps it handles:
+
+* **Recycled tickers at the SEC too**: `company_tickers.json` maps past members' symbols to later registrants (APC→ARKO, STI→Solidion, SE→Sea Ltd, S→SentinelOne …). `xbrl.RECYCLED` drops them; check `entityName` for any new past-member mapping.
+* **Holding-company reorganisations** (XOM 2026, GOOGL 2015, DIS 2019, BLK 2024, AVGO, MDT, CI, ICE, ETN, APA …) start a new CIK: `fetch_xbrl.PREDECESSORS` attaches the old registrant's history. Without it XOM has no fundamentals before Aug-2026.
+* **PIT means per-version, not per-period**: use the first-filed value of each (concept, period); when two tags describe a period, the lower-priority one counts until the preferred one is *filed*; TTM and year-ago "nearest period" joins may only use rows filed no later than the row being built. The first version of the reader violated the last two and a truncation test caught it (`large-cap-sleeve-blend/lookahead_check.py`).
+* 10-Q cash-flow statements are **YTD only**: TTM = FY_prev + YTD − YTD_prior, not a sum of quarters. Share counts are period averages and must not be differenced.
+* Market cap from the cache needs the **dividend adjustment undone** (`Fundamentals.div_factor`) and share counts **split-adjusted after their filing date**; BRK reports Class-A-equivalent shares (`SHARE_MULT`).
+* EDGAR's 10 requests/s limit: the text fetcher is CPU-bound (multi-MB inline-XBRL documents), so it runs processes with per-process pacing. The full history takes ~3 h.
+* Several idea folders each have a `strategy.py`: load them with `code/us-large-cap/shared/modload.load(path)`, not `import strategy`.

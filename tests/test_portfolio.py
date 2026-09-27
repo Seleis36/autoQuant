@@ -200,6 +200,35 @@ def test_a_ledger_for_a_different_basket_is_not_adopted(tmp_path, quotes):
     assert all(v == 0.0 for v in b.position().values())
 
 
+def test_an_open_universe_resumes_a_ledger_whose_symbols_moved(tmp_path, quotes):
+    """An index book's member list changes monthly. Restarting from zero on every change
+    would erase the track, so an open universe keeps what it still holds and drops only
+    the flat legs that left."""
+    f = tmp_path / "l.json"
+    f.write_text(json.dumps({"symbols": ["XLK", "XLE", "GONE", "HELD"],
+                             "positions": {"XLK": 2.0, "XLE": 0.0, "GONE": 0.0, "HELD": -3.0},
+                             "cash": 5.0}))
+    b = SimPortfolioBroker(["XLK", "XLF"], quotes=quotes, state_file=str(f),
+                           open_universe=True)
+    assert b.symbols == ["XLK", "XLF", "HELD"]
+    assert b.position() == {"XLK": 2.0, "XLF": 0.0, "HELD": -3.0}
+
+
+def test_an_open_universe_takes_weights_on_new_symbols(tmp_path, quotes):
+    b = SimPortfolioBroker(["XLK"], capital_usdt=100_000.0, quotes=quotes,
+                           state_file=str(tmp_path / "l.json"), open_universe=True)
+    b.set_target_weights({"XLK": 0.5, "XLE": -0.5})
+    assert b.symbols == ["XLK", "XLE"] and b.position("XLE") < 0
+    again = SimPortfolioBroker(["XLK"], capital_usdt=100_000.0, quotes=quotes,
+                               state_file=str(tmp_path / "l.json"), open_universe=True)
+    assert again.position() == pytest.approx(b.position())
+
+
+def test_a_closed_universe_still_refuses_unknown_symbols(book):
+    with pytest.raises(ValueError, match="does not hold"):
+        book.set_target_weights({"XLK": 0.5, "SPY": -0.5})
+
+
 # --------------------------------------------------------------------- the runner
 
 def test_the_runner_journals_a_basket_the_metrics_can_read(tmp_path, quotes):
