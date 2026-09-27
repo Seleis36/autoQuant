@@ -1188,7 +1188,8 @@ def broker_from_meta(meta: dict, state_file: Optional[str] = None) -> LedgerBrok
             symbols, capital_usdt=capital, state_file=state_file,
             quotes=quotes or "yahoo-daily",
             max_gross=float(meta.get("max_gross") or 1.0),
-            allow_short=bool(meta.get("allow_short", True)))
+            allow_short=bool(meta.get("allow_short", True)),
+            open_universe=bool(meta.get("open_universe", False)))
 
     symbol = meta.get("symbol")
     if not symbol:
