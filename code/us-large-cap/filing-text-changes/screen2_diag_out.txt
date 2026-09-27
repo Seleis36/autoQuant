@@ -1,0 +1,13 @@
+rank corr of text similarity with QVC signals: {'roa': np.float64(0.15), 'cfoa': np.float64(0.13), 'bm': np.float64(-0.11), 'roe': np.float64(0.1), 'gpa': np.float64(0.08), 'lowvol': np.float64(0.08), 'sp': np.float64(-0.07), 'ep': np.float64(0.07), 'd_roa': np.float64(0.05), 'issuance': np.float64(0.05), 'cfp': np.float64(-0.04), 'mom12_1': np.float64(0.04), 'lev': np.float64(-0.03), 'agrowth': np.float64(-0.03), 'size': np.float64(-0.02), 'accruals': np.float64(-0.02), 'fcfp': np.float64(0.01), 'shy': np.float64(0.0)}
+text raw {'FULL': np.float64(0.551), 'IS': np.float64(0.862), 'OOS': np.float64(0.399), 'gross': np.float64(0.677), 'cagr': np.float64(0.012), 'mdd': np.float64(-0.042), 'vol': np.float64(0.023), 'turn': np.float64(5.668)}
+text resid(size,lowvol,roa,gpa,lev) {'FULL': np.float64(0.447), 'IS': np.float64(0.478), 'OOS': np.float64(0.433), 'gross': np.float64(0.595), 'cagr': np.float64(0.009), 'mdd': np.float64(-0.041), 'vol': np.float64(0.02), 'turn': np.float64(5.829)}
+
+text raw: corr {'y': 1.0, 'qvc': 0.34, 'rm': 0.25}
+  FULL: alpha ann 0.0044  resid Sharpe 0.22  betas [0.3 0.1]
+  IS: alpha ann 0.0121  resid Sharpe 0.71  betas [0.04 0.11]
+  OOS: alpha ann 0.0014  resid Sharpe 0.06  betas [0.37 0.11]
+
+text resid(size,lowvol,roa,gpa,lev): corr {'y': 1.0, 'qvc': 0.11, 'rm': 0.09}
+  FULL: alpha ann 0.0064  resid Sharpe 0.33  betas [0.09 0.03]
+  IS: alpha ann 0.0077  resid Sharpe 0.46  betas [-0.04  0.07]
+  OOS: alpha ann 0.0068  resid Sharpe 0.32  betas [0.12 0.03]

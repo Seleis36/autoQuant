@@ -1,0 +1,32 @@
+RM {'FULL': np.float64(0.625), 'IS': np.float64(0.614), 'OOS': np.float64(0.633), 'gross': np.float64(0.685), 'cagr': np.float64(0.063), 'mdd': np.float64(-0.169), 'vol': np.float64(0.106), 'turn': np.float64(12.725)} avg gross 2.36
+QVC {'FULL': np.float64(0.684), 'IS': np.float64(1.173), 'OOS': np.float64(0.472), 'gross': np.float64(0.727), 'cagr': np.float64(0.018), 'mdd': np.float64(-0.056), 'vol': np.float64(0.026), 'turn': np.float64(2.279)} avg gross 0.84
+TXT {'FULL': np.float64(0.551), 'IS': np.float64(0.862), 'OOS': np.float64(0.399), 'gross': np.float64(0.677), 'cagr': np.float64(0.012), 'mdd': np.float64(-0.042), 'vol': np.float64(0.023), 'turn': np.float64(5.668)} avg gross 1.02
+REC {'FULL': np.float64(0.462), 'IS': np.float64(0.661), 'OOS': np.float64(0.411), 'gross': np.float64(0.595), 'cagr': np.float64(0.027), 'mdd': np.float64(-0.12), 'vol': np.float64(0.062), 'turn': np.float64(16.47)} avg gross 0.16
+
+IS equal-risk weights {'RM': 0.067, 'QVC': 0.364, 'TXT': 0.391, 'REC': 0.178}  leverage x6.81
+MULT = {'RM': 0.457, 'QVC': 2.478, 'TXT': 2.664, 'REC': 1.211}
+return-level blend: {'FULL': np.float64(1.013), 'IS': np.float64(1.543), 'OOS': np.float64(0.8)}
+all four @ 2.0 bp: {'FULL': np.float64(1.119), 'IS': np.float64(1.7), 'OOS': np.float64(0.885), 'gross': np.float64(1.178), 'cagr': np.float64(0.159), 'mdd': np.float64(-0.215), 'vol': np.float64(0.141), 'turn': np.float64(42.079)}
+all four @ 10.0 bp: {'FULL': np.float64(0.879), 'IS': np.float64(1.349), 'OOS': np.float64(0.689), 'gross': np.float64(1.178), 'cagr': np.float64(0.121), 'mdd': np.float64(-0.254), 'vol': np.float64(0.141), 'turn': np.float64(42.079)}
+yearly Sharpe: {2011: 3.96, 2012: 0.12, 2013: 0.62, 2014: 2.97, 2015: 0.69, 2016: 0.05, 2017: 2.87, 2018: 1.44, 2019: -0.09, 2020: 1.04, 2021: 2.56, 2022: -0.72, 2023: 0.05, 2024: 1.64, 2025: -0.01, 2026: 0.83}
+
+weight-level blends, 5 bp:
+              FULL     IS    OOS  gross   cagr    mdd    vol    turn  avg_gross  max_gross  oos_vol
+blend                                                                                              
+all four     1.029  1.569  0.811  1.178  0.144 -0.230  0.141  42.079      4.442      6.294    0.166
+without RM   0.883  1.563  0.655  1.033  0.135 -0.247  0.158  47.691      5.128      7.240    0.193
+without QVC  0.896  1.215  0.760  1.073  0.117 -0.239  0.133  47.371      4.210      6.656    0.155
+without TXT  0.997  1.398  0.824  1.130  0.133 -0.205  0.134  35.830      3.174      5.885    0.156
+without REC  0.914  1.370  0.700  1.007  0.118 -0.201  0.131  24.365      4.689      5.283    0.151
+
+sleeve corr FULL / OOS:
+       RM   QVC   TXT   REC
+RM   1.00  0.05  0.22 -0.08
+QVC  0.05  1.00  0.34  0.04
+TXT  0.22  0.34  1.00 -0.01
+REC -0.08  0.04 -0.01  1.00
+       RM   QVC   TXT   REC
+RM   1.00  0.00  0.23 -0.09
+QVC  0.00  1.00  0.43  0.05
+TXT  0.23  0.43  1.00  0.01
+REC -0.09  0.05  0.01  1.00
