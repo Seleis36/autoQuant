@@ -1,0 +1,53 @@
+{
+  "name": "spot-btc/perp-crowding",
+  "title": "Perp crowding — contrarian retail L/S account ratio timer on spot BTC",
+  "asset_class": "spot-btc",
+  "short_name": "perp-crowding",
+  "description": "Binance's BTCUSDT-perp global long/short ACCOUNT ratio is a head count of the retail crowd. Hold spot BTC only while its log level (as of 22:55 UTC) ranks below the median of all prior daily values since 2020-09, sized by a 40% inverse-EWMA-vol scalar (hl 20 d, cap 1).",
+  "symbol": "BTCUSDT",
+  "schedule": "1d",
+  "capital_usdt": 2500.0,
+  "direction": "long/flat",
+  "book": "sim",
+  "quotes": "binance-public",
+  "allow_short": false,
+  "max_weight": 1.0,
+  "deployed_at": "2026-09-28T08:00:00Z",
+  "provenance": {
+    "pr": 23,
+    "branch": "research/spot-btc-perp-crowding",
+    "commit": "23fddf188daab64c8222d89629c6ff3e5b00104f",
+    "spec": "alphas/spot-btc/perp-crowding/2026-09-28_alpha_spec.md",
+    "report": "past_research/spot-btc/perp-crowding/2026-09-28_perp_crowding.md",
+    "strategy_code": "code/spot-btc/perp-crowding/strategy.py"
+  },
+  "backtest": {
+    "period": "2021-03-01 → 2026-09-24",
+    "bars": "daily (00:00 UTC)",
+    "cost_bps_per_side": 10.0,
+    "cost_type": "taker",
+    "sharpe": 1.25,
+    "sharpe_is": 0.61,
+    "sharpe_oos": 1.53,
+    "sharpe_walkforward": 1.09,
+    "sharpe_ci": [0.49, 1.98],
+    "cagr_pct": 37.6,
+    "vol_pct": 29.0,
+    "maxdd_pct": -30.2,
+    "sortino": 1.64,
+    "avg_exposure": 0.43,
+    "round_trips_per_year": null,
+    "state_flips_per_year": 52,
+    "annual_turnover": 41,
+    "benchmark": {"name": "vol-scaled BTC buy & hold", "sharpe": 0.52, "sharpe_is": -0.67, "sharpe_oos": 1.11, "cagr_pct": null, "maxdd_pct": null}
+  },
+  "live_notes": [
+    "SIM BOOK, NOT VENUE. Long/flat spot BTC belongs on the testnet, but the venue pool was fully subscribed (10000/10000 USDT across four strategies) at deployment. It is a SimBroker marked to REAL Binance spot (quotes=binance-public): no order book, no rejection, no partial fill. Weaker evidence than the venue sleeves.",
+    "Costs match the research: fee 10 bp/side, slippage 0. Report cost ladder 0/5/10/20/30 bp → 1.39/1.32/1.25/1.10/0.96. A dashboard flatten rebuilds the broker from this file with the default 1 bp slippage.",
+    "Timing: rebalances at 00:00:20 UTC on the just-closed daily bar, using the L/S snapshot stamped ≤ 22:55 UTC. A one-day delay costs ~0.2 Sharpe (1.24 → 1.05). If the ratio feed is missing near 22:55 the runner raises (and retries) rather than going flat on a NaN rank.",
+    "Ratio feed: data/BTCUSDT_metrics_5m.parquet (research archive), topped up by code/spot-btc/perp-crowding/fetch_metrics.py when >3 days stale, plus REST fapi/futures/data/globalLongShortAccountRatio shifted −5 min (verified max|diff| 3e-4, REST rounding). REST keeps 30 days: if the archive top-up fails for a month the runner raises on the gap.",
+    "Overlap: daily P&L correlation 0.71 with the live spot-btc/coinbase-premium sleeve (weights 0.56). OOS 2023+ it ties a plain SMA50 trend filter (1.53 vs 1.52); its edge over trend was earned in 2021–22. 2025 was −0.47.",
+    "Turnover ≈ 41×/yr at 0.43 average exposure (~52 state flips/yr, spells ~7.7 days).",
+    "Deploy check: live weight series (public daily closes + stitched ratio) matches strategy.target_weight on the research inputs to 1e-10 over 2034 days; equity.csv convention is lag 1 (w[D] earns bar D+1), max|diff| 7e-7."
+  ]
+}
