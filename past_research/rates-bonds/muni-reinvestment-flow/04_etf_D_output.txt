@@ -1,0 +1,40 @@
+  Z = pd.concat([y, x, x.shift(1)], axis=1, keys=["y", "a", "b"]).dropna()
+  Z = pd.concat([y, x, x.shift(1)], axis=1, keys=["y", "a", "b"]).dropna()
+  Z = pd.concat([y, x, x.shift(1)], axis=1, keys=["y", "a", "b"]).dropna()
+  Z = pd.concat([y, x, x.shift(1)], axis=1, keys=["y", "a", "b"]).dropna()
+  Z = pd.concat([y, x, x.shift(1)], axis=1, keys=["y", "a", "b"]).dropna()
+  Z = pd.concat([y, x, x.shift(1)], axis=1, keys=["y", "a", "b"]).dropna()
+  Z = pd.concat([y, x, x.shift(1)], axis=1, keys=["y", "a", "b"]).dropna()
+  Z = pd.concat([y, x, x.shift(1)], axis=1, keys=["y", "a", "b"]).dropna()
+
+=== 2008-16 ===
+       mean_bp     t   hit    n
+MUB       2.14  0.31  0.44  106
+TFI       3.81  0.60  0.51  106
+ITM      11.88  1.49  0.49  103
+HYD      -8.41 -0.86  0.39   89
+SHM      -4.06 -0.88  0.44  105
+VWITX    13.03  2.30  0.56  108
+VWLTX    17.85  2.55  0.63  108
+VMLTX     6.06  2.46  0.63  108
+
+=== 2017-26 ===
+       mean_bp     t   hit    n
+MUB      15.43  4.27  0.69  117
+TFI      22.06  5.17  0.69  117
+ITM      27.99  5.28  0.74  117
+HYD      13.57  1.55  0.56  117
+SHM      13.56  6.57  0.70  117
+VWITX    16.23  5.34  0.74  117
+VWLTX    18.94  4.37  0.68  117
+VMLTX    10.53  6.60  0.78  117
+
+monthly correlation of D, ETFs vs VWITX NAV:
+MUB      0.61
+TFI      0.77
+ITM      0.78
+HYD      0.45
+SHM      0.37
+VWITX    1.00
+VWLTX    0.97
+VMLTX    0.92

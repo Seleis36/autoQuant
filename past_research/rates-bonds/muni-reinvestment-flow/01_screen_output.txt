@@ -1,0 +1,55 @@
+calendar-month mean of the hedged premium, bp/month (t)
+MUB - b*IEF
+          bp           t     
+split     IS    OOS   IS  OOS
+month                        
+1       64.0   10.6  1.7  0.4
+2       34.8  -13.4  1.1 -0.6
+3      -35.3  -59.7 -1.6 -1.2
+4      126.0  -14.8  3.6 -0.5
+5       24.2   67.3  0.6  1.7
+6      -63.0    9.7 -1.9  0.5
+7       58.5   36.5  2.0  1.6
+8       70.3  -29.1  1.9 -2.0
+9       17.6  -34.7  0.3 -0.9
+10     -30.8   -0.2 -0.9 -0.0
+11     -60.7  119.9 -1.1  2.3
+12      80.6   43.3  1.2  3.4
+
+average over MUB/TFI/HYD/SHM/ITM, bp/month
+split    IS    OOS
+month             
+1      62.4   19.1
+2      43.7  -11.9
+3     -15.3  -95.8
+4      85.0   -7.9
+5      26.8   80.3
+6     -49.0   15.1
+7      55.4   41.3
+8      57.0  -25.4
+9      52.2  -53.3
+10    -21.4   -8.4
+11    -30.5  117.6
+12     51.1   71.4
+
+pre-registered book: long Jun-Aug / short Mar-Apr, 3 bp/side/leg
+      ann_ret             long_only             sharpe             short_only            
+split    FULL    IS   OOS      FULL    IS   OOS   FULL    IS   OOS       FULL    IS   OOS
+inst                                                                                     
+HYD      0.53 -1.15  1.81      0.08  0.02  0.18   0.05 -0.23  0.15       0.04 -0.71  0.13
+ITM      0.95  0.26  1.55      0.33  0.38  0.32   0.19  0.08  0.25       0.09 -0.37  0.22
+MUB      0.21 -0.41  0.78      0.24  0.29  0.20   0.06 -0.15  0.20      -0.01 -0.64  0.20
+SHM      0.71  0.51  0.90      0.60  0.56  0.72   0.29  0.32  0.30       0.14  0.01  0.20
+TFI      0.33 -0.44  1.03      0.22  0.30  0.10   0.09 -0.14  0.26       0.02 -0.59  0.29
+
+first 3 trading days of month vs rest, bp/day (t)
+MUB  IS  first3   1.21 ( 0.75)  rest   1.15 ( 1.47)
+MUB  OOS first3   2.54 ( 2.51)  rest   0.14 ( 0.23)
+TFI  IS  first3   1.25 ( 0.81)  rest   1.37 ( 1.41)
+TFI  OOS first3   3.62 ( 3.14)  rest  -0.29 (-0.46)
+HYD  IS  first3   0.81 ( 0.41)  rest   2.53 ( 2.37)
+HYD  OOS first3   2.85 ( 1.42)  rest   0.74 ( 0.39)
+SHM  IS  first3   0.67 ( 0.39)  rest   0.60 ( 1.09)
+SHM  OOS first3   2.40 ( 4.26)  rest  -0.23 (-0.49)
+ITM  IS  first3   3.67 ( 1.91)  rest   1.07 ( 1.04)
+ITM  OOS first3   3.53 ( 2.79)  rest   0.10 ( 0.11)

@@ -1,0 +1,152 @@
+=== Spearman IC (non-overlapping), pre-registered sign ===
+split                IS    OOS
+credit pred  k h              
+EM     resid 1 1 -0.011 -0.032
+               5  0.105  0.001
+             2 1  0.046 -0.016
+               5  0.092 -0.046
+             5 1  0.041 -0.016
+               5  0.102  0.044
+       spy   1 1  0.038 -0.039
+               5  0.045  0.072
+             2 1  0.056 -0.052
+               5 -0.004  0.025
+             5 1 -0.002 -0.055
+               5 -0.069 -0.024
+HY     resid 1 1 -0.010 -0.085
+               5 -0.013 -0.038
+             2 1 -0.020 -0.112
+               5  0.074 -0.035
+             5 1 -0.017 -0.024
+               5 -0.009  0.062
+       spy   1 1  0.017 -0.077
+               5 -0.006 -0.093
+             2 1 -0.009 -0.051
+               5 -0.090 -0.016
+             5 1  0.011 -0.072
+               5 -0.050 -0.041
+IG     resid 1 1  0.018 -0.092
+               5 -0.098 -0.050
+             2 1  0.015 -0.119
+               5 -0.108  0.021
+             5 1 -0.047 -0.010
+               5 -0.183  0.036
+       spy   1 1  0.001 -0.034
+               5  0.042 -0.022
+             2 1  0.015  0.006
+               5  0.059 -0.042
+             5 1  0.084 -0.059
+               5  0.037  0.028
+JNK    resid 1 1 -0.021 -0.076
+               5  0.031 -0.058
+             2 1 -0.044 -0.052
+               5 -0.034 -0.115
+             5 1 -0.142 -0.016
+               5 -0.095 -0.027
+       spy   1 1 -0.033 -0.052
+               5 -0.030  0.008
+             2 1 -0.006 -0.076
+               5 -0.015 -0.072
+             5 1 -0.028 -0.129
+               5 -0.059 -0.109
+
+=== books, 2bp/side: 96 cells ===
+credit  pred  k  h filt    IS   OOS  expo
+    HY   spy  1  1  all -0.37 -1.42  0.98
+    HY   spy  1  1  big  0.15 -0.69  0.12
+    HY   spy  1  5  all -0.15 -1.02  0.36
+    HY   spy  1  5  big -0.03 -0.33  0.08
+    HY resid  1  1  all -0.54 -1.78  0.66
+    HY resid  1  1  big -0.15 -0.63  0.07
+    HY resid  1  5  all -0.31 -0.64  0.26
+    HY resid  1  5  big  0.22  0.11  0.05
+    HY   spy  2  1  all -0.24 -0.90  0.98
+    HY   spy  2  1  big -0.07 -0.23  0.12
+    HY   spy  2  5  all -0.42 -0.86  0.47
+    HY   spy  2  5  big -0.06 -0.24  0.09
+    HY resid  2  1  all -0.50 -1.56  0.66
+    HY resid  2  1  big -0.22 -0.65  0.07
+    HY resid  2  5  all -0.18 -0.45  0.32
+    HY resid  2  5  big  0.19  0.04  0.05
+    HY   spy  5  1  all  0.11 -0.78  0.98
+    HY   spy  5  1  big -0.19 -0.36  0.13
+    HY   spy  5  5  all -0.16 -0.57  0.65
+    HY   spy  5  5  big -0.07 -0.04  0.12
+    HY resid  5  1  all -0.38 -0.77  0.66
+    HY resid  5  1  big  0.18 -0.24  0.08
+    HY resid  5  5  all -0.07 -0.11  0.43
+    HY resid  5  5  big  0.34 -0.07  0.07
+   JNK   spy  1  1  all -0.80 -1.17  0.98
+   JNK   spy  1  1  big -0.63 -0.56  0.12
+   JNK   spy  1  5  all -0.54 -0.85  0.36
+   JNK   spy  1  5  big -0.38 -0.22  0.08
+   JNK resid  1  1  all -1.17 -1.73  0.57
+   JNK resid  1  1  big -0.40 -0.55  0.06
+   JNK resid  1  5  all -0.83 -0.56  0.22
+   JNK resid  1  5  big -0.44  0.03  0.04
+   JNK   spy  2  1  all -0.63 -0.68  0.98
+   JNK   spy  2  1  big -0.20 -0.11  0.12
+   JNK   spy  2  5  all -0.60 -0.71  0.47
+   JNK   spy  2  5  big -0.20 -0.17  0.09
+   JNK resid  2  1  all -1.26 -1.45  0.57
+   JNK resid  2  1  big -0.81 -0.51  0.06
+   JNK resid  2  5  all -0.70 -0.43  0.27
+   JNK resid  2  5  big -0.20  0.07  0.05
+   JNK   spy  5  1  all -0.47 -0.59  0.98
+   JNK   spy  5  1  big -0.56 -0.24  0.13
+   JNK   spy  5  5  all -0.62 -0.47  0.65
+   JNK   spy  5  5  big -0.30  0.02  0.12
+   JNK resid  5  1  all -1.10 -0.72  0.57
+   JNK resid  5  1  big -0.34 -0.42  0.07
+   JNK resid  5  5  all -0.39 -0.15  0.37
+   JNK resid  5  5  big  0.21 -0.14  0.06
+    IG   spy  1  1  all -1.35 -1.72  0.98
+    IG   spy  1  1  big -0.41 -0.58  0.12
+    IG   spy  1  5  all -0.38 -0.72  0.36
+    IG   spy  1  5  big  0.09 -0.24  0.08
+    IG resid  1  1  all -1.03 -2.60  0.83
+    IG resid  1  1  big -0.44 -0.81  0.09
+    IG resid  1  5  all -0.77 -0.90  0.32
+    IG resid  1  5  big -0.23 -0.30  0.07
+    IG   spy  2  1  all -0.97 -1.06  0.98
+    IG   spy  2  1  big -0.32 -0.35  0.12
+    IG   spy  2  5  all -0.41 -0.56  0.47
+    IG   spy  2  5  big  0.05 -0.19  0.09
+    IG resid  2  1  all -0.75 -1.72  0.83
+    IG resid  2  1  big -0.17 -0.58  0.09
+    IG resid  2  5  all -0.85 -0.59  0.39
+    IG resid  2  5  big -0.20 -0.16  0.08
+    IG   spy  5  1  all -0.00 -0.60  0.98
+    IG   spy  5  1  big -0.39 -0.20  0.13
+    IG   spy  5  5  all  0.05 -0.43  0.65
+    IG   spy  5  5  big -0.00  0.12  0.12
+    IG resid  5  1  all -0.93 -0.84  0.83
+    IG resid  5  1  big -0.20 -0.46  0.10
+    IG resid  5  5  all -0.97 -0.22  0.55
+    IG resid  5  5  big -0.37 -0.15  0.10
+    EM   spy  1  1  all -0.63 -1.37  0.98
+    EM   spy  1  1  big  0.00 -0.85  0.12
+    EM   spy  1  5  all -0.84 -0.72  0.36
+    EM   spy  1  5  big -0.30 -0.38  0.08
+    EM resid  1  1  all -1.52 -1.81  0.56
+    EM resid  1  1  big -0.38 -0.69  0.06
+    EM resid  1  5  all -0.04 -1.06  0.21
+    EM resid  1  5  big  0.05 -0.49  0.04
+    EM   spy  2  1  all -0.74 -0.82  0.98
+    EM   spy  2  1  big  0.27 -0.46  0.12
+    EM   spy  2  5  all -1.00 -0.54  0.47
+    EM   spy  2  5  big -0.38 -0.31  0.09
+    EM resid  2  1  all -0.82 -1.32  0.56
+    EM resid  2  1  big -0.61 -0.76  0.06
+    EM resid  2  5  all  0.23 -0.58  0.27
+    EM resid  2  5  big  0.16 -0.44  0.05
+    EM   spy  5  1  all -0.62 -0.71  0.98
+    EM   spy  5  1  big -0.54 -0.41  0.13
+    EM   spy  5  5  all -0.97 -0.29  0.65
+    EM   spy  5  5  big -0.73  0.10  0.12
+    EM resid  5  1  all  0.06 -0.80  0.56
+    EM resid  5  1  big  0.01 -0.78  0.06
+    EM resid  5  5  all  0.31 -0.26  0.36
+    EM resid  5  5  big  0.30 -0.38  0.06
+
+IS>0.3 cells: 2, of which OOS>0.3: 0; median IS -0.38, median OOS -0.56, rank corr 0.45
