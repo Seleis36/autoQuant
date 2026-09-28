@@ -1,0 +1,53 @@
+{
+  "name": "rates-bonds/muni-reinvestment-flow",
+  "title": "Muni reinvestment flow — long munis vs β-hedged Treasuries, first 5 sessions of each month",
+  "asset_class": "rates-bonds",
+  "short_name": "muni-reinvestment-flow",
+  "description": "Muni coupons and redemptions pay on the 1st of the month and funds reinvest that cash in the first days, so munis beat duration-hedged Treasuries early in the month. Long MUB/TFI/ITM/SHM at 0.25 each, short 252-day-beta × IEF (vs MUB/TFI/ITM) and × SHY (vs SHM), from the last NYSE close of the month through the close of session 5; flat otherwise.",
+  "symbol": null,
+  "symbols": ["MUB", "TFI", "ITM", "SHM", "IEF", "SHY"],
+  "schedule": "1d",
+  "capital_usdt": 2500.0,
+  "direction": "long munis / short Treasuries / flat",
+  "book": "sim",
+  "quotes": "yahoo-daily",
+  "allow_short": true,
+  "max_gross": 1.8,
+  "deployed_at": "2026-09-29T00:10:00Z",
+  "provenance": {
+    "pr": 24,
+    "branch": "research/rates-bonds-muni-reinvestment-flow",
+    "commit": "ffcbeffaaeeb0b970d3218cfe93e9ae095403115",
+    "spec": "alphas/rates-bonds/muni-reinvestment-flow/spec.md",
+    "report": "past_research/rates-bonds/muni-reinvestment-flow/2026-09-29_muni_reinvestment_flow.md",
+    "strategy_code": "code/rates-bonds/muni-reinvestment-flow/strategy.py"
+  },
+  "backtest": {
+    "period": "2008-01 → 2026-09",
+    "bars": "daily",
+    "cost_bps_per_side": 2.0,
+    "cost_type": "all-in (spread + fee), charged per unit of turnover on every leg",
+    "sharpe": 0.52,
+    "sharpe_oos": 0.18,
+    "sharpe_oos_note": "2008-16 ETF prices (not the discovery window); 2017-26 discovery window 0.88",
+    "sharpe_discovery_2017_2026": 0.88,
+    "sharpe_ci": null,
+    "deflated_sharpe_prob_45_trials": 0.44,
+    "cagr_pct": 0.7,
+    "vol_pct": 1.4,
+    "maxdd_pct": -3.8,
+    "avg_exposure": 0.235,
+    "avg_gross_when_held": 1.37,
+    "turnover_per_year": 32.8,
+    "round_trips_per_year": 12,
+    "benchmark": null
+  },
+  "live_notes": [
+    "SIM book: filled at the yfinance daily close with no order book, rejection, partial fill or borrow cost. Weaker evidence than a venue fill; do not read this Sharpe as exchange-cleared.",
+    "Borderline by the report's own verdict: 0.18 in the 2008-16 ETF sample, 0.88 in 2017-26 which is the DISCOVERY window, deflated-Sharpe probability 0.44 over 45 trials. The out-of-sample support is the mechanism on muni fund NAVs (t 2.5 in 2000-07 and 2008-16), not the ETF book. Intended as a small diversifier to treasury-flow-calendar (corr ≈ 0), not a standalone book. Expect Sharpe 0.5-0.9; 2024-25 were flat.",
+    "Cost: broker set to 1 bp slippage + 1 bp fee = the research's 2 bp/side all-in on every leg. Cost ladder full-sample: 1 bp 0.76, 2 bp 0.52, 3 bp 0.29, 5 bp -0.17. Do not rebuild with the 10 bp default.",
+    "Scale 1 (the validated book): gross 1.37 avg / 1.74 max on held days; max_gross 1.8 is a backstop. The report's blend with TFC used 2.9× — not deployed here.",
+    "Calendar: strategy.py extends the index with its own NYSE holiday rules (New Year handled correctly, unlike treasury-flow-calendar). One-off closures are not in the rules; an unexpected closure shifts the window a day.",
+    "Runs at 00:00 UTC (after the NYSE close) and trades only when the bar all six legs agree on changes; refuses a still-forming bar and any leg missing the latest bar. Round trips ≈ 12/yr (one per month, all six legs)."
+  ]
+}
