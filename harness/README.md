@@ -174,7 +174,8 @@ Left alone, a research agent would pick one idea, grid it, write it up as Failed
 the first nightly batch produced two PRs 6 and 17 minutes into the run. Two things now push
 back, applied by `agent_exec.sh` to every research session, resumes included:
 
-- **`--effort xhigh`** (`RESEARCH_AGENT_EFFORT`).
+- **`--effort xhigh`** (`RESEARCH_AGENT_EFFORT`). Deploy and revise agents run at `--effort medium`
+  (`DEPLOY_AGENT_EFFORT`, `REVISE_AGENT_EFFORT`) so the usage goes to research.
 - **A Stop hook**, `research_stop_hook.py`. It refuses to let the session end until
   `RESEARCH_MIN_IDEAS` (5) distinct short names have been worked on, and gives up after
   `RESEARCH_MAX_STOP_BLOCKS` (5) refusals so an agent with nothing left can still finish. An

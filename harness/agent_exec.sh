@@ -46,10 +46,11 @@ fi
 
 cd "$REPO" || exit 1
 
-# Research-only knobs, decided from the registry so a resumed session gets them too.
-# The Stop hook refuses to let the agent finish before it has worked RESEARCH_MIN_IDEAS
-# distinct ideas (at most RESEARCH_MAX_STOP_BLOCKS refusals) -- see research_stop_hook.py
-# for why. Deploy and revise agents have one job each and are left alone.
+# Per-kind knobs, decided from the registry so a resumed session gets them too.
+# Research gets xhigh effort plus a Stop hook that refuses to let the agent finish before
+# it has worked RESEARCH_MIN_IDEAS distinct ideas (at most RESEARCH_MAX_STOP_BLOCKS
+# refusals) -- see research_stop_hook.py for why. Deploy and revise agents have one job
+# each and run at medium effort to save usage for research.
 kind="$(sl_py -c 'import json,sys; print(json.load(open(sys.argv[1])).get("kind",""))' \
         "$SL_SESSIONS/$UUID.json" 2>/dev/null)"
 if [ "$kind" = "research" ]; then
@@ -57,6 +58,13 @@ if [ "$kind" = "research" ]; then
   set -- "$@" --effort "${RESEARCH_AGENT_EFFORT:-xhigh}" \
     --settings "{\"hooks\":{\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$hook\",\"timeout\":60}]}]}}"
   say "research: effort=${RESEARCH_AGENT_EFFORT:-xhigh}, stop hook needs ${RESEARCH_MIN_IDEAS:-5} ideas (max ${RESEARCH_MAX_STOP_BLOCKS:-5} refusals)"
+elif [ "$kind" = "deploy" ]; then
+  # Deploy and revise are narrow jobs; medium keeps usage for research.
+  set -- "$@" --effort "${DEPLOY_AGENT_EFFORT:-medium}"
+  say "deploy: effort=${DEPLOY_AGENT_EFFORT:-medium}"
+elif [ "$kind" = "revise" ]; then
+  set -- "$@" --effort "${REVISE_AGENT_EFFORT:-medium}"
+  say "revise: effort=${REVISE_AGENT_EFFORT:-medium}"
 fi
 
 # --output-format json gives us is_error / subtype / terminal_reason, which is the strongest
