@@ -1,0 +1,32 @@
+=== PRIMARY: 4-ETF basket, first 5 sessions, beta-hedged, 2 bp/side ===
+            Sharpe   CAGR    Vol  MaxDD   t_NW
+2008-16      0.177  0.003  0.015 -0.038  0.537
+2017-26      0.883  0.012  0.013 -0.029  2.894
+full 08-26   0.523  0.007  0.014 -0.038  2.321
+annual turnover 32.8x, share of sessions held 0.235, avg gross when held 1.37, avg muni notional when held 1.00, avg hedge notional 0.37
+
+per year:
+Date     2008  2009  2010  2011  2012  2013  2014  2015  2016  2017  2018  2019  2020  2021  2022  2023  2024  2025  2026
+sharpe  -0.19  2.05 -0.75  0.76 -0.22 -0.23 -0.73 -1.64  0.55  2.51 -0.11  1.61  0.86  2.18  1.69  1.75  0.42 -0.00  0.85
+ret_pct -0.56  3.98 -0.81  1.30 -0.26 -0.25 -0.60 -1.08  0.64  2.09 -0.08  0.84  2.52  1.14  2.06  1.92  0.47 -0.02  0.56
+
+=== cost ladder (Sharpe) ===
+            0 bp  0.5 bp  1 bp  2 bp  3 bp  5 bp
+2008-16     0.59    0.49  0.38  0.18 -0.03 -0.43
+2017-26     1.40    1.27  1.14  0.88  0.62  0.11
+full 08-26  0.99    0.87  0.76  0.52  0.29 -0.17
+
+=== sensitivities, 2 bp (Sharpe) ===
+            n_days=3  n_days=7  5-ETF incl. HYD  MUB only
+2008-16        -0.02      0.04             0.12      0.08
+2017-26         0.39      1.01             0.80      0.59
+full 08-26      0.19      0.49             0.47      0.28
+
+truncation test: 368 cut dates (first 2 / last 2 sessions of each month 2019-2026), mismatches: 0
+
+corr with treasury-flow-calendar: daily -0.007, weekly 0.036, monthly 0.005
+  tfc alone                    (muni scale  0.0x): Sharpe full 1.21, 2017-26 1.53
+  tfc + muni at equal risk     (muni scale  5.8x): Sharpe full 1.23, 2017-26 1.73
+  tfc + muni at half risk      (muni scale  2.9x): Sharpe full 1.32, 2017-26 1.77
+
+deflated Sharpe probability (full 2008-26, 45 trials): 0.444

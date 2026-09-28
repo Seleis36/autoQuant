@@ -1,0 +1,39 @@
+216 configurations
+
+=== legacy: top 15 by IS Sharpe (direction chosen on IS) ===
+   rep grp kind   dh  win mode    dir   IS  OOS_syn10  OOS_IEF
+legacy   c  chg  4.0  156  ext   fade 0.59       0.02    -0.00
+legacy   c  chg  4.0   52  ext   fade 0.48       0.24     0.19
+legacy   c  chg  4.0  260  ext   fade 0.43      -0.00    -0.00
+legacy  nc  chg 13.0  156  ext   fade 0.35      -0.13    -0.19
+legacy  nc  chg 13.0  156  lin   fade 0.33      -0.18    -0.23
+legacy   c  chg  4.0  156  lin   fade 0.32       0.25     0.20
+legacy   c  chg  4.0  260  lin   fade 0.32       0.22     0.18
+legacy  nc  chg 13.0  260  lin   fade 0.32      -0.14    -0.19
+legacy   c  chg  4.0   52  lin   fade 0.31       0.13     0.09
+legacy  nc  chg 13.0   52  ext   fade 0.30      -0.03    -0.05
+legacy  nc  chg 13.0  260  ext   fade 0.29       0.04     0.00
+legacy  nc  lvl  NaN   52  ext   fade 0.28      -0.23    -0.22
+legacy  nc  chg  1.0  260  lin   fade 0.26      -0.25    -0.32
+legacy  nc  chg 13.0   52  lin   fade 0.26      -0.12    -0.17
+legacy   c  chg 13.0   52  ext follow 0.24       0.02    -0.05
+IS-rank vs OOS_IEF Spearman: -0.09; median OOS_IEF of top-10 IS: -0.00; of all: 0.00
+
+=== tff: top 15 by IS Sharpe (direction chosen on IS) ===
+rep    grp kind  dh  win mode  dir   IS  OOS_syn10  OOS_IEF
+tff    lev  lvl NaN   52  ext fade 0.72      -0.36    -0.34
+tff    lev  chg 4.0  260  lin fade 0.70      -0.58    -0.55
+tff    lev  chg 4.0  156  lin fade 0.68      -0.59    -0.56
+tff    lev  chg 4.0   52  lin fade 0.66      -0.54    -0.50
+tff    lev  chg 2.0  260  lin fade 0.64      -0.64    -0.60
+tff    lev  chg 2.0  156  ext fade 0.64      -0.67    -0.67
+tff    lev  chg 2.0  156  lin fade 0.62      -0.65    -0.61
+tff    lev  chg 2.0   52  ext fade 0.61      -0.59    -0.52
+tff    lev  chg 2.0  260  ext fade 0.61      -0.57    -0.62
+tff    lev  chg 4.0   52  ext fade 0.59      -0.52    -0.38
+tff    lev  chg 2.0   52  lin fade 0.59      -0.56    -0.52
+tff    lev  chg 1.0  260  ext fade 0.58      -0.44    -0.47
+tff    lev  chg 1.0  156  ext fade 0.57      -0.45    -0.53
+tff    lev  chg 4.0  260  ext fade 0.56      -0.63    -0.64
+tff dealer  chg 1.0  260  lin fade 0.52      -0.24    -0.22
+IS-rank vs OOS_IEF Spearman: -0.34; median OOS_IEF of top-10 IS: -0.55; of all: -0.26

@@ -1,0 +1,65 @@
+        count   mean    std     min    25%    50%    75%     max
+MOVE   4126.0  79.37  24.29   36.62  60.12  75.10  94.22  182.64
+RV     4126.0  75.61  28.24   31.19  55.35  69.27  89.04  211.07
+vrp    4126.0   3.75  15.03 -133.14  -2.89   4.77  12.24   64.34
+ratio  4126.0   1.08   0.19    0.33   0.96   1.07   1.20    1.97
+
+Spearman IC (signal high -> bond up), weekly samples
+split            IS                  OOS              
+h                5      21     63     5      21     63
+sig     inst                                          
+dmove   IEF  -0.036 -0.049  0.000  0.042  0.018 -0.029
+        TLT  -0.031 -0.034 -0.001  0.032  0.002 -0.029
+move_z  IEF  -0.008  0.071  0.032  0.009 -0.003 -0.081
+        TLT  -0.009  0.075  0.018  0.002 -0.025 -0.099
+ratio   IEF   0.060  0.161  0.151 -0.061 -0.102 -0.026
+        TLT   0.051  0.065  0.093 -0.050 -0.090 -0.009
+vrp     IEF   0.068  0.168  0.180 -0.067 -0.104 -0.019
+        TLT   0.058  0.070  0.104 -0.058 -0.098 -0.007
+vrp_raw IEF   0.049  0.152  0.092 -0.086 -0.134 -0.061
+        TLT   0.034  0.004  0.011 -0.083 -0.129 -0.065
+
+books (long duration when signal high), 2 bp/side
+inst     sig mode freq    IS   OOS  net_long
+ IEF     vrp  lin    W  0.34 -0.21      0.01
+ IEF     vrp  lin    M  0.15 -0.02      0.03
+ IEF     vrp  bin    W  0.25 -0.29      0.06
+ IEF     vrp  bin    M  0.04 -0.10      0.11
+ IEF   ratio  lin    W  0.37 -0.17      0.02
+ IEF   ratio  lin    M  0.17  0.00      0.03
+ IEF   ratio  bin    W  0.05 -0.32      0.02
+ IEF   ratio  bin    M  0.26 -0.00      0.12
+ IEF  move_z  lin    W -0.31 -0.07     -0.04
+ IEF  move_z  lin    M -0.47  0.08     -0.04
+ IEF  move_z  bin    W -0.27  0.13     -0.15
+ IEF  move_z  bin    M -0.63 -0.03     -0.14
+ IEF vrp_raw  lin    W  0.23 -0.34      0.01
+ IEF vrp_raw  lin    M  0.07 -0.13      0.02
+ IEF vrp_raw  bin    W -0.18 -0.30      0.01
+ IEF vrp_raw  bin    M  0.21 -0.13      0.05
+ IEF   dmove  lin    W  0.06  0.12      0.01
+ IEF   dmove  lin    M -0.62  0.27      0.07
+ IEF   dmove  bin    W -0.34  0.12      0.01
+ IEF   dmove  bin    M -0.18  0.27      0.12
+ TLT     vrp  lin    W  0.18 -0.27      0.01
+ TLT     vrp  lin    M -0.26  0.03      0.03
+ TLT     vrp  bin    W  0.08 -0.35      0.06
+ TLT     vrp  bin    M -0.13 -0.04      0.11
+ TLT   ratio  lin    W  0.18 -0.22      0.02
+ TLT   ratio  lin    M -0.22  0.06      0.03
+ TLT   ratio  bin    W -0.09 -0.41      0.02
+ TLT   ratio  bin    M  0.04 -0.04      0.12
+ TLT  move_z  lin    W -0.07 -0.05     -0.04
+ TLT  move_z  lin    M -0.41  0.07     -0.04
+ TLT  move_z  bin    W  0.06  0.19     -0.15
+ TLT  move_z  bin    M -0.30 -0.01     -0.14
+ TLT vrp_raw  lin    W  0.14 -0.41      0.01
+ TLT vrp_raw  lin    M -0.46 -0.07      0.02
+ TLT vrp_raw  bin    W -0.22 -0.35      0.01
+ TLT vrp_raw  bin    M -0.05 -0.03      0.05
+ TLT   dmove  lin    W  0.07  0.17      0.01
+ TLT   dmove  lin    M -0.65  0.29      0.07
+ TLT   dmove  bin    W -0.08  0.15      0.01
+ TLT   dmove  bin    M -0.19  0.19      0.12
+
+IS-rank vs OOS-rank Spearman: -0.47
