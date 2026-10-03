@@ -1,0 +1,53 @@
+{
+  "name": "spot-eth/options-expiry-drift",
+  "title": "Options-expiry drift — short ETH into the month-end Deribit settlement",
+  "asset_class": "spot-eth",
+  "short_name": "options-expiry-drift",
+  "description": "Deribit ETH options settle at 08:00 UTC against a 30-minute TWAP, and open interest is concentrated in the last-Friday monthly/quarterly expiry. ETH loses ~61 bp on average over the eight hours before it, so the sleeve is short 1× ETH from Friday 00:00 to 08:00 UTC on the last Friday of each month and flat otherwise.",
+  "symbol": "ETHUSDT",
+  "schedule": "1h",
+  "capital_usdt": 2500.0,
+  "direction": "short/flat",
+  "book": "sim",
+  "quotes": "binance-public",
+  "allow_short": true,
+  "max_weight": 1.0,
+  "deployed_at": "2026-10-03T09:30:00Z",
+  "provenance": {
+    "pr": 26,
+    "branch": "research/spot-eth-options-expiry-drift",
+    "commit": "66b103433cde8ac0c4a9278fec093b2f8f5db5aa",
+    "spec": "alphas/spot-eth/options-expiry-drift/2026-10-03_alpha_spec.md",
+    "report": "past_research/spot-eth/options-expiry-drift/2026-10-03_options_expiry_drift.md",
+    "strategy_code": "code/spot-eth/options-expiry-drift/strategy.py"
+  },
+  "backtest": {
+    "period": "2020-01 → 2026-10",
+    "bars": "hourly",
+    "cost_bps_per_side": 10.0,
+    "cost_type": "taker",
+    "sharpe": 0.71,
+    "sharpe_is": 0.58,
+    "sharpe_oos": 0.88,
+    "sharpe_walkforward": null,
+    "sharpe_ci": [0.16, 1.27],
+    "cagr_pct": 4.5,
+    "vol_pct": 6.5,
+    "maxdd_pct": -6.0,
+    "sortino": null,
+    "calmar": null,
+    "avg_exposure": -0.011,
+    "round_trips_per_year": 12,
+    "annual_turnover": 24,
+    "benchmark": {"name": null, "sharpe": null, "cagr_pct": null, "maxdd_pct": null}
+  },
+  "live_notes": [
+    "SIM BOOK, NOT VENUE. The rule is short-only and the spot testnet is long/flat. It is a SimBroker with allow_short, marked to REAL Binance spot last price (quotes=binance-public): no order book, no rejection, no partial fill, no borrow cost. Weaker evidence than the venue sleeves.",
+    "Flat almost always. It trades twice a month: short at Fri 00:00 UTC and flat at Fri 08:00 UTC on the last Friday of the calendar month. Next windows: 2026-10-30, 2026-11-27, 2026-12-25. A weight of 0 on any other hour is the signal, not a fault.",
+    "Costs match the research exactly: fee 10 bp/side, slippage 0 in the runner. The report's cost ladder is 0 bp 1.05 / 5 bp 0.89 / 10 bp 0.71 / 20 bp 0.35 / 30 bp −0.03. A dashboard flatten rebuilds the broker from this file with the default 1 bp slippage, so that one trade costs 1 bp more.",
+    "Borderline by the report's own account: sharpe_ci is the 5–95% event-bootstrap interval; net per-event t-stat 1.9; deflated Sharpe 0.70 at 16 trials and 0.48 at 64; three of 81 events supply half the Sharpe (0.36 without them); quarterly expiries show no dip (−8 bp, n 27).",
+    "Exit timing is the sensitive leg: Sharpe 0.24 if closed at 07:00, 0.55 at 09:00. The runner raises rather than trading when the last closed Binance bar is not the one that just ended, so a missed 08:00 run leaves the short on until the next successful hour — check the log after each window.",
+    "Review trigger from the spec: eight consecutive losing events (backtest's longest run is six), or a cumulative net loss of 6% (the backtest's maximum drawdown). Also review if Deribit changes its settlement time or method.",
+    "The same spec on spot BTC has ρ 0.88 with this sleeve — one bet, not two. Correlation with the live spot-eth/eth-trend-filter is −0.06."
+  ]
+}
