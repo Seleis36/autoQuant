@@ -1,0 +1,65 @@
+== headline, 2 bp per side
+IS 2008-17   Sharpe 1.06  CAGR 3.27%  vol 3.07%  maxDD -6.9%  t_NW 2.8  (gross Sharpe 1.95)
+OOS 2018-26  Sharpe 0.88  CAGR 3.81%  vol 4.34%  maxDD -6.0%  t_NW 1.8  (gross Sharpe 1.57)
+full         Sharpe 0.95  CAGR 3.53%  vol 3.72%  maxDD -6.9%  t_NW 3.0  (gross Sharpe 1.72)
+turnover 142x / yr   avg gross 0.75   max gross 1.60   avg |muni notional| 0.59   avg |IEF| 0.16
+
+== where the P&L comes from (gross, % per year)
+IS muni legs 5.84%  IEF hedge leg 0.13%  | Sharpe of hedge leg alone 0.12, muni legs alone 1.79
+OOS muni legs 6.27%  IEF hedge leg 0.56%  | Sharpe of hedge leg alone 0.35, muni legs alone 1.36
+
+== cost ladder (bp per side): IS / OOS net Sharpe
+0 1.95 / 1.57
+1 1.51 / 1.23
+2 1.06 / 0.88
+3 0.62 / 0.54
+4 0.18 / 0.19
+5 -0.25 / -0.15
+
+== entry delay (sessions), 2 bp
+0 net 1.06 / 0.88   gross 1.95 / 1.57
+1 net 0.16 / 0.19   gross 1.04 / 0.88
+2 net -0.47 / -0.02   gross 0.42 / 0.63
+3 net -0.80 / -0.21   gross 0.09 / 0.43
+
+== by year (net %, 2 bp) and net Sharpe
+Date     2008  2009  2010  2011  2012  2013  2014  2015  2016  2017  2018  2019   2020  2021   2022  2023  2024  2025  2026
+net%    10.94  6.41  3.02  6.08  2.77  4.26 -1.16 -1.61  0.93  1.00 -0.33 -0.13  16.27  0.40  13.33  6.28 -2.26 -2.33  2.35
+gross%  12.93  8.81  5.43  8.85  5.15  7.21  2.05  1.43  3.63  4.15  2.69  2.93  18.51  3.31  16.47  9.39  0.50  0.94  5.02
+sharpe   1.57  2.06  1.02  2.65  1.77  1.15 -1.01 -1.58  0.58  1.08 -0.27 -0.18   1.37  0.44   4.81  3.73 -1.75 -0.99  1.68
+
+== one ETF at a time (net IS / OOS at 2 bp; gross)
+MUB   net 0.47 / 0.66   gross 1.18 / 1.48
+TFI   net 1.04 / 1.29   gross 1.61 / 2.04
+ITM   net 1.22 / 0.92   gross 1.77 / 1.49
+SHM   net -0.22 / 0.30   gross 0.68 / 1.16
+SUB   net -0.81 / -0.01   gross 0.39 / 1.04
+PZA   net 1.27 / 1.22   gross 1.78 / 1.82
+HYD   net 0.37 / 0.50   gross 0.90 / 0.78
+VTEB  net 0.06 / 0.94   gross 0.88 / 1.63
+liquid four (MUB, VTEB, TFI, SHM)        net 0.73 / 0.91   gross 1.67 / 1.75
+national IG only (MUB, VTEB, TFI, ITM)   net 1.21 / 1.02   gross 2.00 / 1.76
+
+== neighbours (net IS / OOS at 2 bp)
+{'k': 2} 0.81 / 0.27
+{'k': 4} 0.97 / 1.03
+{'k': 5} 0.74 / 0.98
+{'vol_window': 120, 'minp': 60} 1.01 / 0.87
+{'beta_window': 120} 1.04 / 0.89
+{'beta_window': 500} 1.06 / 0.89
+
+== unhedged version (muni legs only) and hedge = SHY-scaled: for reference
+unhedged: net 1.12 / 0.88
+
+== truncation test
+max |dw| over the last 30 rows at 6 cut dates: 0.00e+00
+last row from 400 bars vs full history: max |dw| 8.60e-15
+
+== vectorbt cross-check (targetpercent, 2 bp fees)
+vectorbt Sharpe IS 1.08 OOS 0.88 | research 1.08 / 0.88 | daily corr 0.9980
+
+== correlation with deployed rates-bonds sleeves and the CEF book (daily / monthly, 2010+)
+{'muni-treasury-lead-lag': 1.0, 'treasury-flow-calendar': 0.021, 'muni-reinvestment-flow': 0.129, 'cef-discount-reversion': 0.015}
+{'muni-treasury-lead-lag': 1.0, 'treasury-flow-calendar': 0.247, 'muni-reinvestment-flow': 0.02, 'cef-discount-reversion': 0.569}
+
+Deflated Sharpe prob, OOS, 16 trials: 0.954

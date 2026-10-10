@@ -1,0 +1,47 @@
+signal months: 1996-05-31 -> 2026-09-30 | mean data age at decision: 85 days
+      growth3  infl3  growth6  infl6  growth12  infl12
+mean    -0.10   0.02    -0.11   0.03     -0.12    0.03
+std      0.98   0.95     0.90   0.84      0.80    0.75
+min    -11.72  -3.96    -8.34  -3.61     -5.56   -2.28
+max      5.15   4.37     4.96   3.05      4.21    3.23
+
+net Sharpe of the long/short timer (monthly, 2 bp)
+                   syn10 design 96-09  syn10 test 10-26  syn10 10-14  syn10 15-19  syn10 20-26  IEF test 10-26  IEF 10-14  IEF 15-19  IEF 20-26  TLT test 10-26  TLT 10-14  TLT 15-19  TLT 20-26  turn/yr
+signal                                                                                                                                                                                                   
+macro3                           0.07             -0.01         0.11         0.04        -0.09           -0.04       0.02       0.04      -0.10           -0.12       0.01      -0.15      -0.18     3.60
+growth3                          0.13              0.01        -0.28        -0.01         0.24            0.00      -0.32      -0.02       0.25           -0.01      -0.35       0.10       0.20     3.01
+infl3                           -0.05              0.00         0.31         0.05        -0.18           -0.03       0.22       0.07      -0.19           -0.10       0.26      -0.22      -0.23     5.56
+macro3 sign                     -0.06              0.17         0.15         0.34         0.08            0.15       0.11       0.35       0.06            0.07      -0.03       0.16       0.09     7.56
+macro6                          -0.10             -0.15        -1.10         0.36         0.20           -0.15      -1.13       0.34       0.20           -0.18      -1.19       0.21       0.20     2.09
+growth6                          0.08             -0.17        -0.76         0.43         0.03           -0.19      -0.83       0.37       0.05           -0.11      -0.75       0.40       0.15     2.00
+infl6                           -0.42             -0.09        -0.67         0.15         0.19           -0.08      -0.66       0.14       0.18           -0.14      -0.68       0.03       0.17     3.14
+macro6 sign                      0.18             -0.16        -0.93         0.56        -0.07           -0.15      -0.95       0.52      -0.04           -0.19      -1.03       0.40      -0.01     4.08
+macro12                         -0.03             -0.02        -0.34        -0.01         0.08           -0.01      -0.40      -0.07       0.12           -0.07      -0.46       0.01       0.05     1.18
+growth12                         0.17             -0.24        -0.09        -0.18        -0.36           -0.23      -0.18      -0.22      -0.28           -0.28      -0.30      -0.08      -0.37     1.33
+infl12                          -0.32              0.09        -0.40         0.13         0.30            0.08      -0.43       0.08       0.30            0.02      -0.45       0.08       0.22     1.69
+macro12 sign                    -0.07              0.00        -0.60         0.49         0.12           -0.02      -0.69       0.43       0.14           -0.05      -0.63       0.47       0.03     2.76
+macro avg(3,6,12)               -0.02              0.12        -0.66         0.25         0.39            0.10      -0.74       0.21       0.38            0.02      -0.81       0.00       0.32     1.63
+growth avg                       0.13             -0.04        -0.39         0.08         0.17           -0.06      -0.45       0.04       0.19           -0.05      -0.52       0.14       0.18     1.78
+infl avg                        -0.39              0.10        -0.56         0.24         0.31            0.08      -0.62       0.23       0.29            0.00      -0.66      -0.16       0.26     2.56
+
+benchmark, long-only excess return Sharpe:
+syn10 {'design 96-09': np.float64(0.43), 'test 10-26': np.float64(0.09), '10-14': np.float64(0.79), '15-19': np.float64(0.29), '20-26': np.float64(-0.48)}
+IEF {'design 96-09': np.float64(0.43), 'test 10-26': np.float64(0.16), '10-14': np.float64(1.02), '15-19': np.float64(0.33), '20-26': np.float64(-0.45)}
+TLT {'design 96-09': np.float64(0.31), 'test 10-26': np.float64(0.11), '10-14': np.float64(0.81), '15-19': np.float64(0.29), '20-26': np.float64(-0.49)}
+
+design-best on syn10: macro6 sign 0.18 -> test syn10 -0.16  IEF -0.15  TLT -0.19
+
+predictive regressions: next-month syn10 excess return (bp) on the signal (per 1 z)
+growth6   design slope   +13.2 bp  t +0.51  n 163
+growth6   test   slope    -2.3 bp  t -0.17  n 200
+infl6     design slope   +29.5 bp  t +1.45  n 163
+infl6     test   slope    -6.0 bp  t -0.34  n 200
+growth12  design slope    +0.5 bp  t +0.02  n 163
+growth12  test   slope   +14.9 bp  t +0.83  n 200
+infl12    design slope   +44.0 bp  t +1.43  n 163
+infl12    test   slope   -19.3 bp  t -1.17  n 200
+
+credit premium (HYG - beta x IEF) on +growth, 2 bp, IS 2008-17 / OOS 2018-26
+growth3: -0.32 / -0.10   (long-only premium: 0.83 / 0.27)
+growth6: -0.32 / -0.54   (long-only premium: 0.83 / 0.27)
+growth12: -0.35 / -0.55   (long-only premium: 0.83 / 0.27)

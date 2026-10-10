@@ -1,0 +1,22 @@
+(a) truncation
+2008-10-15 max |dw| over last 40 rows: 0.00e+00 tickers differing: []
+2012-06-13 max |dw| over last 40 rows: 0.00e+00 tickers differing: []
+2016-02-29 max |dw| over last 40 rows: 0.00e+00 tickers differing: []
+2018-12-31 max |dw| over last 40 rows: 0.00e+00 tickers differing: []
+2020-03-18 max |dw| over last 40 rows: 0.00e+00 tickers differing: []
+2021-12-31 max |dw| over last 40 rows: 0.00e+00 tickers differing: []
+2022-09-30 max |dw| over last 40 rows: 0.00e+00 tickers differing: []
+2024-05-08 max |dw| over last 40 rows: 0.00e+00 tickers differing: []
+2025-11-14 max |dw| over last 40 rows: 0.00e+00 tickers differing: []
+2026-07-22 max |dw| over last 40 rows: 0.00e+00 tickers differing: []
+worst: 0.0
+
+(b) short history (latest row vs full-history run)
+300 max |dw| last row 0.0000  sum |dw| 0.000   last-20-rows max 0.0000
+400 max |dw| last row 0.0000  sum |dw| 0.000   last-20-rows max 0.0000
+500 max |dw| last row 0.0000  sum |dw| 0.000   last-20-rows max 0.0000
+750 max |dw| last row 0.0000  sum |dw| 0.000   last-20-rows max 0.0000
+1000 max |dw| last row 0.0000  sum |dw| 0.000   last-20-rows max 0.0000
+
+(c) permutation placebo: fund i trades on fund j's signal (10 bp)
+gross Sharpe mean 0.06 (sd 0.19, max 0.32)   net mean -0.93

@@ -1,0 +1,181 @@
+ticker,nav_ticker,name,category,group,sponsor,inception,mcap_musd,adv_shares,price,leveraged,term
+ACP,XACPX,abrdn Income Credit Strategies Fund,Senior Loans,taxable,abrdn Investments Limited,1/27/2011,547.052,5942990,4.36,True,False
+AFB,XAFBX,AllianceBernstein National Mun Inc,Municipal,muni,AllianceBernstein L.P.,1/28/2002,271.927,1021040,9.46,True,False
+ARDC,XADCX,Ares Dynamic Credit Allocation Fund,Senior Loans,taxable,Ares Capital Management II LLC,11/27/2012,274.411,1131640,11.45,True,False
+ASGI,XAGIX,abrdn Global Infrastructure Income Fund,Global Income,taxable,abrdn Inc.,7/28/2020,608.539,1912630,19.24,True,False
+AWF,XAWFX,AllianceBernstein Global High Income,High Yield,taxable,AllianceBernstein L.P.,7/28/1993,827.805,3099140,9.6,True,False
+BBN,XBBNX,BlackRock Taxable Municipal Bond Trust,Taxable Muni,taxable,"BlackRock Advisors, LLC",8/27/2010,891.666,2180870,14.43,True,False
+BGB,XBGBX,Blackstone Strategic Credit 2027 term,Senior Loans,taxable,Blackstone Liquid Credit Strategies LLC,9/26/2012,496.828,1396890,11.12,True,True
+BGH,XBGHX,Barings Global Short Duration High Yield,High Yield,taxable,Barings LLC,10/25/2012,262.075,771530,13.05,True,False
+BGT,XBGTX,Blackrock Floating Rate Income,Senior Loans,taxable,BlackRock,8/30/2004,309.581,1346880,10.38,True,False
+BGX,XXBGX,Blackstone Long-Short Credit Income,Senior Loans,taxable,Blackstone Liquid Credit Strategies LLC,1/27/2011,134.072,688930,10.55,True,False
+BHK,XBHKX,BlackRock Core Bond,Investment Grade,taxable,BlackRock,11/30/2001,592.961,2983530,8.21,True,False
+BHV,XBHVX,BlackRock VA Municipal Bond,Municipal-Single State,muni,BlackRock,4/30/2002,18.383,51040,11.57,True,False
+BIT,XBITX,BlackRock Multi-Sector Income Trust,Multi-Sector,taxable,BlackRock,2/25/2013,643.097,3092130,11.27,True,False
+BKT,XBKTX,BlackRock Income,Investment Grade,taxable,BlackRock,8/1/1988,309.314,1362450,9.55,True,False
+BLW,XBLWX,BlackRock Limited Duration Income,Limited Duration,taxable,BlackRock,7/28/2003,463.15,1324570,11.85,True,False
+BMN,XBMNX,BlackRock 2037 Municipal Target term,Municipal,muni,BlackRock,10/28/2022,135.31,120610,22.01,True,True
+BRW,XPPRX,Saba Capital Income & Opportunities Fund,Senior Loans,taxable,"Saba Capital Management, LP",5/12/1988,306.417,2507580,5.9,True,False
+BSL,XBSLX,Blackstone Senior Floating Rt 2027 term,Senior Loans,taxable,Blackstone Liquid Credit Strategies LLC,5/26/2010,169.064,439100,12.985,True,True
+BTT,XBTTX,BlackRock Municipal 2030 Target Term,Municipal,muni,BlackRock,8/29/2012,1386.398,917060,21.79,True,True
+BTZ,XBTZX,BlackRock Credit Allocation Income Trust,Investment Grade,taxable,BlackRock,12/27/2006,880.983,2792260,9.44,True,False
+BWG,XBWGX,BrandywineGLOBAL – Global Inc Opp Fund,Global Income,taxable,"Franklin Templeton Fund Adviser, LLC",3/28/2012,117.375,778550,6.99,True,False
+CCIF,XCCIFX,Carlyle Credit Income Ord,Senior Loans,taxable,Carlyle Global Credit Inv Mgmt,12/30/2011,49.817,1294480,2.35,True,False
+CEV,XCEVX,Eaton Vance CA Muni Inc,Municipal-CA,muni,Eaton Vance Management,1/29/1999,73.431,257300,10.44,True,False
+CIK,XCIKX,UBS Asset Management Income,High Yield,taxable,UBS Asset Management (Americas) LLC,3/23/1987,128.371,4911110,2.34,True,False
+DBL,XDBLX,Doubleline Opportunistic Cred,Multi-Sector,taxable,DoubleLine,1/26/2012,264.746,677720,13.39,True,False
+DHF,XDHFX,BNY Mellon High Yield Strategies Fund,High Yield,taxable,BNY Mellon,4/29/1998,159.293,3541730,2.19,True,False
+DHY,XDHYX,UBS Asset Management High Yield Credit,High Yield,taxable,UBS Asset Management (Americas) LLC,7/31/1998,168.262,668590,16.24,True,False
+DLY,XDLYX,DoubleLine Yield Opportunities Fund,Multi-Sector,taxable,DoubleLine Capital LP,2/25/2020,642.661,2133310,13.24,True,False
+DMB,XDMBX,BNY Mellon Muni Bond Infrastructure Fund,Municipal,muni,BNY Mellon,4/26/2013,171.544,610520,9.32,True,False
+DMO,XDMOX,Western Asset Mortgage Opp Fund Inc.,High Yield,taxable,"Franklin Templeton Fund Adviser, LLC",2/26/2010,107.186,509930,9.38,True,False
+DSL,XDSLX,DoubleLine Income Solutions Fund,Global Income,taxable,DoubleLine Capital LP,4/26/2013,1135.4,6033760,9.91,True,False
+DSM,XDSMX,BNY Mellon Strategic Muni Bond,Municipal,muni,BNY Mellon,11/22/1989,256.041,1213260,5.18,True,False
+DSU,XDSUX,BlackRock Debt Strategies,Senior Loans,taxable,BlackRock,3/27/1998,574.625,2764110,8.87,True,False
+DTF,XDTFX,DTF Tax-Free Income 2028 Term,Municipal,muni,Duff & Phelps,11/29/1991,79.575,77210,11.32,True,False
+EAD,XEADX,Allspring Income Opps,High Yield,taxable,Allspring Global Investments,2/28/2003,356.918,1994470,6.04,True,False
+EARN,EARN,Ellington Credit Company,Senior Loans,taxable,Ellington Credit Co Management LLC,4/1/2025,130.164,4120210,3.41,True,False
+ECC,XECCX,Eagle Point Credit Company LLC,Senior Loans,taxable,Eagle Point Credit Management,10/8/2014,411.003,13748590,3.09,True,False
+EDD,XEDDX,Morgan Stanley Emrgng Mkts Domestic Debt,Emerging Market Income,taxable,"Morgan Stanley Investment Management, Inc.",4/24/2007,344.195,3671580,5.34,True,False
+EDF,XEDFX,Virtus Stone Harbor Emerging Markets Inc,Emerging Market Income,taxable,Virtus Investment Advisors (VIA),12/23/2010,157.01,1591810,4.88,True,False
+EFR,XEFRX,Eaton Vance Senior Floating Rate,Senior Loans,taxable,Eaton Vance Management,11/24/2003,304.389,1394600,10.31,True,False
+EFT,XEFTX,Eaton Vance Floating-Rate Income,Senior Loans,taxable,Eaton Vance Management,6/29/2004,283.056,1145190,10.65,True,False
+EHI,XEHIX,Western Asset Global High Income,High Yield,taxable,"Franklin Templeton, Inc",7/28/2003,166.649,1132560,5.5,True,False
+EIC,XEICX,Eagle Point Income Co Inc,High Yield,taxable,Eagle Point Income Management LLC,7/23/2019,206.933,1477090,8.98,True,False
+EIM,XEIMX,Eaton Vance Municipal Bond,Municipal,muni,Eaton Vance Management,8/30/2002,454.134,1617680,8.84,True,False
+EMD,XEMDX,Western Asset Emerging Markets Debt,Emerging Market Income,taxable,"Franklin Templeton Fund Adviser, LLC",12/1/2003,541.194,2006180,9.31,True,False
+EOT,XEOTX,Eaton Vance National Municipal Opprs Tr,Municipal,muni,Eaton Vance Management,5/27/2009,237.968,380060,15.23,True,False
+ERC,XERCX,Allspring Multi-Sec Inc,Limited Duration,taxable,Allspring Global Investments,6/25/2003,240.702,739150,8.58,True,False
+ETX,XETTX,EV Municipal Income 2028 Term Trust,Municipal,muni,Eaton Vance Management,3/26/2013,190.575,175240,17.48,True,True
+EVF,XEVFX,Eaton Vance Senior Income,Senior Loans,taxable,Eaton Vance Management,10/30/1998,87.762,734500,4.83,True,False
+EVG,XEVGX,Eaton Vance Short Duration Divers Inc,Limited Duration,taxable,Eaton Vance Management,2/28/2005,138.741,373980,10.31,True,False
+EVN,XEVNX,Eaton Vance Municipal Income,Municipal,muni,Eaton Vance,1/29/1999,374.077,842300,9.37,True,False
+EVV,XEVVX,Eaton Vance Limited Duration Income,Limited Duration,taxable,Eaton Vance,5/30/2003,980.757,3701980,8.44,True,False
+FAX,XFAPX,abrdn Asia-Pacific Income Fund Inc,Global Income,taxable,abrdn Asia Limited,4/24/1986,562.049,1798940,12.87,True,False
+FMN,XFMNX,Federated Premier Municipal Income,Municipal,muni,Federated Advisers,12/20/2002,78.343,291320,10.02,True,False
+FMY,XFMYX,First Trust Mortgage Income,Investment Grade,taxable,First Trust Advisors L.P.,5/25/2005,46.597,53820,11.06,True,False
+FRA,XFRAX,BlackRock Floating Rate Inc Strategies,Senior Loans,taxable,"BlackRock Advisors, LLC",10/31/2003,364.624,1664480,10.29,True,False
+FSCO,XFSCX,FS Credit Opportunities Corp.,Multi-Sector,taxable,FS Global Advisor LLC,11/14/2022,995.746,14172750,5.02,True,False
+FSSL,FSSL,FS Specialty Lending Fund,Senior Loans,taxable,FS Specialty Lending Advisor LLC,11/13/2025,875.331,0,11.53,True,False
+FTF,XFTFX,Franklin Limited Duration Income Trust,Limited Duration,taxable,"Franklin Advisers, Inc.",8/27/2003,216.977,1987660,5.37,True,False
+FTHY,XFTHYX,FIRST TRUST HY OPPORTUNITIES 2027 Term,High Yield,taxable,First Trust Advisors L.P.,6/25/2020,471.43,1039090,12.82,True,True
+GBAB,XGBAX,Guggenheim Tax Muni & Inv Grade Debt Tr,Taxable Muni,taxable,Guggenheim Funds Investment Advisors LLC,10/26/2010,347.351,949530,12.54,True,False
+GDO,XGDOX,Western Asset Global Corp Opp,Global Income,taxable,"Franklin Templeton Fund Adviser, LLC",11/27/2009,72.036,339080,9.58,True,False
+GHY,XGHYX,"PGIM Global High Yield Fund, Inc.",High Yield,taxable,PGIM,12/21/2012,446.886,1601440,10.91,True,False
+GOF,XGOFX,Guggenheim Strategic Opp Fund,Multi-Sector,taxable,Guggenheim Funds Investment Advisors LLC,7/26/2007,1973.044,18392790,8.83,True,False
+HFRO,XHFOX,Highland Opportunities and Income Ord,Senior Loans,taxable,"NexPoint Asset Management, L.P.",1/13/2000,362.233,1271060,6.56,True,False
+HIO,XHIOX,Western Asset High Income Opportunity,High Yield,taxable,"Franklin Templeton Fund Adviser, LLC",11/16/1993,310.974,4133680,3.27,False,False
+HIX,XHGIX,Western Asset High Income II,High Yield,taxable,"Franklin Templeton, Inc",5/28/1998,315.244,3486250,3.5,True,False
+HYI,XHYIX,Western Asset High Yield Opp Fund,High Yield,taxable,"Franklin Templeton Fund Adviser, LLC",10/27/2010,124.937,618420,9.75,False,True
+HYT,XHYTX,BlackRock Corporate High Yield Fund,High Yield,taxable,BlackRock,5/30/2003,1551.565,8580730,7.93,True,False
+IGI,XIGIX,Western Asset Invstm Grd Opp Tr Inc,Investment Grade,taxable,"Franklin Templeton Fund Adviser, LLC",6/26/2009,91.883,164960,15.33,False,False
+IIM,XIIMX,Invesco Value Muni Income,Municipal,muni,"Invesco Advisers, Inc",2/26/1993,510.874,1300240,10.85,True,False
+IQI,XIQIX,Invesco Quality Municipal Income Trust,Municipal,muni,"Invesco Advisers, Inc",9/29/1992,470.137,1564250,8.89,True,False
+ISD,XISDX,"PGIM High Yield Bond Fund, Inc.",High Yield,taxable,PGIM,4/26/2012,389.562,1048100,11.7,True,False
+JFR,XJFRX,Nuveen Floating Rate Income,Senior Loans,taxable,"Nuveen Fund Advisors, LLC.",3/25/2004,1194.378,7658590,7.42,True,False
+JGH,XJGHX,Nuveen Global High Income Fund,Global Income,taxable,"Nuveen Fund Advisors, LLC.",11/24/2014,325.697,1000530,11.58,True,False
+JHI,XJHIX,JHancock Investors,Investment Grade,taxable,John Hancock,1/29/1971,105.459,205760,12.06,True,False
+JHS,XJHSX,JHancock Income Secs,Investment Grade,taxable,John Hancock Investment Management LLC,2/14/1973,118.388,149020,10.165,True,False
+JLS,XJLSX,Nuveen Mortgage and Income Fund,High Yield,taxable,"Nuveen Fund Advisors, LLC.",11/25/2009,90.145,203830,16.46,True,False
+JMM,XJMMX,Nuveen Multi-Market Income Fund,Investment Grade,taxable,"Nuveen Fund Advisors, LLC.",12/30/1988,51.804,92000,5.4748,True,False
+JQC,XJQCX,Nuveen Credit Strategies Income Fund,Senior Loans,taxable,"Nuveen Fund Advisors, LLC.",6/25/2003,687.348,7730680,4.65,True,False
+KIO,XKIOX,KKR Income Opportunities Fund,High Yield,taxable,Kohlberg Kravis Roberts & Co.,7/26/2013,415.59,2431140,10.14,True,False
+KTF,XKTFX,DWS Municipal Income,Municipal,muni,"DWS Investment Management Americas, Inc.",10/20/1988,316.213,1550360,8.07,True,False
+LEO,XLEOX,BNY Mellon Strategic Municipals,Municipal,muni,BNY Mellon,9/23/1987,345.714,2054850,5.55,True,False
+MCI,XMCIX,Barings Corporate Investors,High Yield,taxable,Barings LLC,9/1/1971,384.36,348100,18.67,True,False
+MFM,XMFMX,Aberdeen Municipal Income,Municipal,muni,abrdn Inc.,11/25/1986,493.172,1941090,4.96,True,False
+MGF,XMGFX,Aberdeen Government Markets Income,Investment Grade,taxable,abrdn Inc.,5/28/1987,88.971,146740,13.65,False,False
+MHD,XMHDX,BlackRock Municipal Income,Municipal,muni,BlackRock,5/2/1997,1783.684,3473880,10.21,True,False
+MHF,XMHFX,Western Asset Municipal High Income,Municipal,muni,"Franklin Templeton Fund Adviser, LLC",11/28/1988,140.523,650830,6.24,True,False
+MIN,XMINX,Aberdeen Intermediate Income,Global Income,taxable,abrdn Inc.,3/17/1988,261.357,390760,13.78,False,False
+MIY,XMIYX,BlackRock MuniYield MI Quality,Municipal-Single State,muni,BlackRock,10/30/1992,332.119,623020,11.46,True,False
+MMD,XMMDX,NYLIM MacKay DefinedTerm Muni Opps Fund,Municipal,muni,New York Life Investment Management LLC,6/27/2012,261.598,674920,13.93,True,True
+MMT,XMMTX,Aberdeen Multi-Market Income,Global Income,taxable,MFS,3/12/1987,487.173,1602580,4.2,True,False
+MMU,XMMUX,Western Asset Managed Municipals,Municipal,muni,"Franklin Templeton, Inc",6/26/1992,503.04,1426990,9.21,True,False
+MPA,XMPAX,BlackRock MuniYield PA Quality,Municipal-Single State,muni,BlackRock,10/30/1992,125.87,327170,9.72,True,False
+MPV,XMPVX,Barings Participation Invs,High Yield,taxable,Barings LLC,10/6/1988,182.821,172560,16.94,True,False
+MQY,XMQYX,BlackRock Muniyield Quality,Municipal,muni,"BlackRock Advisors, LLC",6/26/1992,1501.312,4149450,9.98,True,False
+MSD,XMSDX,Morgan Stanley Emerging Markets Debt,Emerging Market Income,taxable,"Morgan Stanley Investment Management, Inc.",7/23/1993,136.966,913580,6.77,True,False
+MUA,XMUAX,BlackRock Muniassets,Municipal,muni,BlackRock,6/25/1993,626.414,1750710,9.33,True,False
+MUC,XMUCX,BlackRock MuniHoldings CA Qty,Municipal-CA,muni,BlackRock,2/27/1998,1227.58,3423730,9.82,True,False
+MUJ,XMUJX,BlackRock MuniHoldings NJ Qty,Municipal-Single State,muni,BlackRock,3/11/1998,598.864,1029380,11.26,True,False
+MYI,XMYIX,BlackRock MuniYield Qty III,Municipal,muni,BlackRock,4/13/1992,1170.35,2979040,9.57,True,False
+MYN,XMYNX,BlackRock MuniYield NY Quality,Municipal-NY,muni,"BlackRock Advisors, LLC",2/28/1992,827.346,1547450,8.79,True,False
+NAC,XNACX,Nuveen CA Quality Muni Income,Municipal-CA,muni,"Nuveen Fund Advisors, LLC.",5/26/1999,1715.157,6023440,10.17,True,False
+NAD,XNADX,Nuveen Quality Muni Income Fund,Municipal,muni,"Nuveen Fund Advisors, LLC.",5/26/1999,2398.423,8046310,10.2,True,False
+NAN,XNANX,Nuveen NY Quality Muni Inc,Municipal-NY,muni,"Nuveen Fund Advisors, LLC.",5/26/1999,323.941,835310,9.65,True,False
+NAZ,XNAZX,Nuveen AZ Quality Muni Inc,Municipal-Single State,muni,"Nuveen Fund Advisors, LLC.",11/19/1992,139.859,244920,10.66,True,False
+NBB,XNBBX,Nuveen Taxable Municipal Income,Taxable Muni,taxable,"Nuveen Fund Advisors, LLC.",4/27/2010,419.757,592340,14.28,True,False
+NBH,XNBHX,Neuberger Municipal Fund,Municipal,muni,Neuberger Berman,9/27/2002,263.305,981400,8.89,True,False
+NCA,XNCAX,Nuveen CA Municipal Value,Municipal-CA,muni,"Nuveen Fund Advisors, LLC.",10/7/1987,276.893,742360,8.28,True,False
+NDMO,XNDMX,Nuveen Dynamic Municipal Opportunities,Municipal,muni,"Nuveen Fund Advisors, LLC.",8/26/2020,536.446,1634490,8.86,True,False
+NEA,XNEAX,Nuveen AMT-Free Quality Muni Inc,Municipal,muni,"Nuveen Fund Advisors, LLC.",11/21/2002,3056.12,10086140,10.01,True,False
+NHS,XNHSX,Neuberger High Yield Strategies,High Yield,taxable,Neuberger Berman,7/28/2003,227.696,2118240,5.44,True,False
+NIM,XNIMX,Nuveen Select Maturity Muni,Municipal,muni,"Nuveen Fund Advisors, LLC.",9/18/1992,109.281,212900,8.78,True,False
+NKX,XNCMX,Nuveen CA AMT - Free Quality Muni Inc,Municipal-CA,muni,"Nuveen Fund Advisors, LLC.",11/22/2002,588.385,1522440,10.47,True,False
+NMCO,XNMCX,Nuveen Municipal Credit Opps Fund,Municipal,muni,"Nuveen Fund Advisors, LLC.",9/16/2019,498.76,2288680,8.7,True,False
+NMI,XNMIX,Nuveen Municipal Income,Municipal,muni,"Nuveen Fund Advisors, LLC.",4/20/1988,113.564,284060,9.23,True,False
+NMS,XMNSX,Nuveen MN Quality Muni Inc,Municipal-Single State,muni,"Nuveen Fund Advisors, LLC.",6/25/1993,63.119,188970,9.84,True,False
+NMT,XNMTX,Nuveen MA Quality Muni Inc,Municipal-Single State,muni,"Nuveen Fund Advisors, LLC.",3/18/1993,108.627,232210,10.18,True,False
+NMZ,XNMZX,Nuveen Municipal High Income Opp Fd,Municipal,muni,"Nuveen Fund Advisors, LLC.",11/19/2003,1973.22,6013230,9.09,True,False
+NNY,XNNYX,Nuveen NY Municipal Value,Municipal-NY,muni,"Nuveen Fund Advisors, LLC.",10/7/1987,150.711,388680,7.98,True,False
+NPCT,XNPCX,Nuveen Core Plus Impact Fund,Investment Grade,taxable,"Nuveen Fund Advisors, LLC.",4/27/2021,260.52,1210480,9.06,True,False
+NPV,XNPVX,Nuveen VA Quality Muni Inc,Municipal-Single State,muni,"Nuveen Fund Advisors, LLC.",3/18/1993,186.198,585010,9.5,True,False
+NRK,XNRKX,Nuveen NY AMT - Free Quality Muni Inc,Municipal-NY,muni,"Nuveen Fund Advisors, LLC.",11/21/2002,812.161,3422540,9.31,True,False
+NUV,XNUVX,Nuveen Municipal Value,Municipal,muni,"Nuveen Fund Advisors, LLC.",6/17/1987,1763.444,5757730,8.33,True,False
+NUW,XNUWX,Nuveen AMT-Free Municipal Value Fund,Municipal,muni,"Nuveen Fund Advisors, LLC.",2/25/2009,235.522,457920,13.12,True,False
+NVG,XNVGX,Nuveen AMT-Free Muni Credit Inc,Municipal,muni,"Nuveen Fund Advisors, LLC.",3/25/2002,2333.313,6346860,10.71,True,False
+NXP,XNXPX,Nuveen Select Tax Free Inc,Municipal,muni,"Nuveen Fund Advisors, LLC.",3/19/1992,835.76,1634950,13.12,True,False
+NZF,XNZFX,Nuveen Municipal Credit Income,Municipal,muni,"Nuveen Fund Advisors, LLC.",9/25/2001,2148.353,6145460,10.86,True,False
+OCCI,OCCI,OFS Credit Company Inc,Senior Loans,taxable,"OFS Capital Management, LLC",10/5/2018,61.344,2732060,2.08,True,False
+OIA,XOIAX,Invesco Municipal Inc Opp I,Municipal,muni,"Invesco Advisers, Inc",9/19/1988,274.344,1310670,5.73,True,False
+OPP,XOPPX,RiverNorth/DoubleLine Strategic Opp Fund,High Yield,taxable,"RiverNorth Capital Management, LLC",9/27/2016,172.932,1069700,6.92,True,True
+OXLC,OXLCX,Oxford Lane Capital Corp,Senior Loans,taxable,Oxford Lane Management,1/20/2011,834.904,12070260,8.55,True,False
+PAI,XPAIX,Western Asset Income,Investment Grade,taxable,"Franklin Templeton, Inc",12/21/1972,107.474,186890,11.3,True,False
+PAXS,XPAAX,PIMCO Access Income,Multi-Sector,taxable,PIMCO,1/31/2022,628.059,2054570,13.32,True,False
+PCM,XPCMX,PCM Fund,Limited Duration,taxable,"Pacific Investment Management Company, LLC",9/2/1993,62.583,548300,5.02896,True,False
+PCN,XPCNX,PIMCO Corporate & Income Strgy,Investment Grade,taxable,"Pacific Investment Management Company, LLC",12/21/2001,833.981,3529820,10.89,True,False
+PCQ,XPCQX,PIMCO CA Municipal Income,Municipal-CA,muni,"Pacific Investment Management Company, LLC",6/29/2001,436.712,1659800,7.78,True,False
+PDCC,PDCC,Pearl Diver Credit Company Inc,Senior Loans,taxable,Pearl Diver Capital LLP,7/18/2024,55.138,58630,7.95,True,False
+PDI,XPDIX,PIMCO Dynamic Income Fund,Multi-Sector,taxable,"Pacific Investment Management Company, LLC",5/25/2012,6844.213,30406990,14.36,True,False
+PDO,XPDOX,PIMCO Dynamic Income Opportunities Fund,Global Income,taxable,"Pacific Investment Management Company, LLC",1/29/2021,1761.516,7099950,12.1,True,False
+PFL,XPFLX,PIMCO Income Strategy,Multi-Sector,taxable,PIMCO,8/26/2003,349.004,2140860,6.94,True,False
+PFN,XPFNX,PIMCO Income Strategy II,Multi-Sector,taxable,"Pacific Investment Management Company, LLC",10/29/2004,623.466,4624960,6.25,True,False
+PHK,XPHKX,PIMCO High Income,Multi-Sector,taxable,"Pacific Investment Management Company, LLC",4/30/2003,794.888,8536620,4.16,True,False
+PIM,XPIMX,Franklin Master Intermediate Income,Investment Grade,taxable,"Franklin Advisers, Inc.",4/29/1988,144.553,848350,3.0,True,False
+PML,XPMLX,PIMCO Municipal Income II,Municipal,muni,PIMCO,6/28/2002,825.578,4640890,6.58,True,False
+PMM,XPMMX,Franklin Managed Municipal Income,Municipal,muni,"Franklin Advisers, Inc.",2/24/1989,249.719,1095170,5.83,True,False
+PMO,XPMOX,Franklin Municipal Opportunities,Municipal,muni,"Franklin Advisers, Inc.",5/28/1993,258.103,726950,9.42,True,False
+PNI,XPNIX,PIMCO NY Municipal Income II,Municipal-NY,muni,PIMCO,6/28/2002,144.626,624920,6.055,True,False
+PPT,XPPTX,Franklin Premier Income,Global Income,taxable,"Franklin Advisers, Inc.",2/29/1988,310.594,1491680,3.25,True,False
+PTY,XPTYX,PIMCO Corporate & Income Opportunity Fd,Investment Grade,taxable,PIMCO,12/27/2002,2434.066,11994240,10.97,True,False
+RA,XRAIX,Brookfield Real Assets Income Fund Inc.,High Yield,taxable,Brookfield Public Securities Group LLC,12/2/2016,637.639,1795400,11.54,True,False
+RCS,XRCSX,PIMCO Strategic Income Fund,Investment Grade,taxable,PIMCO,2/24/1994,239.3,1565830,5.04,True,False
+RFM,XRFMX,RiverNorth Flexible Municipal Income,Municipal,muni,"RiverNorth Capital Management, LLC",3/26/2020,79.613,202730,13.02,True,True
+RFMZ,XRFZX,RiverNorth Flexible Municipal Income II,Municipal,muni,"RiverNorth Capital Management, LLC",2/24/2021,279.558,782390,11.48,True,True
+RMI,XRMIX,RiverNorth Opp Muni Income Fund Inc,Municipal,muni,"RiverNorth Capital Management, LLC",10/25/2018,87.401,217150,13.71,True,True
+RMM,XRMMX,RiverNorth Managed Duration Muni Inc Fd,Municipal,muni,"RiverNorth Capital Management, LLC",7/25/2019,254.049,628350,12.87,True,True
+RMMZ,XRMZX,RiverNorth Manage Dur Muni Inc Fd II Inc,Municipal,muni,"RiverNorth Capital Management, LLC",2/10/2022,112.282,222630,13.28,True,True
+RSF,XRSFX,RiverNorth Capital and Inc Fund,High Yield,taxable,"RiverNorth Capital Management, LLC",9/22/2016,47.032,134360,14.29,True,False
+SABA,XSABX,Saba Capital Income & Ops Fund II,Global Income,taxable,"Saba Capital Management, LP",3/17/1988,208.358,712660,7.72,False,False
+SBI,XSBIX,Western Asset Intermediate Muni,Municipal,muni,"Franklin Templeton Fund Adviser, LLC",3/2/1992,100.266,459980,7.12,True,False
+SDHY,XSDHX,PGIM Short Duration High Yield Opps,High Yield,taxable,PGIM,11/25/2020,378.731,689910,15.35,True,False
+SPMC,,Sound Point Meridian Capital Inc,Senior Loans,taxable,Sound Point Meridian Management Company LLC,6/14/2024,165.317,287960,7.84,True,False
+TEI,XTEIX,Templeton Emerg Mkts Income,Emerging Market Income,taxable,"Franklin Advisers, Inc.",9/23/1993,292.344,1759890,6.19,True,False
+TSI,XXCVTXX,TCW Strategic Income,Multi-Sector,taxable,TCW Investment Management Co LLC,3/5/1987,270.784,1324360,4.25,True,False
+VBF,XVBFX,Invesco Bond,Investment Grade,taxable,"Invesco Advisers, Inc",10/28/1970,162.236,555620,14.2,False,False
+VCV,XVCVX,Invesco CA Value,Municipal-CA,muni,"Invesco Advisers, Inc",4/30/1993,433.185,1161940,8.93,True,False
+VGI,XVGIX,Virtus Global Multi-Sector Income Fund,Multi-Sector,taxable,"Virtus Investment Advisers, LLC",2/23/2012,75.798,379650,6.7,True,False
+VGM,XVGMX,Invesco Tr Inv Gr Muni,Municipal,muni,"Invesco Advisers, Inc",1/24/1992,484.291,1885920,8.93,True,False
+VKI,XVKIX,Invesco Adv Muni Inc II,Municipal,muni,"Invesco Advisers, Inc",8/27/1993,345.528,1348960,7.78,True,False
+VKQ,XVKQX,Invesco Municipal,Municipal,muni,"Invesco Advisers, Inc",9/27/1991,478.652,2034830,8.65,True,False
+VLT,XVLTX,Invesco High Income II,High Yield,taxable,"Invesco Advisers, Inc",4/28/1989,59.252,187210,9.1,True,False
+VMO,XVMOX,Invesco Muni Opp,Municipal,muni,"Invesco Advisers, Inc",4/24/1992,584.036,2514610,8.66,True,False
+VPV,XVPVX,Invesco PA Value,Municipal-Single State,muni,"Invesco Advisers, Inc",4/30/1993,189.534,317970,10.605,True,False
+VTN,XVTNX,Invesco Tr Inv Gr NY,Municipal-NY,muni,"Invesco Advisers, Inc",3/27/1992,138.526,344480,9.46,True,False
+VVR,XVVRX,Invesco Senior Income,Senior Loans,taxable,"Invesco Advisers, Inc",6/24/1998,440.226,9249320,2.86,True,False
+WDI,XWDIX,Western Asset Diversified Inc Fund,Multi-Sector,taxable,"Franklin Templeton Fund Adviser, LLC",6/24/2021,607.891,2220280,11.71,True,True
+WEA,XWEAX,Western Asset Premier Bond,Investment Grade,taxable,Western Asset Management Company Pte Ltd. – Singapore,3/28/2002,116.283,297450,9.8,True,False
+WIA,XWIAX,Western Asset Inflation-Linked Income Fd,Investment Grade,taxable,"Western Asset Management Company, LLC",9/30/2003,177.249,407710,7.6,True,False
+WIW,XWIWX,Western Asset Infl-Linked Opps & Inc Fd,Investment Grade,taxable,"Western Asset Management Company, LLC",2/27/2004,481.519,2531230,7.87,True,False
+XFLT,XFLTX,XAI Octagon FR & Alternative Inc Trust,Senior Loans,taxable,XA Investments LLC,9/27/2017,288.473,1046580,18.94,True,False

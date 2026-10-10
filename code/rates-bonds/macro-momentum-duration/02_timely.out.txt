@@ -1,0 +1,38 @@
+decisions: 1996-06-04 -> 2026-10-02 | mean data age at decision: 56 days
+                syn10 design  syn10 test  syn10 10-14  syn10 15-19  syn10 20-26  IEF test  IEF 10-14  IEF 15-19  IEF 20-26  TLT test
+signal                                                                                                                              
+macro3                  0.12       -0.03        -0.08        -0.26         0.09     -0.01      -0.18      -0.23       0.17     -0.04
+growth3                 0.18       -0.09        -0.17        -0.58         0.20     -0.12      -0.30      -0.58       0.22     -0.05
+infl3                   0.01       -0.02         0.02        -0.05        -0.03      0.02      -0.02       0.00       0.05     -0.05
+news macro3             0.08       -0.00        -0.05        -0.19         0.11      0.03      -0.08      -0.18       0.19      0.14
+news growth3            0.25       -0.06         0.26        -0.49        -0.07     -0.10       0.10      -0.47      -0.06     -0.00
+news infl3              0.11        0.06        -0.20         0.08         0.19      0.11      -0.13       0.08       0.25      0.20
+macro6                 -0.10       -0.33        -1.30         0.18        -0.11     -0.31      -1.29       0.17      -0.06     -0.31
+growth6                 0.13       -0.31        -0.96         0.03        -0.01     -0.34      -1.11      -0.03       0.05     -0.24
+infl6                  -0.37       -0.14        -0.68         0.22         0.01     -0.10      -0.60       0.23       0.03     -0.16
+news macro6            -0.10       -0.40         0.04        -0.33        -0.62     -0.43      -0.01      -0.35      -0.66     -0.31
+news growth6            0.19       -0.20        -0.19        -0.38        -0.16     -0.26      -0.38      -0.38      -0.17     -0.13
+news infl6             -0.17       -0.23         0.18        -0.19        -0.45     -0.26       0.25      -0.21      -0.51     -0.17
+macro12                 0.03       -0.12        -0.74         0.10         0.04     -0.07      -0.83      -0.02       0.16     -0.13
+growth12                0.17       -0.28        -0.35        -0.26        -0.26     -0.24      -0.44      -0.36      -0.09     -0.29
+infl12                 -0.32       -0.02        -0.69         0.30         0.21      0.01      -0.74       0.25       0.28     -0.03
+news macro12            0.13       -0.24        -0.93         0.26        -0.07     -0.26      -1.08       0.21      -0.03     -0.19
+news growth12           0.22       -0.13        -0.60        -0.23         0.05     -0.15      -0.73      -0.29       0.09     -0.09
+news infl12             0.02       -0.24        -0.85         0.48        -0.15     -0.25      -0.95       0.47      -0.13     -0.20
+macro avg               0.01       -0.03        -1.15        -0.01         0.30     -0.00      -1.24      -0.04       0.37     -0.06
+news macro avg          0.15       -0.30        -0.36        -0.25        -0.33     -0.32      -0.46      -0.26      -0.33     -0.17
+
+design-best: news growth3 0.25 -> test syn10 -0.06  IEF -0.10  TLT -0.00
+design/test rank corr (syn10): -0.02
+cells with the same sign and |Sharpe| > 0.3 in design and test (syn10): []
+
+re-framing 3: by inflation regime (CPI year-on-year as known at the decision, above / below 3 %)
+share of months with inflation > 3%: design 0.31  test 0.26
+growth6      high infl design 0.39  test 0.08
+growth6      low infl  design -0.17  test -0.40
+infl6        high infl design -0.14  test -0.18
+infl6        low infl  design -0.35  test -0.01
+macro6       high infl design 0.38  test -0.20
+macro6       low infl  design -0.33  test -0.28
+news infl6   high infl design -0.04  test -0.27
+news infl6   low infl  design -0.18  test -0.05

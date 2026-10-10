@@ -1,0 +1,84 @@
+== headline, 10 bp per side
+IS Sharpe 2.71  CAGR 11.7%  vol 4.1%  maxDD -3.1%  t_NW 5.6
+OOS Sharpe 2.49  CAGR 7.3%  vol 2.8%  maxDD -2.6%  t_NW 5.9
+full Sharpe 2.57  CAGR 9.4%  vol 3.5%  maxDD -3.1%  t_NW 7.9
+turnover 21.0x / yr   avg gross 0.60   max gross 1.00   avg names 16 (long 8 / short 8)
+avg holding period 21.9 sessions; share of sessions with a position 0.98; max single-name weight 0.050
+net exposure: mean -0.0000  max |net| 0.0000
+skew 4.00  kurt 65.4  worst day -2.20%  best day 4.80%
+
+== extra entry lag on top of the deployed one-session skip, 10 bp
+-1 {'IS': np.float64(3.19), 'OOS': np.float64(3.28), 'full': np.float64(3.19)} gross {'IS': np.float64(3.66), 'OOS': np.float64(3.96), 'full': np.float64(3.75)} (NOT tradable: uses the NAV of the entry close)
+0 {'IS': np.float64(2.71), 'OOS': np.float64(2.49), 'full': np.float64(2.57)} gross {'IS': np.float64(3.2), 'OOS': np.float64(3.26), 'full': np.float64(3.17)} 
+1 {'IS': np.float64(2.14), 'OOS': np.float64(1.79), 'full': np.float64(1.96)} gross {'IS': np.float64(2.67), 'OOS': np.float64(2.61), 'full': np.float64(2.61)} 
+2 {'IS': np.float64(1.7), 'OOS': np.float64(1.18), 'full': np.float64(1.45)} gross {'IS': np.float64(2.26), 'OOS': np.float64(2.02), 'full': np.float64(2.13)} 
+4 {'IS': np.float64(1.03), 'OOS': np.float64(0.82), 'full': np.float64(0.93)} gross {'IS': np.float64(1.62), 'OOS': np.float64(1.71), 'full': np.float64(1.63)} 
+
+== cost ladder, bp per side
+0 {'IS': np.float64(3.2), 'OOS': np.float64(3.26), 'full': np.float64(3.17)} CAGR full 11.3%  OOS 9.3%
+5 {'IS': np.float64(2.96), 'OOS': np.float64(2.88), 'full': np.float64(2.87)} CAGR full 10.1%  OOS 8.2%
+10 {'IS': np.float64(2.71), 'OOS': np.float64(2.49), 'full': np.float64(2.57)} CAGR full 9.0%  OOS 7.0%
+15 {'IS': np.float64(2.46), 'OOS': np.float64(2.1), 'full': np.float64(2.27)} CAGR full 7.8%  OOS 5.9%
+20 {'IS': np.float64(2.2), 'OOS': np.float64(1.71), 'full': np.float64(1.96)} CAGR full 6.7%  OOS 4.8%
+25 {'IS': np.float64(1.95), 'OOS': np.float64(1.31), 'full': np.float64(1.65)} CAGR full 5.6%  OOS 3.7%
+30 {'IS': np.float64(1.69), 'OOS': np.float64(0.91), 'full': np.float64(1.33)} CAGR full 4.5%  OOS 2.5%
+
+== borrow fee on shorts (bp / yr), 10 bp cost
+0 {'IS': np.float64(2.71), 'OOS': np.float64(2.49), 'full': np.float64(2.57)}
+100 {'IS': np.float64(2.64), 'OOS': np.float64(2.38), 'full': np.float64(2.49)}
+300 {'IS': np.float64(2.51), 'OOS': np.float64(2.15), 'full': np.float64(2.32)}
+500 {'IS': np.float64(2.38), 'OOS': np.float64(1.92), 'full': np.float64(2.15)}
+
+== legs, 10 bp
+long leg alone : {'IS': np.float64(0.99), 'OOS': np.float64(0.89), 'full': np.float64(0.94)} ann 6.5%
+short leg alone: {'IS': np.float64(0.5), 'OOS': np.float64(0.38), 'full': np.float64(0.45)} ann 2.5%
+long leg minus equal-weight liquid universe (same notional): {'IS': np.float64(2.17), 'OOS': np.float64(1.7), 'full': np.float64(1.94)} ann 4.0%
+short leg plus equal-weight liquid universe (same notional): {'IS': np.float64(2.59), 'OOS': np.float64(2.31), 'full': np.float64(2.44)} ann 5.0%
+
+== universe floors (median 60d $ volume), 10 bp
+$0.5M {'IS': np.float64(3.35), 'OOS': np.float64(2.74), 'full': np.float64(3.04)} @20bp {'IS': np.float64(2.64), 'OOS': np.float64(1.81), 'full': np.float64(2.25)} avg gross 0.81
+$1.0M {'IS': np.float64(2.71), 'OOS': np.float64(2.49), 'full': np.float64(2.57)} @20bp {'IS': np.float64(2.2), 'OOS': np.float64(1.71), 'full': np.float64(1.96)} avg gross 0.60
+$2.0M {'IS': np.float64(1.76), 'OOS': np.float64(1.82), 'full': np.float64(1.79)} @20bp {'IS': np.float64(1.33), 'OOS': np.float64(1.28), 'full': np.float64(1.3)} avg gross 0.22
+$3.0M {'IS': np.float64(0.75), 'OOS': np.float64(0.93), 'full': np.float64(0.78)} @20bp {'IS': np.float64(0.5), 'OOS': np.float64(0.6), 'full': np.float64(0.51)} avg gross 0.06
+
+== one group at a time, 10 bp
+muni {'IS': np.float64(1.58), 'OOS': np.float64(1.64), 'full': np.float64(1.55)} avg gross 0.08
+taxable {'IS': np.float64(2.56), 'OOS': np.float64(2.24), 'full': np.float64(2.39)} avg gross 0.52
+
+== neighbours of the selected parameters, 10 bp / 20 bp (IS, OOS)
+spec 10bp (np.float64(2.71), np.float64(2.49)) 20bp (np.float64(2.2), np.float64(1.71))
+{'win': 40} 10bp (np.float64(2.38), np.float64(2.43)) 20bp (np.float64(1.91), np.float64(1.66))
+{'win': 90} 10bp (np.float64(2.42), np.float64(2.2)) 20bp (np.float64(1.94), np.float64(1.47))
+{'x_in': 0.015} 10bp (np.float64(3.07), np.float64(2.9)) 20bp (np.float64(2.2), np.float64(1.47))
+{'x_in': 0.02} 10bp (np.float64(2.85), np.float64(2.64)) 20bp (np.float64(2.18), np.float64(1.58))
+{'x_in': 0.035} 10bp (np.float64(2.22), np.float64(1.9)) 20bp (np.float64(1.93), np.float64(1.47))
+{'x_out': 0.005} 10bp (np.float64(2.66), np.float64(2.4)) 20bp (np.float64(2.09), np.float64(1.54))
+{'x_out': 0.0125} 10bp (np.float64(2.49), np.float64(2.32)) 20bp (np.float64(1.84), np.float64(1.33))
+{'unit': 0.03} 10bp (np.float64(2.74), np.float64(2.49)) 20bp (np.float64(2.26), np.float64(1.83))
+{'unit': 0.1} 10bp (np.float64(2.77), np.float64(2.3)) 20bp (np.float64(2.14), np.float64(1.43))
+{'min_hist': 500} 10bp (np.float64(2.61), np.float64(2.45)) 20bp (np.float64(2.13), np.float64(1.66))
+{'group_min': 5} 10bp (np.float64(2.8), np.float64(2.49)) 20bp (np.float64(2.27), np.float64(1.71))
+
+== by year, 10 bp
+date       2004  2005  2006  2007   2008   2009  2010  2011   2012   2013  2014  2015  2016  2017  2018  2019   2020  2021   2022  2023  2024  2025  2026
+net10%     2.58  1.84  1.84  6.47  44.16  22.24  7.42  6.91  10.12  13.91  4.77  1.92  4.43  1.34 -0.36  4.71  21.59  6.60  20.70  5.55  5.02  6.20  5.12
+net20%     1.91  0.77  1.28  4.71  40.27  19.09  4.88  4.69   7.40  10.54  3.39  0.45  2.64  0.20 -1.93  3.11  18.15  4.33  16.55  2.96  2.63  3.97  3.22
+gross%     3.25  2.90  2.40  8.22  48.04  25.38  9.97  9.14  12.84  17.28  6.16  3.39  6.22  2.47  1.22  6.31  25.03  8.87  24.85  8.13  7.41  8.42  7.01
+sharpe10   1.97  1.16  2.24  2.02   4.46   3.87  2.40  2.38   4.35   4.85  3.12  0.96  1.80  1.02 -0.17  2.87   3.91  2.56   6.32  1.96  2.40  2.49  2.27
+avg_gross  0.16  0.36  0.18  0.41   0.74   0.70  0.72  0.72   0.71   0.85  0.43  0.45  0.55  0.36  0.51  0.51   0.73  0.76   0.94  0.70  0.82  0.79  0.67
+
+== sub-periods, 10 bp / 20 bp net Sharpe
+2004 2007 1.63 1.12
+2008 2009 4.09 3.67
+2010 2014 3.31 2.37
+2015 2019 1.23 0.46
+2020 2022 4.06 3.26
+2023 2026 2.25 1.32
+
+== market betas of the daily net return (full sample, 2007+)
+SPY beta 0.023  corr 0.14
+HYG beta 0.059  corr 0.17
+MUB beta 0.078  corr 0.14
+TLT beta 0.002  corr 0.01
+
+Deflated Sharpe prob (OOS, 188 trials): 1.000

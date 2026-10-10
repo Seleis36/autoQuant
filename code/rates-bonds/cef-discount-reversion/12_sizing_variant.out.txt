@@ -1,0 +1,5 @@
+sizing                       IS 10bp / 20bp | turnover | avg gross | mean |net| | max |net| | OOS 10bp / 20bp
+spec (sides equalised)       2.71 / 2.20 | 21.0x | 0.60 | 0.000 | 0.00 | 2.49 / 1.71
+fixed 5 % per name           2.77 / 2.40 | 18.2x | 0.71 | 0.130 | 0.65 | 2.05 / 1.54
+fixed 3 % per name           2.82 / 2.50 | 10.8x | 0.47 | 0.083 | 0.39 | 2.17 / 1.77
+fixed 2.5 % per name         2.82 / 2.51 | 8.9x | 0.39 | 0.069 | 0.33 | 2.14 / 1.77
