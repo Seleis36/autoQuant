@@ -1,0 +1,59 @@
+160 cells
+       IS_gross       OOS_gross       IS_net       OOS_net      
+           mean   max      mean   max   mean   max    mean   max
+family                                                          
+A          0.17  0.87      0.29  1.07  -0.82  0.03   -1.49 -0.18
+B          1.92  5.72      2.07  6.70   1.11  3.78    0.46  1.85
+C          0.82  2.36      0.95  2.40  -0.18  0.44   -0.76  0.46
+D          0.58  2.11      0.47  1.89  -0.24  0.50   -1.03  0.41
+E         -0.24  0.23     -0.18  0.50  -0.73 -0.19   -1.26  0.08
+
+best 12 by IS net (2 bp):
+               sig  liq    sub  zmin  hold  lag  IS_gross  OOS_gross  IS_net  OOS_net   turn
+B prem_z60 no-skip 0.5M    all   NaN     1    0      5.72       6.70    3.78     1.85 269.28
+B prem_z60 no-skip 0.5M credit   NaN     1    0      4.73       4.25    2.90     0.90 279.60
+B prem_z60 no-skip   2M credit   NaN     1    0      5.00       3.56    2.63     0.59 252.34
+B prem_z60 no-skip   2M    all   NaN     1    0      4.77       6.03    2.45     0.81 244.12
+B prem_z60 no-skip 0.5M    all   1.5     1    0      1.66       2.74    1.08     0.90 113.68
+B prem_z60 no-skip 0.5M    all   NaN     5    0      1.53       1.44    1.04     0.46  62.56
+B prem_z60 no-skip 0.5M credit   1.5     1    0      0.91       0.92    0.70     0.20  35.48
+B prem_z60 no-skip   2M credit   1.5     5    0      0.78      -0.03    0.58    -0.18   6.76
+      D resid_2d z 0.5M    all   1.5     5    0      0.62       0.53    0.50     0.12  20.68
+      D resid_5d z 0.5M    all   1.5     1    0      0.88       0.57    0.49    -0.95  79.03
+      D resid_1d z   2M    all   1.5     5    0      0.51       0.30    0.46    -0.26  20.52
+B prem_z60 no-skip 0.5M credit   1.5     5    0      0.53      -0.11    0.46    -0.28   8.31
+
+best 8 tradable by IS gross (families A, C, D, E):
+               sig  liq    sub  zmin  hold  lag  IS_gross  OOS_gross  IS_net  OOS_net   turn
+  C model_prem z60 0.5M    all   NaN     1    0      2.36       2.40    0.40    -1.81 288.76
+      D resid_1d z 0.5M    all   NaN     1    0      2.11       1.89   -0.61    -3.82 379.82
+  C model_prem z60 0.5M credit   NaN     1    0      2.11       1.05    0.16    -1.95 288.72
+C model_prem dev60 0.5M    all   NaN     1    0      2.07       1.97    0.14    -1.81 297.32
+  C model_prem z60   2M credit   NaN     1    0      1.93       1.03   -0.60    -1.84 257.75
+C model_prem dev60 0.5M credit   NaN     1    0      1.76       0.88   -0.14    -1.85 300.02
+      D resid_5d z 0.5M credit   NaN     1    0      1.75       0.39    0.10    -1.50 202.68
+C model_prem dev60   2M credit   NaN     1    0      1.75       0.80   -0.70    -1.78 266.94
+
+IS/OOS rank corr net: 0.71  gross: 0.66
+
+G. substitute pairs: long the cheaper / short the richer on the gap in official premium (skip 1)
+JNK-SPHY   lag 1  gross IS   nan OOS  0.24 | net IS   nan OOS -1.87
+JNK-SPHY   lag 0  gross IS   nan OOS  3.50 | net IS   nan OOS  1.64
+JNK-SJNK   lag 1  gross IS   nan OOS -0.67 | net IS   nan OOS -4.35
+JNK-SJNK   lag 0  gross IS   nan OOS  1.91 | net IS   nan OOS -2.17
+SPIB-SPBO  lag 1  gross IS -0.15 OOS -0.08 | net IS -1.48 OOS -2.88
+SPIB-SPBO  lag 0  gross IS  3.44 OOS  2.53 | net IS  2.14 OOS -0.02
+SPSB-SPIB  lag 1  gross IS  0.19 OOS  0.23 | net IS -1.85 OOS -1.52
+SPSB-SPIB  lag 0  gross IS  3.68 OOS  1.66 | net IS  1.61 OOS -0.14
+SPTI-SPAB  lag 1  gross IS   nan OOS -0.52 | net IS   nan OOS -1.92
+SPTI-SPAB  lag 0  gross IS   nan OOS  0.66 | net IS   nan OOS -0.90
+TFI-SHM    lag 1  gross IS  0.32 OOS  0.06 | net IS -0.96 OOS -1.89
+TFI-SHM    lag 0  gross IS  2.27 OOS  2.81 | net IS  1.03 OOS  1.04
+SPIP-TIPX  lag 1  gross IS   nan OOS -0.11 | net IS   nan OOS -2.66
+SPIP-TIPX  lag 0  gross IS   nan OOS  2.93 | net IS   nan OOS  0.96
+BWX-IBND   lag 1  gross IS  0.29 OOS  0.56 | net IS -0.34 OOS -0.53
+BWX-IBND   lag 0  gross IS  1.87 OOS  3.80 | net IS  1.38 OOS  2.86
+SPTL-SPLB  lag 1  gross IS  0.30 OOS -0.15 | net IS -0.01 OOS -0.70
+SPTL-SPLB  lag 0  gross IS  0.23 OOS  0.29 | net IS -0.01 OOS -0.32
+all pairs  lag 1  gross IS  0.09 OOS -0.03 | net IS -1.95 OOS -3.52
+all pairs  lag 0  gross IS  4.47 OOS  5.08 | net IS  2.58 OOS  1.38

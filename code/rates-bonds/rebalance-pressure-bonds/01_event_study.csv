@@ -1,0 +1,181 @@
+signal,target,period,slope_bp,t,n
+threshold,"stocks-bonds (index, syn10)",IS 1990-2009,-17.03469469483391,-3.2617817110107414,4998
+threshold,"stocks-bonds (index, syn10)",OOS 2010-2026,-30.270283223161883,-2.898941236915825,4177
+threshold,"stocks-bonds (index, syn10)",paper 1997-2023,-26.422770586933318,-4.111635981149495,6743
+threshold,"stocks-bonds (index, syn10)",post 2024-26,-4.945492726818938,-0.27513867799337993,681
+threshold,"stocks-bonds (index, syn10)",1982-1996,1.7865688835716458,0.3020659785231284,3727
+threshold,bond syn10,IS 1990-2009,0.012960653148173802,0.007639237530859078,4998
+threshold,bond syn10,OOS 2010-2026,4.372882221945207,1.8756441127449728,4177
+threshold,bond syn10,paper 1997-2023,2.980234629722232,1.8664653093158432,6743
+threshold,bond syn10,post 2024-26,-1.2993622251877504,-0.28555291233180136,681
+threshold,bond syn10,1982-1996,-10.766537298126742,-2.7349353511588603,3727
+threshold,stocks S&P,IS 1990-2009,-17.021734041685733,-3.681705352761738,4998
+threshold,stocks S&P,OOS 2010-2026,-25.8974010012167,-2.879638359279361,4177
+threshold,stocks S&P,paper 1997-2023,-23.442535957211074,-4.23154941449759,6743
+threshold,stocks S&P,post 2024-26,-6.244854952006694,-0.3540370400711075,681
+threshold,stocks S&P,1982-1996,-8.979968414555103,-1.8159873491774898,3727
+threshold,bond IEF,IS 1990-2009,6.187919068424447,2.5632060918302293,1856
+threshold,bond IEF,OOS 2010-2026,5.462403528993594,2.643890732435182,4177
+threshold,bond IEF,paper 1997-2023,6.216514199716135,3.7635388198620006,5352
+threshold,bond IEF,post 2024-26,-1.5191362629041814,-0.3597541975584195,681
+threshold,bond IEF,1982-1996,,,0
+threshold,bond TLT,IS 1990-2009,8.891540361481576,1.9599710704736901,1856
+threshold,bond TLT,OOS 2010-2026,13.302918514924523,2.7027946619889733,4177
+threshold,bond TLT,paper 1997-2023,13.009393721513817,3.5314907721561255,5352
+threshold,bond TLT,post 2024-26,-5.452017765107091,-0.6022028983240074,681
+threshold,bond TLT,1982-1996,,,0
+threshold,SPY-IEF,IS 1990-2009,-29.232984101060843,-3.0086977204680645,1856
+threshold,SPY-IEF,OOS 2010-2026,-30.4313305476087,-3.1007420483800927,4177
+threshold,SPY-IEF,paper 1997-2023,-31.437012670876154,-4.159437311626646,5352
+threshold,SPY-IEF,post 2024-26,-6.88195247660487,-0.3724494970211281,681
+threshold,SPY-IEF,1982-1996,,,0
+calendar all days,"stocks-bonds (index, syn10)",IS 1990-2009,-6.154636763893003,-1.7128568941145246,4998
+calendar all days,"stocks-bonds (index, syn10)",OOS 2010-2026,-6.623821533818818,-2.2499745451917876,4177
+calendar all days,"stocks-bonds (index, syn10)",paper 1997-2023,-6.018257957380372,-2.2967354243557394,6743
+calendar all days,"stocks-bonds (index, syn10)",post 2024-26,-11.930515688529065,-1.423860622289061,681
+calendar all days,"stocks-bonds (index, syn10)",1982-1996,-3.464076494442263,-0.7749866035062198,3727
+calendar all days,bond syn10,IS 1990-2009,0.0835254189189139,0.08317219872725978,4998
+calendar all days,bond syn10,OOS 2010-2026,0.313055711241051,0.31909257367091604,4177
+calendar all days,bond syn10,paper 1997-2023,0.26108406827630526,0.3438624755082121,6743
+calendar all days,bond syn10,post 2024-26,1.391601994896042,0.5290356119017074,681
+calendar all days,bond syn10,1982-1996,-6.181827594386515,-2.3436042583179426,3727
+calendar all days,stocks S&P,IS 1990-2009,-6.071111344974098,-1.8036350114217863,4998
+calendar all days,stocks S&P,OOS 2010-2026,-6.3107658225777685,-2.3619274729405837,4177
+calendar all days,stocks S&P,paper 1997-2023,-5.757173889104068,-2.366681797813309,6743
+calendar all days,stocks S&P,post 2024-26,-10.538913693633027,-1.466893457548222,681
+calendar all days,stocks S&P,1982-1996,-9.645904088828788,-2.603824707226753,3727
+calendar all days,bond IEF,IS 1990-2009,0.5135943040723555,0.4346617950908232,1856
+calendar all days,bond IEF,OOS 2010-2026,0.3613609552137238,0.42357961592923776,4177
+calendar all days,bond IEF,paper 1997-2023,0.3478918782291432,0.4737611572242525,5352
+calendar all days,bond IEF,post 2024-26,1.1897999399731334,0.5285061461955591,681
+calendar all days,bond IEF,1982-1996,,,0
+calendar all days,bond TLT,IS 1990-2009,0.9942967781583959,0.4749242344207883,1856
+calendar all days,bond TLT,OOS 2010-2026,1.9704314203758602,0.8661884675535949,4177
+calendar all days,bond TLT,paper 1997-2023,1.427434843271918,0.8799342440404121,5352
+calendar all days,bond TLT,post 2024-26,2.936453616955938,0.6270272222730642,681
+calendar all days,bond TLT,1982-1996,,,0
+calendar all days,SPY-IEF,IS 1990-2009,-5.481453936231615,-0.9775987806287577,1856
+calendar all days,SPY-IEF,OOS 2010-2026,-6.56337142862643,-2.30324630452884,4177
+calendar all days,SPY-IEF,paper 1997-2023,-5.571835219505519,-1.7943735830344876,5352
+calendar all days,SPY-IEF,post 2024-26,-12.37496022989064,-1.4439757684472416,681
+calendar all days,SPY-IEF,1982-1996,,,0
+"calendar, next day in last 5","stocks-bonds (index, syn10)",IS 1990-2009,-21.185367799203117,-3.2091506820569085,1200
+"calendar, next day in last 5","stocks-bonds (index, syn10)",OOS 2010-2026,-13.82068732426808,-3.8554852191949944,1002
+"calendar, next day in last 5","stocks-bonds (index, syn10)",paper 1997-2023,-19.36989629551507,-4.089766071603672,1620
+"calendar, next day in last 5","stocks-bonds (index, syn10)",post 2024-26,-7.172115265643745,-0.8657145780768251,162
+"calendar, next day in last 5","stocks-bonds (index, syn10)",1982-1996,-3.1797083329145437,-0.4195711718696309,895
+"calendar, next day in last 5",bond syn10,IS 1990-2009,1.878435254599906,1.3143938064971956,1200
+"calendar, next day in last 5",bond syn10,OOS 2010-2026,1.761234312521939,1.2469157841693796,1002
+"calendar, next day in last 5",bond syn10,paper 1997-2023,2.473019004117278,2.3694878313835592,1620
+"calendar, next day in last 5",bond syn10,post 2024-26,-2.4695379372788833,-0.6757945001387256,162
+"calendar, next day in last 5",bond syn10,1982-1996,-2.859419749841882,-1.6296595859371326,895
+"calendar, next day in last 5",stocks S&P,IS 1990-2009,-19.306932544603207,-3.326566167869671,1200
+"calendar, next day in last 5",stocks S&P,OOS 2010-2026,-12.059453011746154,-3.804308741285409,1002
+"calendar, next day in last 5",stocks S&P,paper 1997-2023,-16.896877291397793,-3.9886009127636095,1620
+"calendar, next day in last 5",stocks S&P,post 2024-26,-9.641653202922631,-1.2996636672265036,162
+"calendar, next day in last 5",stocks S&P,1982-1996,-6.039128082756413,-0.8428996186719152,895
+"calendar, next day in last 5",bond IEF,IS 1990-2009,2.093065432025105,1.2503586727789524,446
+"calendar, next day in last 5",bond IEF,OOS 2010-2026,1.1893386498468679,0.9566854974666129,1002
+"calendar, next day in last 5",bond IEF,paper 1997-2023,1.7933405428380904,1.6464469470811647,1286
+"calendar, next day in last 5",bond IEF,post 2024-26,-2.7042798134277595,-0.8023660526625267,162
+"calendar, next day in last 5",bond IEF,1982-1996,,,0
+"calendar, next day in last 5",bond TLT,IS 1990-2009,4.669127709394081,1.5135981235257119,446
+"calendar, next day in last 5",bond TLT,OOS 2010-2026,5.512646471177308,1.9915250784312823,1002
+"calendar, next day in last 5",bond TLT,paper 1997-2023,5.454746850612046,2.661155506270216,1286
+"calendar, next day in last 5",bond TLT,post 2024-26,-1.4345513669647134,-0.18700327685000254,162
+"calendar, next day in last 5",bond TLT,1982-1996,,,0
+"calendar, next day in last 5",SPY-IEF,IS 1990-2009,-26.943154610178432,-3.0602803672448,446
+"calendar, next day in last 5",SPY-IEF,OOS 2010-2026,-13.342176992991373,-3.8175389466688157,1002
+"calendar, next day in last 5",SPY-IEF,paper 1997-2023,-20.21958752896382,-3.670736865478639,1286
+"calendar, next day in last 5",SPY-IEF,post 2024-26,-7.223345126504015,-0.8685266678212481,162
+"calendar, next day in last 5",SPY-IEF,1982-1996,,,0
+"calendar, next day in last 3","stocks-bonds (index, syn10)",IS 1990-2009,-11.751795290142978,-2.025616713626448,720
+"calendar, next day in last 3","stocks-bonds (index, syn10)",OOS 2010-2026,-13.387175272122626,-2.2233232739821815,600
+"calendar, next day in last 3","stocks-bonds (index, syn10)",paper 1997-2023,-12.911523179618348,-2.8426104087376234,972
+"calendar, next day in last 3","stocks-bonds (index, syn10)",post 2024-26,-10.628347205734064,-1.080835507896757,96
+"calendar, next day in last 3","stocks-bonds (index, syn10)",1982-1996,-10.986071801024853,-1.5402769956804094,537
+"calendar, next day in last 3",bond syn10,IS 1990-2009,0.6909823197365903,0.3645371162510375,720
+"calendar, next day in last 3",bond syn10,OOS 2010-2026,0.47120286572443454,0.23740984399253365,600
+"calendar, next day in last 3",bond syn10,paper 1997-2023,1.2806594088143435,0.8670697720393522,972
+"calendar, next day in last 3",bond syn10,post 2024-26,-3.5517214086232576,-0.7505165729402711,96
+"calendar, next day in last 3",bond syn10,1982-1996,-2.549747259848983,-1.361024073929103,537
+"calendar, next day in last 3",stocks S&P,IS 1990-2009,-11.060812970406383,-2.123400649721182,720
+"calendar, next day in last 3",stocks S&P,OOS 2010-2026,-12.915972406398186,-2.779879633397046,600
+"calendar, next day in last 3",stocks S&P,paper 1997-2023,-11.630863770804009,-2.984008822620539,972
+"calendar, next day in last 3",stocks S&P,post 2024-26,-14.180068614357321,-1.822848392221963,96
+"calendar, next day in last 3",stocks S&P,1982-1996,-13.535819060873836,-2.0742710660388815,537
+"calendar, next day in last 3",bond IEF,IS 1990-2009,-0.1275331588172637,-0.06294830602802316,268
+"calendar, next day in last 3",bond IEF,OOS 2010-2026,0.0725831988726795,0.04233003039704943,600
+"calendar, next day in last 3",bond IEF,paper 1997-2023,0.17926383952199937,0.1336451379055143,772
+"calendar, next day in last 3",bond IEF,post 2024-26,-3.5784501121347136,-0.7856282023246554,96
+"calendar, next day in last 3",bond IEF,1982-1996,,,0
+"calendar, next day in last 3",bond TLT,IS 1990-2009,3.841511998986551,1.0370398519489976,268
+"calendar, next day in last 3",bond TLT,OOS 2010-2026,2.8891585889531974,0.8290636097000239,600
+"calendar, next day in last 3",bond TLT,paper 1997-2023,3.630574484381016,1.378994786213961,772
+"calendar, next day in last 3",bond TLT,post 2024-26,-1.1824391193062014,-0.12074252999441341,96
+"calendar, next day in last 3",bond TLT,1982-1996,,,0
+"calendar, next day in last 3",SPY-IEF,IS 1990-2009,-16.43273303212758,-2.9943146615008565,268
+"calendar, next day in last 3",SPY-IEF,OOS 2010-2026,-13.029669617209803,-2.3243457956177562,600
+"calendar, next day in last 3",SPY-IEF,paper 1997-2023,-14.500159391885063,-3.4905362896088645,772
+"calendar, next day in last 3",SPY-IEF,post 2024-26,-11.109133089212003,-1.124052533223648,96
+"calendar, next day in last 3",SPY-IEF,1982-1996,,,0
+"calendar, next day is last","stocks-bonds (index, syn10)",IS 1990-2009,-20.969695322323368,-1.951143087939782,240
+"calendar, next day is last","stocks-bonds (index, syn10)",OOS 2010-2026,-10.750826574760644,-1.0529211864949053,200
+"calendar, next day is last","stocks-bonds (index, syn10)",paper 1997-2023,-15.465036825147223,-1.7223593429235606,324
+"calendar, next day is last","stocks-bonds (index, syn10)",post 2024-26,,,32
+"calendar, next day is last","stocks-bonds (index, syn10)",1982-1996,-12.522950043074069,-1.7617127654754237,179
+"calendar, next day is last",bond syn10,IS 1990-2009,3.566903041063388,1.1492096893720072,240
+"calendar, next day is last",bond syn10,OOS 2010-2026,-1.1462768824414764,-0.38243749617474704,200
+"calendar, next day is last",bond syn10,paper 1997-2023,2.2038126529789897,0.8684999091696732,324
+"calendar, next day is last",bond syn10,post 2024-26,,,32
+"calendar, next day is last",bond syn10,1982-1996,-3.184942884226477,-1.1525997847698985,179
+"calendar, next day is last",stocks S&P,IS 1990-2009,-17.402792281259984,-1.9359975718639133,240
+"calendar, next day is last",stocks S&P,OOS 2010-2026,-11.897103457202128,-1.4722123153244713,200
+"calendar, next day is last",stocks S&P,paper 1997-2023,-13.261224172168232,-1.830344869196919,324
+"calendar, next day is last",stocks S&P,post 2024-26,,,32
+"calendar, next day is last",stocks S&P,1982-1996,-15.707892927300557,-2.383844510780559,179
+"calendar, next day is last",bond IEF,IS 1990-2009,4.243701286135549,1.0735862080865393,90
+"calendar, next day is last",bond IEF,OOS 2010-2026,-2.5011549005266667,-0.92361182241178,200
+"calendar, next day is last",bond IEF,paper 1997-2023,0.33502769480980193,0.11662448745465352,258
+"calendar, next day is last",bond IEF,post 2024-26,,,32
+"calendar, next day is last",bond IEF,1982-1996,,,0
+"calendar, next day is last",bond TLT,IS 1990-2009,13.201937299898145,1.913592662854746,90
+"calendar, next day is last",bond TLT,OOS 2010-2026,4.516343985138811,0.6947749355048727,200
+"calendar, next day is last",bond TLT,paper 1997-2023,8.679117910405584,1.6254026781225466,258
+"calendar, next day is last",bond TLT,post 2024-26,,,32
+"calendar, next day is last",bond TLT,1982-1996,,,0
+"calendar, next day is last",SPY-IEF,IS 1990-2009,-26.326070956372977,-2.626423021606779,90
+"calendar, next day is last",SPY-IEF,OOS 2010-2026,-9.450940554232453,-0.9927327692832879,200
+"calendar, next day is last",SPY-IEF,paper 1997-2023,-15.61073207138456,-1.9604622130898997,258
+"calendar, next day is last",SPY-IEF,post 2024-26,,,32
+"calendar, next day is last",SPY-IEF,1982-1996,,,0
+"calendar, next day = first of month","stocks-bonds (index, syn10)",IS 1990-2009,12.575068945057987,0.9071618146341373,240
+"calendar, next day = first of month","stocks-bonds (index, syn10)",OOS 2010-2026,26.967642498412726,3.2193572579012883,200
+"calendar, next day = first of month","stocks-bonds (index, syn10)",paper 1997-2023,20.21061279187696,2.175753902086827,324
+"calendar, next day = first of month","stocks-bonds (index, syn10)",post 2024-26,,,32
+"calendar, next day = first of month","stocks-bonds (index, syn10)",1982-1996,-14.0660059424274,-2.2854210742642,179
+"calendar, next day = first of month",bond syn10,IS 1990-2009,-6.529647144521899,-2.1018317974284324,240
+"calendar, next day = first of month",bond syn10,OOS 2010-2026,-10.707759434255662,-3.664173267122826,200
+"calendar, next day = first of month",bond syn10,paper 1997-2023,-8.129796459653287,-3.574377387727112,324
+"calendar, next day = first of month",bond syn10,post 2024-26,,,32
+"calendar, next day = first of month",bond syn10,1982-1996,-9.685328599513404,-1.3101031980194393,179
+"calendar, next day = first of month",stocks S&P,IS 1990-2009,6.045421800536088,0.5069455972970528,240
+"calendar, next day = first of month",stocks S&P,OOS 2010-2026,16.259883064157055,2.3204774064843807,200
+"calendar, next day = first of month",stocks S&P,paper 1997-2023,12.08081633222367,1.532295862804422,324
+"calendar, next day = first of month",stocks S&P,post 2024-26,,,32
+"calendar, next day = first of month",stocks S&P,1982-1996,-23.751334541940803,-3.784291726045234,179
+"calendar, next day = first of month",bond IEF,IS 1990-2009,-5.989841802463559,-1.59483725460392,90
+"calendar, next day = first of month",bond IEF,OOS 2010-2026,-8.672025208030062,-3.3743307330512544,200
+"calendar, next day = first of month",bond IEF,paper 1997-2023,-7.7073944021167975,-3.396104722907614,258
+"calendar, next day = first of month",bond IEF,post 2024-26,,,32
+"calendar, next day = first of month",bond IEF,1982-1996,,,0
+"calendar, next day = first of month",bond TLT,IS 1990-2009,-13.0687079016865,-1.7673284555950521,90
+"calendar, next day = first of month",bond TLT,OOS 2010-2026,-17.411444887082098,-3.0324198185467615,200
+"calendar, next day = first of month",bond TLT,paper 1997-2023,-16.111089950801897,-3.462486126902036,258
+"calendar, next day = first of month",bond TLT,post 2024-26,,,32
+"calendar, next day = first of month",bond TLT,1982-1996,,,0
+"calendar, next day = first of month",SPY-IEF,IS 1990-2009,23.827193762570317,1.3874044795903895,90
+"calendar, next day = first of month",SPY-IEF,OOS 2010-2026,24.813657169738065,3.0890221731062395,200
+"calendar, next day = first of month",SPY-IEF,paper 1997-2023,23.776785080535664,2.510668401081483,258
+"calendar, next day = first of month",SPY-IEF,post 2024-26,,,32
+"calendar, next day = first of month",SPY-IEF,1982-1996,,,0

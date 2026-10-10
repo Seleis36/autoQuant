@@ -1,0 +1,4 @@
+1990 - 1999 VWITX  same-day 0.24  lag1 0.09  lag2 0.05  lag3 0.04 | VWLTX  same-day 0.40  lag1 0.12  lag2 0.05  lag3 0.04
+2000 - 2007 VWITX  same-day 0.20  lag1 0.10  lag2 0.05  lag3 0.03 | VWLTX  same-day 0.29  lag1 0.12  lag2 0.07  lag3 0.03
+2008 - 2017 VWITX  same-day 0.13  lag1 0.08  lag2 0.05  lag3 0.02 | VWLTX  same-day 0.16  lag1 0.10  lag2 0.06  lag3 0.02
+2018 - 2026 VWITX  same-day 0.17  lag1 0.11  lag2 0.09  lag3 0.04 | VWLTX  same-day 0.24  lag1 0.15  lag2 0.12  lag3 0.05

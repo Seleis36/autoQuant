@@ -1,0 +1,32 @@
+(a) extreme days (net, 10 bp)
+2008-10-13 +4.80% {'PCN': '+1.70% (w +0.042, r +40.8%)', 'BTZ': '+1.68% (w +0.042, r +40.4%)', 'DSU': '+1.29% (w +0.042, r +31.1%)'}
+2008-10-14 +3.05% {'BTZ': '+0.63% (w +0.045, r +13.8%)', 'EDD': '+0.62% (w +0.045, r +13.7%)', 'JQC': '+0.49% (w +0.045, r +10.9%)'}
+2020-03-25 +2.41% {'EDF': '+0.30% (w +0.017, r +17.2%)', 'ACP': '+0.25% (w +0.017, r +14.7%)', 'FRA': '+0.24% (w +0.017, r +14.0%)'}
+2007-08-17 +2.20% {'DSU': '+0.72% (w +0.050, r +14.4%)', 'PFL': '+0.45% (w +0.050, r +9.0%)', 'EVV': '+0.38% (w +0.050, r +7.5%)'}
+2008-10-29 +2.20% {'EDD': '+0.37% (w +0.042, r +8.8%)', 'PHK': '+0.35% (w +0.042, r +8.5%)', 'AWF': '+0.35% (w +0.042, r +8.5%)'}
+2008-09-29 -2.20% {'EAD': '-1.01% (w +0.050, r -20.1%)', 'EFR': '+0.72% (w -0.050, r -14.3%)', 'PFN': '-0.71% (w +0.050, r -14.3%)'}
+2008-10-09 -1.78% {'PCN': '-1.01% (w +0.045, r -22.1%)', 'BTZ': '-0.61% (w +0.045, r -13.4%)', 'EAD': '-0.60% (w +0.045, r -13.1%)'}
+2020-03-18 -1.58% {'DMO': '+0.54% (w -0.022, r -25.0%)', 'HIO': '+0.54% (w -0.022, r -24.6%)', 'EDF': '-0.50% (w +0.019, r -26.2%)'}
+2008-10-06 -1.42% {'EMD': '-0.55% (w +0.050, r -11.0%)', 'EDD': '-0.51% (w +0.050, r -10.2%)', 'PCN': '-0.50% (w +0.050, r -10.0%)'}
+2009-01-06 -1.25% {'DSU': '-0.58% (w -0.050, r +11.6%)', 'EFT': '-0.31% (w -0.050, r +6.2%)', 'PFN': '-0.29% (w -0.050, r +5.8%)'}
+drop best 5 days IS: Sharpe 2.75 (was 2.71), ann 9.9%
+drop best 5 days OOS: Sharpe 2.45 (was 2.49), ann 6.3%
+drop best 10 days IS: Sharpe 2.67 (was 2.71), ann 9.1%
+drop best 10 days OOS: Sharpe 2.36 (was 2.49), ann 5.9%
+drop best 20 days IS: Sharpe 2.49 (was 2.71), ann 7.8%
+drop best 20 days OOS: Sharpe 2.18 (was 2.49), ann 5.3%
+drop best 50 days IS: Sharpe 1.94 (was 2.71), ann 5.4%
+drop best 50 days OOS: Sharpe 1.72 (was 2.49), ann 3.9%
+
+(b) P&L by fund / sponsor (gross, sum of daily, %)
+total 255%; top 10 funds 37% of it; funds with positive P&L 111 / 131 traded
+{'PCN': 15.6, 'PTY': 14.6, 'DSU': 11.7, 'HIX': 9.7, 'PHK': 8.1, 'PFN': 7.8, 'AWF': 7.4, 'EDD': 6.8, 'TEI': 6.2, 'PDI': 5.7}
+{'VKQ': -0.5, 'NPCT': -0.5, 'FTF': -0.7, 'WDI': -0.8, 'VGI': -1.0}
+{'Pacific Investment Management Company, LLC': 14.5, 'BlackRock': 13.9, 'PIMCO': 9.1, 'Nuveen Fund Advisors, LLC.': 8.6, 'Franklin Templeton, Inc': 5.3, 'Franklin Templeton Fund Adviser, LLC': 4.7, 'Eaton Vance Management': 4.0, 'Franklin Advisers, Inc.': 3.6}
+ex PIMCO (13 funds dropped) 10bp IS/OOS 2.39 / 2.31   20bp 1.92 / 1.58
+ex top-10 P&L funds (10 funds dropped) 10bp IS/OOS 2.30 / 2.29   20bp 1.78 / 1.55
+
+(c) vectorbt cross-check, 10 bp fees, weights as deployed
+vectorbt  Sharpe IS 2.69  OOS 2.47  full 2.55   total return 654%
+research  Sharpe IS 2.71  OOS 2.49  full 2.57   total return 666%
+daily return correlation 0.9988

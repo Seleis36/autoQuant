@@ -1,0 +1,35 @@
+                         syn10 IS 1990-09 gross  syn10 IS 1990-09 net  syn10 OOS 2010-26 net  IEF OOS 2010-26 gross  IEF OOS 2010-26 net  TLT OOS 2010-26 gross  TLT OOS 2010-26 net  IEF 2022-26 net  TLT 2022-26 net   turn  expo
+book                                                                                                                                                                                                                               
+A threshold scaled                        -0.01                 -0.27                   0.17                   0.60                 0.31                   0.53                 0.41            -0.06             0.20  70.69  0.96
+B calendar last5 scaled                   -0.02                 -0.17                   0.43                   0.55                 0.37                   0.69                 0.61             0.46             0.79  20.39  0.23
+B calendar last3 scaled                   -0.03                 -0.20                   0.16                   0.30                 0.09                   0.37                 0.28            -0.15             0.11  17.94  0.14
+B calendar last1 scaled                    0.27                  0.03                  -0.21                  -0.07                -0.37                   0.23                 0.11            -0.28             0.06  15.19  0.05
+C month-start k1 scaled                     NaN                   NaN                  -0.24                  -0.15                -0.25                  -0.20                -0.25            -0.47            -0.47   0.75  0.00
+C month-start k2 scaled                     NaN                   NaN                  -0.13                  -0.01                -0.09                  -0.07                -0.11            -0.17            -0.21   0.75  0.01
+C month-start k3 scaled                     NaN                   NaN                  -0.22                  -0.16                -0.22                  -0.37                -0.40            -0.42            -0.75   0.75  0.01
+C month-start k5 scaled                     NaN                   NaN                  -0.19                  -0.12                -0.17                  -0.33                -0.35            -0.32            -0.66   0.75  0.02
+A threshold sign                          -0.07                 -0.28                   0.26                   0.61                 0.37                   0.54                 0.43             0.08             0.25  75.86  1.00
+B calendar last5 sign                     -0.19                 -0.36                   0.40                   0.56                 0.34                   0.74                 0.65             0.19             0.49  30.84  0.24
+B calendar last3 sign                     -0.20                 -0.39                   0.32                   0.48                 0.23                   0.59                 0.47            -0.30            -0.11  27.61  0.14
+B calendar last1 sign                      0.26                 -0.02                  -0.29                  -0.03                -0.41                   0.26                 0.10            -0.44            -0.14  24.18  0.05
+C month-start k1 sign                      0.48                  0.24                   0.27                   0.51                 0.21                   0.41                 0.28            -0.02            -0.29  24.18  0.05
+C month-start k2 sign                      0.19                  0.00                   0.34                   0.50                 0.29                   0.40                 0.31             0.25            -0.11  24.18  0.10
+C month-start k3 sign                      0.19                  0.03                   0.35                   0.46                 0.29                   0.40                 0.33             0.27            -0.16  24.18  0.14
+C month-start k5 sign                      0.24                  0.11                   0.33                   0.42                 0.28                   0.38                 0.32             0.19            -0.20  24.18  0.24
+
+IS-best on syn10 net: C month-start k1 sign 0.24
+
+first session of the month, bond return (bp) by sign of the month-end deviation
+syn10  1982-89    stocks-overweight months:   -0.8 (n  53)   bonds-overweight:  +22.3 (n  42)   diff t -2.0
+syn10  1990-2009  stocks-overweight months:   -7.3 (n 128)   bonds-overweight:   +8.8 (n 112)   diff t -2.1
+syn10  2010-2026  stocks-overweight months:   -8.8 (n 126)   bonds-overweight:   +7.1 (n  74)   diff t -2.0
+syn10  2010-17    stocks-overweight months:  -16.3 (n  59)   bonds-overweight:   +5.2 (n  37)   diff t -2.0
+syn10  2018-26    stocks-overweight months:   -2.2 (n  67)   bonds-overweight:   +9.1 (n  37)   diff t -0.9
+IEF    1990-2009  stocks-overweight months:  -10.1 (n  49)   bonds-overweight:   +4.4 (n  41)   diff t -1.3
+IEF    2010-2026  stocks-overweight months:   -6.5 (n 126)   bonds-overweight:   +8.2 (n  74)   diff t -2.0
+IEF    2010-17    stocks-overweight months:  -11.9 (n  59)   bonds-overweight:   +7.0 (n  37)   diff t -2.0
+IEF    2018-26    stocks-overweight months:   -1.7 (n  67)   bonds-overweight:   +9.4 (n  37)   diff t -1.0
+TLT    1990-2009  stocks-overweight months:  -19.6 (n  49)   bonds-overweight:  +10.0 (n  41)   diff t -1.4
+TLT    2010-2026  stocks-overweight months:  -11.2 (n 126)   bonds-overweight:  +15.7 (n  74)   diff t -1.7
+TLT    2010-17    stocks-overweight months:  -24.8 (n  59)   bonds-overweight:  +20.4 (n  37)   diff t -1.9
+TLT    2018-26    stocks-overweight months:   +0.8 (n  67)   bonds-overweight:  +10.9 (n  37)   diff t -0.5
