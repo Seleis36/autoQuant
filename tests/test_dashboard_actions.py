@@ -262,3 +262,58 @@ def test_the_picker_shows_what_an_alias_last_resolved_to(monkeypatch):
     opts = {o["key"]: o for o in dashboard.research_model_options()}
     assert opts["opus"]["resolved"] == "claude-opus-5-5"
     assert "resolved" not in opts["sonnet"]
+
+
+# --------------------------------------------------------------------- cross-site guards
+#
+# The API can place orders and spend money on agents, so it must not be drivable from a
+# page that merely happens to be open in the operator's browser.
+
+def test_a_text_plain_body_is_refused(server):
+    """A hidden <form enctype=text/plain> can send this cross-site without a preflight."""
+    status, body = post(server, None, raw=b'{"action": "kill_all"}',
+                        headers={"Content-Type": "text/plain"})
+    assert status == 403 and "Content-Type" in body["error"]
+
+
+def test_a_foreign_origin_is_refused(server):
+    status, body = post(server, {"action": "kill_all"},
+                        headers={"Content-Type": "application/json",
+                                 "Origin": "https://evil.example"})
+    assert status == 403 and "cross-origin" in body["error"]
+
+
+def test_a_same_origin_post_is_served(server):
+    port = server.rsplit(":", 1)[1]
+    status, body = post(server, {"action": "no-such-action"},
+                        headers={"Content-Type": "application/json",
+                                 "Origin": f"http://127.0.0.1:{port}"})
+    assert status == 200 and "unknown action" in body["error"]
+
+
+def test_a_rebound_host_name_is_refused(server):
+    """DNS rebinding: the socket is ours but the browser still says attacker's name."""
+    status, body = post(server, {"action": "kill_all"},
+                        headers={"Content-Type": "application/json",
+                                 "Host": "evil.example", "Origin": "http://evil.example"})
+    assert status == 403 and "host" in body["error"]
+
+
+def test_a_configured_public_host_is_served(server, monkeypatch):
+    """The name Cloudflare Tunnel forwards with must be admitted via DASHBOARD_HOSTS."""
+    monkeypatch.setenv("DASHBOARD_HOSTS", "quant.example.com, other.example")
+    status, body = post(server, {"action": "no-such-action"},
+                        headers={"Content-Type": "application/json",
+                                 "Host": "quant.example.com",
+                                 "Origin": "https://quant.example.com"})
+    assert status == 200 and "unknown action" in body["error"]
+
+
+@pytest.mark.parametrize("host,ok", [
+    ("127.0.0.1:8788", True), ("localhost", True), ("[::1]:8788", True),
+    ("box.tail1234.ts.net", True), ("evil.example", False), ("", False),
+    ("127.0.0.1.evil.example", False),
+])
+def test_host_allowlist(host, ok, monkeypatch):
+    monkeypatch.delenv("DASHBOARD_HOSTS", raising=False)
+    assert dashboard.host_allowed(host, "127.0.0.1") is ok

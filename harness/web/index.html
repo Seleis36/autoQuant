@@ -147,6 +147,9 @@ nav.tabs .n{color:var(--dim2);font-weight:500;margin-left:4px}
 .sum tbody tr:hover td{color:var(--accent)}
 .sum td:first-child{color:var(--fg)}
 .sum .badge{font-size:9.5px}
+details.fill{border-bottom:1px solid var(--line);padding:6px 0}
+details.fill summary{cursor:pointer;display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px}
+details.fill table{margin:6px 0 4px}
 @media (max-width:560px){main{padding:10px}.grid{grid-template-columns:1fr}header{gap:8px}}
 </style>
 
@@ -242,6 +245,11 @@ const $ = s => document.querySelector(s);
 const fmt = (v,d=2) => (v===null||v===undefined||Number.isNaN(v)) ? '—' : Number(v).toFixed(d);
 const pct = (v,d=2) => v===null||v===undefined ? '—' : (v>=0?'+':'')+Number(v).toFixed(d)+'%';
 const sgn = v => v===null||v===undefined ? '' : (v>0?'up':v<0?'down':'');
+const signed = (v,d=2) => v===null||v===undefined ? '—' : (v>=0?'+':'')+Number(v).toFixed(d);
+/* One basket holds 5.7M SHIB and 0.03 BTC; a fixed six decimals prints one as noise and
+   the other as a wall of digits. */
+const fmtQty = v => { if(v===null||v===undefined) return '—'; const a = Math.abs(v);
+  return a>=1000 ? Number(v).toFixed(0) : a>=1 ? Number(v).toFixed(3) : Number(v).toPrecision(4); };
 const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const dur = s => { if(s==null) return '—'; s=Math.floor(s);
   const d=Math.floor(s/86400), h=Math.floor(s%86400/3600), m=Math.floor(s%3600/60);
@@ -254,6 +262,11 @@ const short = n => String(n||'').split('/').pop();
    themselves are a tooltip. */
 const legCount = s => (s.symbols||[]).length
   || String(s.symbol||'').split(/[+,\s]+/).filter(Boolean).length;
+const isBasket = s => !!(s.live && s.live.basket) || legCount(s) > 1;
+/* Legs actually held, not the universe: crypto-alts lists 64 names and holds ~23, and
+   "64 legs" on a book holding nothing read as fully invested. */
+const heldLegs = s => Object.values((s.state||{}).positions || (s.ledger||{}).positions || {})
+  .filter(v => v).length;
 const symLabel = s => {
   const sy = String(s.symbol||'');
   return sy.length <= 30 ? (sy || '?') : `${legCount(s)} instruments`;
@@ -454,7 +467,11 @@ function equityChart(el, ser, opts){
 function weightChart(el, ser, opts){
   const tk = theme(), o = opts||{};
   const w = ser.weight || [];
-  const lo = Math.min(0, ...w), hi = Math.max(0, ...w);
+  // A basket's weight is net: a long/short book drew a flat line at zero for its whole
+  // life. Its gross is drawn too, so the chart shows how much it actually holds.
+  const g = ser.gross || [];
+  const basket = g.length > 0 && g.length === w.length;
+  const lo = Math.min(0, ...w), hi = Math.max(0, ...w, ...(basket ? g : []));
   const u = new uPlot({
     width: Math.max(el.clientWidth||360, 180),
     height: o.height || 92,
@@ -471,7 +488,9 @@ function weightChart(el, ser, opts){
     ],
     series:[
       {value:(u,v)=>v==null?'—':new Date(v*1000).toISOString().slice(0,16).replace('T',' ')},
-      {label:'exposure', stroke:tk.s3, width:2, fill:'rgba(25,158,112,.13)',
+      ...(basket ? [{label:'gross', stroke:tk.s1, width:2, spanGaps:true,
+                     value:(u,v)=>v==null?'—':v.toFixed(3)}] : []),
+      {label:basket ? 'net' : 'exposure', stroke:tk.s3, width:2, fill:'rgba(25,158,112,.13)',
        spanGaps:true, value:(u,v)=>v==null?'—':v.toFixed(3)},
     ],
     hooks:{
@@ -485,7 +504,7 @@ function weightChart(el, ser, opts){
       ready:[pinLegend],
       setCursor:[u=>{ if(u.cursor.idx == null) pinLegend(u); }],
     },
-  }, [ser.ts, w], el);
+  }, basket ? [ser.ts, g, w] : [ser.ts, w], el);
   return u;
 }
 
@@ -578,8 +597,10 @@ function cardBottom(s){
   const m = s.meta||{}, bt = m.backtest||{}, lv = s.live||{}, st = s.state||{};
   const bh = lv.benchmark||{};
   // A basket holds no single position, so "0.00000 <symbol>" is a number about
-  // nothing; the leg count is the honest version of that cell.
-  const basket = legCount(s) > 1;
+  // nothing; the leg count is the honest version of that cell. Its `weight` is NET
+  // exposure, near zero for any long/short book however much it holds, so gross leads
+  // -- and gross is what the backtests report as a basket's exposure.
+  const basket = isBasket(s);
   const cmp = (label, live, back, hold, d=2, suffix='') => `<tr><td>${label}</td>
     <td class="${sgn(live)}">${live==null?'—':fmt(live,d)+suffix}</td>
     <td class="dim">${back==null?'—':fmt(back,d)+suffix}</td>
@@ -591,13 +612,16 @@ function cardBottom(s){
       ${cmp('CAGR', lv.sufficient?lv.cagr_pct:null, bt.cagr_pct, null, 1, '%')}
       ${cmp('Max DD', lv.maxdd_pct, bt.maxdd_pct, bh.maxdd_pct, 1, '%')}
       ${cmp('Vol', lv.sufficient?lv.vol_pct:null, bt.vol_pct, null, 1, '%')}
-      ${cmp('Avg exposure', lv.avg_exposure, bt.avg_exposure, null, 2)}
+      ${basket ? cmp('Avg gross', lv.avg_gross, bt.avg_exposure, null, 2)
+               : cmp('Avg exposure', lv.avg_exposure, bt.avg_exposure, null, 2)}
       ${cmp('RT / year', lv.round_trips_per_year, bt.round_trips_per_year, null, 0)}
-      <tr><td>Weight now</td><td colspan="3" style="text-align:right">
-        <b>${fmt(lv.current_weight ?? st.last_weight, 3)}</b>
-        <span class="dim">· ${basket
-          ? legCount(s)+' legs'
-          : fmt(st.position,5)+' '+esc((s.symbol||'').replace('USDT',''))}
+      <tr><td>${basket?'Exposure now':'Weight now'}</td><td colspan="3" style="text-align:right">
+        ${basket
+          ? `<b>gross ${fmt(lv.current_gross ?? st.gross, 2)}</b>
+             <span class="dim">· net ${signed(lv.current_weight ?? st.net, 3)}
+             · ${heldLegs(s)} of ${legCount(s)} legs held`
+          : `<b>${fmt(lv.current_weight ?? st.last_weight, 3)}</b>
+             <span class="dim">· ${fmt(st.position,5)} ${esc((s.symbol||'').replace('USDT',''))}`}
         · $${fmt(st.equity,2)}</span></td></tr>
       <tr><td>Fees paid</td><td colspan="3" style="text-align:right" class="dim">
         $${fmt(lv.fees_paid,2)} over ${lv.trades||0} trade(s)
@@ -717,7 +741,8 @@ function renderSummary(list){
   const cell = (v,d,suf='') => `<td class="${sgn(v)}">${v==null?'—':fmt(v,d)+suf}</td>`;
   host.innerHTML = `<table class="sum"><thead><tr><th>strategy</th><th>status</th>
       <th>book</th><th>return</th><th>Sharpe live</th><th>Sharpe bt</th><th>max DD</th>
-      <th>weight</th></tr></thead><tbody>${list.map(s=>{
+      <th title="Weight for one instrument; gross (and net) for a basket">exposure</th>
+      </tr></thead><tbody>${list.map(s=>{
     const m = s.meta||{}, lv = s.live||{}, bt = m.backtest||{}, st = s.state||{};
     const mode = s.mode==='sim' ? 'simulated' : s.shadow ? 'shadow' : 'live paper';
     return `<tr data-goto="${esc(s.name)}"><td>${esc(m.title||short(s.name))}</td>
@@ -727,7 +752,9 @@ function renderSummary(list){
       ${cell(lv.sufficient?lv.sharpe:null,2)}
       <td class="dim">${bt.sharpe==null?'—':fmt(bt.sharpe,2)}</td>
       <td class="dim">${lv.maxdd_pct==null?'—':fmt(lv.maxdd_pct,1)+'%'}</td>
-      <td>${fmt(lv.current_weight ?? st.last_weight,2)}</td></tr>`;
+      <td>${isBasket(s)
+        ? `${fmt(lv.current_gross ?? st.gross,2)}<span class="dim"> g · ${signed(lv.current_weight ?? st.net,2)} n</span>`
+        : fmt(lv.current_weight ?? st.last_weight,2)}</td></tr>`;
   }).join('')}</tbody></table>`;
 }
 
@@ -912,9 +939,11 @@ function corrHeatmap(corr, tk){
         patternTransform="rotate(45)">
         <line x1="0" y1="0" x2="0" y2="6" stroke="${tk.line}" stroke-width="2"/></pattern></defs>
       ${heads}${cells}</svg>
-    <div class="note">Everything this venue hosts is a long-only crypto book. High
-      correlation means the portfolio is one bet, not several. Hatched cells are pairs
-      with no shared bar size, or fewer than ten shared bars — not a correlation of zero.</div>`;
+    <div class="note">High correlation means the portfolio is one bet, not several. The
+      venue books are all long-only crypto and expected to move together; the simulated
+      ones span asset classes and go short, so a high number between them is a finding.
+      Hatched cells are pairs with no shared bar size, or fewer than ten shared bars —
+      not a correlation of zero.</div>`;
 }
 
 function renderHealth(){
@@ -927,7 +956,9 @@ function renderHealth(){
       <td colspan="2" style="text-align:right">${cap}
       <span class="dim">· ${b.strategies} strategy(ies)</span></td></tr>`;
   }).join('');
-  const stale = data.filter(d=>d.age_h>36).slice(0,4);
+  // Only files a live strategy reads, flagged server-side: ranking every cached file by
+  // age always named the same four research-only series and hid the live ones.
+  const stale = data.filter(d=>d.stale);
   $('#health').innerHTML = `
     <table><tbody>
       <tr><td>Venue</td><td colspan="2" style="text-align:right">
@@ -937,8 +968,9 @@ function renderHealth(){
         ${fmt(a.usdt_free,2)} USDT · ${fmt(a.btc_total,5)} BTC</td></tr>
     </tbody></table>
     ${corrHeatmap(corr, theme())}
-    ${stale.length?`<div class="note">Stale market data:
-      ${stale.map(d=>esc(d.file)+' ('+fmt(d.age_h,0)+'h)').join(', ')}</div>`:''}`;
+    ${stale.length?`<div class="note">Stale live inputs (not refreshing):
+      ${stale.slice(0,8).map(d=>esc(d.file)+' ('+fmt(d.age_h,0)+'h'+(d.feeds?', '+esc(short(d.feeds)):'')+')').join(', ')}
+      ${stale.length>8?` and ${stale.length-8} more`:''}</div>`:''}`;
 }
 
 function renderHeader(){
@@ -1083,6 +1115,49 @@ function openTranscript(sid){
     '/api/transcript?session='+encodeURIComponent(sid), j=>renderTranscript(j, sid));
 }
 
+/* The Trades panel. Fills come from /api/trades, which reads the whole journal: the
+   panel used to filter the last 200 journal rows for fills, so a quiet week on an
+   hourly book showed "no fills yet", and it drew every fill as one instrument's
+   side/qty/price -- which a basket rebalance has none of, so nine books listed their
+   trades as blank rows. A basket fill is one line (legs, turnover, gross/net) that
+   opens onto its largest legs. */
+function renderFills(j){
+  if(!j || !Array.isArray(j.fills))
+    return `<div class="down">${esc((j&&j.error)||'unexpected response')}</div>`;
+  const f = j.fills;
+  if(!f.length) return '<div class="dim">no fills yet</div>';
+  const when = r => esc(String(r.ts).slice(0,19).replace('T',' '));
+  const tag = r => r.backfill ? ' <span class="badge b-stop" title="replayed after an outage">backfill</span>' : '';
+  const head = `<div class="dim" style="font-size:11.5px;margin-bottom:6px">
+    ${f.length<j.total?`latest ${f.length} of ${j.total} fills`:`${j.total} fill(s)`}, newest first</div>`;
+  if(!f.some(r=>r.legs_total!=null)){
+    return head + `<table><thead><tr><th>time</th><th>side</th><th>qty</th><th>price</th>
+      <th>weight</th><th>fee</th><th>equity</th></tr></thead><tbody>${f.map(r=>
+      `<tr><td class="mono">${when(r)}${tag(r)}</td>
+       <td class="${r.side==='BUY'?'up':'down'}">${esc(r.side||'')}</td>
+       <td>${fmt(r.qty,6)}</td><td>${fmt(r.price,2)}</td>
+       <td>${fmt(r.weight,3)}</td><td>${fmt(r.fee,2)}</td><td>${fmt(r.equity,2)}</td></tr>`).join('')}</tbody></table>`;
+  }
+  return head + f.map(r=>{
+    const more = r.legs_total > (r.legs||[]).length
+      ? `<div class="dim" style="font-size:11px">largest ${r.legs.length} of ${r.legs_total} legs by notional</div>` : '';
+    return `<details class="fill"><summary>
+        <span class="mono">${when(r)}</span>${tag(r)}
+        <span>${r.legs_total} legs <span class="dim">(${r.buys} buy · ${r.sells} sell)</span></span>
+        <span>$${fmt(r.turnover_usdt,2)} <span class="dim">traded</span></span>
+        <span>gross ${fmt(r.gross,2)} · net ${signed(r.net)}</span>
+        <span class="dim">fee $${fmt(r.fee,2)} · eq $${fmt(r.equity,2)}</span>
+      </summary>
+      <table><thead><tr><th>symbol</th><th>side</th><th>qty</th><th>price</th><th>notional</th>
+        <th>target w</th></tr></thead><tbody>${(r.legs||[]).map(g=>
+        `<tr><td class="mono">${esc(g.symbol)}</td>
+         <td class="${g.side==='BUY'?'up':'down'}">${esc(g.side||'')}</td>
+         <td>${fmtQty(g.qty)}</td><td>${fmt(g.price,4)}</td><td>$${fmt(g.notional,2)}</td>
+         <td>${fmt(g.target_weight,4)}</td></tr>`).join('')}</tbody></table>${more}
+    </details>`;
+  }).join('');
+}
+
 async function showModal(title, url, render){
   closeDetail();
   $('#modal-title').textContent = title;
@@ -1108,18 +1183,7 @@ document.addEventListener('click', e=>{
     if(a==='log') return showModal(name+' — runner.log',
       '/api/log?strategy='+encodeURIComponent(name)+'&n=400', j=>`<pre>${esc(j.text||j.error)}</pre>`);
     if(a==='journal') return showModal(name+' — trades',
-      '/api/journal?strategy='+encodeURIComponent(name), rows=>{
-        if(!Array.isArray(rows))
-          return `<div class="down">${esc((rows&&rows.error)||'unexpected response')}</div>`;
-        const t = rows.filter(r=>r.traded).reverse().slice(0,80);
-        if(!t.length) return '<div class="dim">no fills yet</div>';
-        return `<table><thead><tr><th>time</th><th>side</th><th>qty</th><th>price</th>
-          <th>weight</th><th>equity</th></tr></thead><tbody>${t.map(r=>
-          `<tr><td class="mono">${esc(String(r.ts).slice(0,19).replace('T',' '))}</td>
-           <td class="${r.side==='BUY'?'up':'down'}">${esc(r.side||'')}</td>
-           <td>${fmt(r.filled_qty??r.delta_qty,6)}</td><td>${fmt(r.fill_price??r.price,2)}</td>
-           <td>${fmt(r.weight,3)}</td><td>${fmt(r.equity,2)}</td></tr>`).join('')}</tbody></table>`;
-      });
+      '/api/trades?strategy='+encodeURIComponent(name)+'&limit=100', renderFills);
     if(a==='flatten' && !confirm('Sell '+name+' down to flat?')) return;
     return act({action:a, strategy:name}, a+' '+name);
   }

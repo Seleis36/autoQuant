@@ -16,6 +16,10 @@
 set -uo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# On a native Linux host there is no Windows side: no logon hook to write, and no D: tick
+# disk -- the tick backfill would download ~330 GB onto the system disk instead.
+IS_WSL=""
+grep -qi microsoft /proc/version 2>/dev/null && IS_WSL=1
 UNIT_SRC="$REPO/harness/systemd"
 UNIT_DST="$HOME/.config/systemd/user"
 WIN_USER="$(cmd.exe /c 'echo %USERNAME%' 2>/dev/null | tr -d '\r\n')"
@@ -81,8 +85,13 @@ for s in $(strategies); do "$REPO/harness/launch_live.sh" stop "$s" >/dev/null 2
 systemctl --user enable autoquant.target >/dev/null 2>&1
 systemctl --user enable autoquant-dashboard.service autoquant-poller.service >/dev/null 2>&1
 # The tick store: mounts the D: tick disk through its Windows task and keeps the tick
-# backfill running (code/shared/tick_backfill.sh --foreground).
-systemctl --user enable autoquant-ticks.service >/dev/null 2>&1
+# backfill running (code/shared/tick_backfill.sh --foreground). WSL only, see IS_WSL.
+if [ -n "$IS_WSL" ]; then
+  systemctl --user enable autoquant-ticks.service >/dev/null 2>&1
+else
+  systemctl --user disable autoquant-ticks.service >/dev/null 2>&1
+  say "tick store skipped: not WSL, no D: tick disk"
+fi
 for s in $(strategies); do
   unit="autoquant-strategy@$(systemd-escape "$s").service"
   systemctl --user enable "$unit" >/dev/null 2>&1
@@ -98,7 +107,9 @@ systemctl --user enable --now autoquant-nightly.timer >/dev/null 2>&1 \
   && say "nightly research timer: $(systemctl --user list-timers autoquant-nightly.timer --no-legend --no-pager | awk '{print $1, $2, $3}')"
 
 # ---- 2. Windows logon hook -------------------------------------------------
-if [ -d "$STARTUP" ]; then
+if [ -z "$IS_WSL" ]; then
+  say "not WSL: linger starts the user manager at boot, no logon hook needed"
+elif [ -d "$STARTUP" ]; then
   cat > "$VBS" <<VBSEOF
 ' autoQuant - boot WSL at logon so its systemd units come up.
 ' Written by harness/install_autostart.sh. Runs hidden (0) and does not wait.
@@ -118,8 +129,10 @@ echo "Status:"
 systemctl --user list-units 'autoquant*' --no-pager --no-legend | sed 's/^/  /'
 echo
 echo "Notes:"
-echo "  * This starts at LOGON, not at boot. A true pre-login start needs an elevated"
-echo "    Task Scheduler entry -- see harness/windows_autostart_task.ps1 (run as admin)."
+if [ -n "$IS_WSL" ]; then
+  echo "  * This starts at LOGON, not at boot. A true pre-login start needs an elevated"
+  echo "    Task Scheduler entry -- see harness/windows_autostart_task.ps1 (run as admin)."
+fi
 echo "  * systemd now supervises the strategies. Use launch_live.sh as before; it"
 echo "    delegates to systemctl for anything under a unit."
 echo "  * Logs are unchanged: live/<name>/runner.log, harness/logs/."

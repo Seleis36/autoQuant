@@ -275,3 +275,35 @@ def test_leverage_above_one_is_allowed_when_asked_for(tmp_path, quotes):
     assert rep["gross"] == pytest.approx(2.0)
     assert rep["cash"] == pytest.approx(-100_000.0)
     assert b.equity() == pytest.approx(100_000.0)
+
+
+# ------------------------------------------------------------------- annualisation
+
+class PerLegQuotes(StubQuotes):
+    """A source that knows each leg's market, as YahooQuotes does from its cache."""
+
+    def __init__(self, prices, per_leg):
+        super().__init__(prices)
+        self.per_leg = per_leg
+        self.asked = []
+
+    def daily_bars_per_year(self, symbol):
+        self.asked.append(symbol)
+        return self.per_leg[symbol]
+
+
+def test_a_crypto_basket_is_annualised_on_the_calendar_year(tmp_path):
+    """crypto-alts trades every day; it was journalled as one of 252 bars, which
+    understated its live Sharpe and vol by a sixth."""
+    q = PerLegQuotes({"SOL-USD": 1.0, "XRP-USD": 1.0}, {"SOL-USD": 365.0, "XRP-USD": 365.0})
+    b = SimPortfolioBroker(["SOL-USD", "XRP-USD"], quotes=q, state_file=str(tmp_path / "l.json"))
+    assert b.bars_per_year("1d") == 365.0
+    assert set(q.asked) == {"SOL-USD", "XRP-USD"}, "asked per leg, not for 'SOL-USD+XRP-USD'"
+    assert b.bars_per_year("1h") is None
+
+
+def test_a_mixed_basket_runs_at_its_slowest_leg(tmp_path):
+    """bar_key waits for every leg, so a weekend crypto print cannot advance the book."""
+    q = PerLegQuotes({"BTC-USD": 1.0, "SPY": 1.0}, {"BTC-USD": 365.0, "SPY": 252.0})
+    b = SimPortfolioBroker(["BTC-USD", "SPY"], quotes=q, state_file=str(tmp_path / "l.json"))
+    assert b.bars_per_year("1d") == 252.0

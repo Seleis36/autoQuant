@@ -421,6 +421,10 @@ class QuoteSource:
     def bar_key(self, symbol: str) -> Optional[str]:
         return None
 
+    def daily_bars_per_year(self, symbol: str) -> float:
+        """Daily bars `symbol` prints in a year on this source."""
+        return self.bars_per_year_daily
+
 
 class TestnetQuotes(QuoteSource):
     """The paper venue's own last trade -- the right price to SIZE a testnet order."""
@@ -462,6 +466,7 @@ class YahooQuotes(QuoteSource):
         self.cache_hours = float(cache_hours)
         self.memo_seconds = float(memo_seconds)
         self._memo: dict = {}          # symbol -> (monotonic, bar date, close)
+        self._bpy: dict = {}           # symbol -> daily bars per year, fixed per process
 
     def _last_bar(self, symbol: str):
         hit = self._memo.get(symbol)
@@ -482,6 +487,29 @@ class YahooQuotes(QuoteSource):
 
     def bar_key(self, symbol: str) -> Optional[str]:
         return self._last_bar(symbol)[0].isoformat()
+
+    def daily_bars_per_year(self, symbol: str) -> float:
+        """365 for a series that prints at weekends (yfinance crypto), else 252.
+
+        Yahoo carries both kinds, so the source alone cannot say: the crypto-alts and
+        crypto-perps baskets were journalled at 252 while trading every calendar day,
+        understating their live Sharpe and vol by a sixth. Read off the cached file's
+        own last year -- never the network, since a basket asks this for every leg.
+        """
+        hit = self._bpy.get(symbol)
+        if hit is None:
+            hit = self.bars_per_year_daily
+            try:
+                idx = pd.DatetimeIndex(pd.read_parquet(daily_cache_path(symbol),
+                                                       columns=["Close"]).index)
+                recent = idx[idx > idx.max() - pd.Timedelta(days=365)]
+                # Weekends are 2/7 of a seven-day market's bars and none of a weekday one's.
+                if len(recent) and (recent.dayofweek >= 5).mean() > 0.2:
+                    hit = 365.0
+            except Exception:  # noqa: BLE001 - no cache yet: the trading-day default
+                pass
+            self._bpy[symbol] = hit
+        return hit
 
 
 #: name -> factory, so a runner or `meta.json` can name its quote source as a string
@@ -781,7 +809,7 @@ class LedgerBroker:
         compares against the backtest.
         """
         if schedule == "1d":
-            return self.quotes.bars_per_year_daily
+            return self.quotes.daily_bars_per_year(self.symbol)
         return None
 
     def position(self) -> float:

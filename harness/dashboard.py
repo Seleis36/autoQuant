@@ -24,6 +24,7 @@ import glob
 import json
 import os
 import re
+import socket
 import subprocess
 import sys
 import threading
@@ -37,7 +38,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import metrics  # noqa: E402
 import transcript  # noqa: E402
 from live_lib import (BASE_URL, LIVE_DIR, REPO_ROOT, PaperBroker,  # noqa: E402
-                      allocations_summary, load_env)
+                      allocations_summary, daily_cache_path, load_env)
 
 HARNESS_DIR = os.path.dirname(os.path.abspath(__file__))
 WEB_DIR = os.path.join(HARNESS_DIR, "web")
@@ -52,7 +53,9 @@ SESSIONS_DIR = os.path.join(STATE_DIR, "sessions")
 
 # A deployment is always "<asset-class>/<short-name>": one slash, no traversal. Kept in
 # one place because the HTTP layer and the action layer must agree on what is addressable.
-STRATEGY_RE = r"[\w.-]+/[\w.-]+"
+# Neither part may start with a dot: `[\w.-]+` alone admits "..", and only do_action
+# checked for it, so `/api/log?strategy=../x` read <repo>/x/runner.log.
+STRATEGY_RE = r"(?!\.)[\w.-]+/(?!\.)[\w.-]+"
 LOGFILE_RE = r"[\w.-]+\.log"
 # Session ids are minted by uuidgen in session_lib.sh; nothing else may name a transcript.
 SESSION_RE = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
@@ -400,13 +403,56 @@ def refresh_usage():
     CACHE.set("usage", res)
 
 
+#: Untouched for this long, a file a running strategy reads is no longer being refreshed.
+#: A daily cache is rewritten whenever its strategy finds it older than an hour, but a
+#: large-cap member is only refetched once a new session exists -- a holiday weekend.
+LIVE_INPUT_STALE_H = {"daily": 96.0, "live": 36.0}
+
+
+#: A basket leg this far behind its own strategy's typical leg has stopped refreshing.
+LEG_LAG_H = 48.0
+
+
+def stale_live_inputs(ages: dict) -> dict:
+    """data/ basename -> the strategy it feeds, for live inputs that stopped refreshing.
+
+    The stale-data warning used to rank all ~2,800 cached files by age, so it always
+    named the same four research-only series (IXIC, GBTC, ...) and could never surface
+    a live input going stale behind them. Not every listed leg is read through its
+    daily file, though -- cef-discount-reversion prices off its own panel, so its 168
+    `_d` files age together untouched. A basket leg is therefore judged against its own
+    strategy's median leg: one that lags the rest (a delisted or renamed member whose
+    refresh keeps coming back empty) is the fault worth showing.
+    """
+    out = {}
+    for name in strategy_dirs():
+        meta = _read_json(os.path.join(LIVE_DIR, name, "meta.json"), {}) or {}
+        syms = meta.get("symbols") or ([meta["symbol"]] if meta.get("symbol") else [])
+        legs = {b: ages[b] for b in (os.path.basename(daily_cache_path(s)) for s in syms)
+                if b in ages}
+        if not legs:
+            continue
+        typical = sorted(legs.values())[len(legs) // 2]
+        floor = LIVE_INPUT_STALE_H["daily"] if len(legs) == 1 else typical + LEG_LAG_H
+        for b, age in legs.items():
+            if age > max(floor, LIVE_INPUT_STALE_H["daily"]):
+                out[b] = name
+    for b, age in ages.items():
+        if b.endswith("_live.parquet") and age > LIVE_INPUT_STALE_H["live"]:
+            out[b] = "binance cache"
+    return out
+
+
 def refresh_data_freshness():
-    out = []
+    ages, out = {}, []
     for p in sorted(glob.glob(os.path.join(REPO_ROOT, "data", "*.parquet"))):
-        age = time.time() - os.path.getmtime(p)
-        out.append({"file": os.path.basename(p), "age_h": age / 3600,
-                    "mb": os.path.getsize(p) / 1e6})
-    out.sort(key=lambda r: -r["age_h"])
+        ages[os.path.basename(p)] = (time.time() - os.path.getmtime(p)) / 3600
+    stale = stale_live_inputs(ages)
+    for p in sorted(glob.glob(os.path.join(REPO_ROOT, "data", "*.parquet"))):
+        base = os.path.basename(p)
+        out.append({"file": base, "age_h": ages[base], "mb": os.path.getsize(p) / 1e6,
+                    "stale": base in stale, "feeds": stale.get(base)})
+    out.sort(key=lambda r: (not r["stale"], -r["age_h"]))
     CACHE.set("data", out)
 
 
@@ -636,11 +682,60 @@ def do_action(body: dict) -> dict:
 
 # --------------------------------------------------------------------------- http
 
+# Names the dashboard answers to, beyond the address it is bound on. Binding to loopback
+# and the tailnet keeps strangers off the socket, but not a page in your own browser:
+# DNS rebinding points attacker.example at 127.0.0.1 or the tailnet IP, and from then on
+# that page is same-origin with the API. Checking Host closes it, because the browser
+# still sends the attacker's name. DASHBOARD_HOSTS (comma-separated, from .env) adds the
+# public name a reverse proxy or Cloudflare Tunnel forwards with.
+LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
+
+
+def _hostname(netloc: str) -> str:
+    """Host header or Origin netloc -> bare lowercase name, port and brackets dropped."""
+    netloc = netloc.strip().lower()
+    if netloc.startswith("["):
+        return netloc[1:netloc.find("]")] if "]" in netloc else netloc
+    return netloc.rsplit(":", 1)[0] if netloc.count(":") == 1 else netloc
+
+
+def allowed_hosts(bound: str) -> set:
+    extra = {h.strip().lower() for h in os.environ.get("DASHBOARD_HOSTS", "").split(",")}
+    return LOOPBACK_HOSTS | {bound.lower(), socket.gethostname().lower()} | (extra - {""})
+
+
+def host_allowed(host: str, bound: str) -> bool:
+    name = _hostname(host or "")
+    # MagicDNS names are issued by Tailscale, so no outside page can rebind one.
+    return name in allowed_hosts(bound) or name.endswith(".ts.net")
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "autoQuant"
 
     def log_message(self, fmt, *args):
         pass                      # the access log is noise here
+
+    def _refuse(self, post: bool):
+        """403 payload for a request that must not be served, else None."""
+        host = self.headers.get("Host", "")
+        if not host_allowed(host, self.server.server_address[0]):
+            return {"ok": False, "error": "unknown host"}
+        if not post:
+            return None
+        # Cross-site forms can only send urlencoded, multipart or text/plain, and json.loads
+        # happily parses a text/plain body, so an unchecked type made /api/action forgeable
+        # from any page. Cross-origin application/json needs a CORS preflight, which this
+        # server never grants.
+        ctype = self.headers.get("Content-Type", "").split(";")[0].strip().lower()
+        if ctype != "application/json":
+            return {"ok": False, "error": "Content-Type must be application/json"}
+        # Browsers always send Origin on POST; curl and scripts do not, and are not a
+        # cross-site risk, so only a present-and-foreign Origin is refused.
+        origin = self.headers.get("Origin")
+        if origin is not None and _hostname(urlsplit(origin).netloc) != _hostname(host):
+            return {"ok": False, "error": "cross-origin request refused"}
+        return None
 
     def _send(self, code, payload, ctype="application/json"):
         body = payload if isinstance(payload, bytes) else json.dumps(
@@ -656,6 +751,8 @@ class Handler(BaseHTTPRequestHandler):
             pass
 
     def do_GET(self):
+        if (bad := self._refuse(post=False)):
+            return self._send(403, bad)
         # parse_qs, not a hand-rolled split: every strategy name contains a "/", so the
         # browser sends it percent-encoded and an undecoded value matches no name at all.
         # That single omission broke Log, Trades and every equity sparkline at once.
@@ -709,6 +806,15 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(400, {"error": "bad strategy"})
             rows = [r for r in metrics.read_journal(name) if r.get("event") != "heartbeat"]
             return self._send(200, rows[-200:])
+        if path == "/api/trades":
+            name = qs.get("strategy", "")
+            if not re.fullmatch(STRATEGY_RE, name or ""):
+                return self._send(400, {"error": "bad strategy"})
+            try:
+                n = min(max(int(qs.get("limit") or 100), 1), 500)
+            except ValueError:
+                return self._send(400, {"error": "bad limit"})
+            return self._send(200, metrics.fills(name, limit=n))
         if path == "/api/log":
             name = qs.get("strategy", "")
             try:
@@ -747,6 +853,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path != "/api/action":
             return self._send(404, {"error": "not found"})
+        if (bad := self._refuse(post=True)):
+            return self._send(403, bad)
         try:
             n = int(self.headers.get("Content-Length") or 0)
             if n < 0 or n > MAX_BODY_BYTES:

@@ -80,10 +80,35 @@ This starts at **logon**, not at boot. If you want the harness running while the
 at the lock screen, `harness/windows_autostart_task.ps1` registers a real at-startup task —
 it needs an elevated PowerShell, which is why the installer cannot do it for you.
 
+On a **native Linux host** (no WSL) the installer skips the Windows hook and the tick store —
+there is no D: disk, and the tick backfill would pull ~330 GB onto the system disk. Linger
+alone starts the user manager at boot, so everything is up before anyone logs in.
+
 ```bash
 systemctl --user status 'autoquant*'
 journalctl --user -u autoquant-poller -f
 ```
+
+### After an outage: backfilling the sim books
+
+A daemon that was down does not trade. On restart it resumes its ledger and acts on the
+current bar, so the journal draws a straight line over the outage and every rebalance in
+between is lost. For a `sim` book that is unnecessary — its fills are modelled — so replay the
+missed bars **before** restarting it:
+
+```bash
+.venv/bin/python harness/backfill.py <asset>/<name> --dry-run   # what it would write
+.venv/bin/python harness/backfill.py <asset>/<name>
+```
+
+It runs the runner's own `compute_weight(s)` once with today's data, keeps the full weight
+series the strategy's signal function returned, and refuses unless the series' last row
+reproduces the live weight. Each missed bar is then filled through the runner's own broker at
+that bar's close (session markets) or at the boundary price (continuous ones). Replayed rows
+carry `"backfill": true`. A `backfill` event records the range, and the pre-replay journal,
+ledger and state are copied to `harness/state/backfill/`. The inputs are today's vintage of
+the data. Venue books are refused: the testnet never filled those orders, so their outage
+stays a gap. One strategy per process, daemon stopped.
 
 ## Running it
 

@@ -43,6 +43,9 @@ function loadPage(fetchImpl) {
          symLabel:   typeof symLabel   !== 'undefined' ? symLabel   : null,
          corrHeatmap:typeof corrHeatmap!== 'undefined' ? corrHeatmap: null,
          renderTranscript: typeof renderTranscript !== 'undefined' ? renderTranscript : null,
+         renderFills:typeof renderFills!== 'undefined' ? renderFills: null,
+         heldLegs:   typeof heldLegs   !== 'undefined' ? heldLegs   : null,
+         isBasket:   typeof isBasket   !== 'undefined' ? isBasket   : null,
        };`;
 
   const document = {
@@ -196,4 +199,42 @@ for (const [lo, hi] of [[100, 140], [60, 100], [99.99, 100.01], [101, 110]]) {
   assert.ok(P.renderTranscript({ error: 'no transcript' }, 'x').includes('no transcript'));
 }
 
-console.log('ok - dashboard action dispatch + chart helpers (14 groups)');
+/* 15. Trades: a basket fill is a summary line with its legs, never a blank row. The panel
+       drew every fill as one instrument's side/qty/price, which a basket rebalance has
+       none of, so nine books listed their trades as empty lines. */
+{
+  assert.ok(P.renderFills, 'renderFills must exist');
+  const single = P.renderFills({ total: 3, fills: [
+    { ts: '2026-10-22T09:28:10+00:00', side: 'BUY', qty: 0.00196, price: 81756.86,
+      weight: 0.25, fee: 0.16, equity: 2499.13 }] });
+  assert.ok(single.includes('BUY') && single.includes('81756.86'), 'a fill shows side and price');
+  assert.ok(single.includes('latest 1 of 3 fills'), 'says when older fills are not shown');
+
+  const basket = P.renderFills({ total: 1, fills: [
+    { ts: '2026-10-22T00:30:00+00:00', side: 'REBAL', legs_total: 23, buys: 9, sells: 14,
+      turnover_usdt: 811.14, gross: 1.31, net: 0.334, fee: 0.81, equity: 2514.52,
+      backfill: true,
+      legs: [{ symbol: 'SHIB-USD', side: 'BUY', qty: 5706407.59, price: 4.99e-6,
+               notional: 28.47, target_weight: 0.087 }] }] });
+  assert.ok(basket.includes('23 legs') && basket.includes('9 buy') && basket.includes('14 sell'));
+  assert.ok(basket.includes('811.14'), 'the rebalance shows its turnover');
+  assert.ok(basket.includes('gross 1.31') && basket.includes('net +0.33'));
+  assert.ok(basket.includes('SHIB-USD') && basket.includes('5706408'), 'legs, sized readably');
+  assert.ok(basket.includes('largest 1 of 23 legs'), 'says the leg list is truncated');
+  assert.ok(basket.includes('backfill'), 'a replayed fill is labelled as such');
+
+  assert.ok(P.renderFills({ total: 0, fills: [] }).includes('no fills yet'));
+  assert.ok(P.renderFills({ error: 'bad strategy' }).includes('bad strategy'));
+}
+
+/* 16. A basket's held legs are its non-zero positions, not the size of its universe. */
+{
+  const s = { symbols: ['A', 'B', 'C', 'D'], live: { basket: true },
+              state: { positions: { A: 1.5, B: 0, C: -2, D: 0 } } };
+  assert.equal(P.heldLegs(s), 2);
+  assert.equal(P.isBasket(s), true);
+  assert.equal(P.isBasket({ symbol: 'BTCUSDT', live: {} }), false);
+  assert.equal(P.heldLegs({ ledger: { positions: { A: 0 } } }), 0, 'falls back to the ledger');
+}
+
+console.log('ok - dashboard action dispatch + chart helpers (16 groups)');

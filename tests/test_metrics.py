@@ -331,3 +331,100 @@ def test_portfolio_skips_a_book_with_too_little_history(live_dir):
     out = metrics.portfolio_series([{"name": "spot-btc/a", "capital_usdt": 1000.0},
                                     {"name": "spot-btc/one", "capital_usdt": 1000.0}])
     assert out["live"]["books"] == ["spot-btc/a"]
+
+
+# ------------------------------------------------------------- per-bar statistics
+#
+# A continuous-market daemon that restarts mid-bar rebalances at once, so a daily book's
+# journal can hold several rows in one day. Each row used to count as a bar.
+
+def test_restart_rows_inside_a_bar_do_not_change_the_sharpe(live_dir):
+    from datetime import datetime, timedelta, timezone
+    t0 = datetime(2026, 1, 1, 0, 0, 20, tzinfo=timezone.utc)
+    eq = [100.0 * (1.002 ** i) * (1.01 if i % 3 else 0.995) for i in range(40)]
+    daily = [_row((t0 + timedelta(days=i)).isoformat(), e, weight=1.0) for i, e in enumerate(eq)]
+    write_strategy(live_dir, "spot-btc/d", journal_rows=daily)
+    clean = metrics.compute("spot-btc/d", "1d")
+
+    restarted = []
+    for i, r in enumerate(daily):
+        restarted.append(r)
+        if i % 4 == 1 and i + 1 < len(daily):         # a restart nine hours into the day
+            mid = dict(r, ts=(t0 + timedelta(days=i, hours=9)).isoformat(),
+                       equity=(r["equity"] + daily[i + 1]["equity"]) / 2)
+            restarted.append(mid)
+    write_strategy(live_dir, "spot-btc/r", journal_rows=restarted)
+    noisy = metrics.compute("spot-btc/r", "1d")
+    assert noisy["sharpe"] == pytest.approx(clean["sharpe"], rel=1e-9)
+    assert noisy["vol_pct"] == pytest.approx(clean["vol_pct"], rel=1e-9)
+    assert noisy["total_return_pct"] == pytest.approx(clean["total_return_pct"])
+
+
+def test_correlation_uses_bar_to_bar_returns(live_dir):
+    """A bucket holding a restart row kept only that row's slice of the bar's return."""
+    from datetime import datetime, timedelta, timezone
+    t0 = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    eq = [100.0 + ((-1) ** i) * (i % 5) for i in range(30)]
+    a = [_row((t0 + timedelta(hours=i)).isoformat(), e) for i, e in enumerate(eq)]
+    b = []
+    for i, r in enumerate(a):
+        b.append(r)
+        if i % 3 == 2:     # restarted twenty minutes into the bar, at another price
+            b.append(dict(r, ts=(t0 + timedelta(hours=i, minutes=20)).isoformat(),
+                          equity=r["equity"] * 1.05))
+    write_strategy(live_dir, "spot-btc/a", journal_rows=a)
+    write_strategy(live_dir, "spot-btc/b", journal_rows=b)
+    out = metrics.correlation(["spot-btc/a", "spot-btc/b"],
+                              {"spot-btc/a": "1h", "spot-btc/b": "1h"})
+    assert out["spot-btc/a|spot-btc/b"]["corr"] == pytest.approx(1.0)
+
+
+# --------------------------------------------------------- basket exposure is gross
+
+def test_a_long_short_basket_reports_its_gross(live_dir):
+    """cef-discount-reversion is dollar-neutral: its net weight read 0.000 fully invested."""
+    rows = [_row(f"2026-01-{i + 1:02d}T00:00:20+00:00", 100.0 + i, weight=0.001 * i,
+                 gross=1.0, net=0.001 * i, turnover_usdt=5.0) for i in range(4)]
+    write_strategy(live_dir, "rates-bonds/cef", journal_rows=rows)
+    out = metrics.compute("rates-bonds/cef", "1d")
+    assert out["basket"] is True
+    assert out["avg_gross"] == pytest.approx(1.0)
+    assert out["current_gross"] == pytest.approx(1.0)
+    assert abs(out["avg_exposure"]) < 0.01           # net, kept for single instruments
+    assert metrics.equity_series("rates-bonds/cef")["gross"] == [1.0] * 4
+
+
+def test_a_single_instrument_has_no_gross_series(live_dir):
+    write_strategy(live_dir, "spot-btc/x", journal_rows=[rebalance(i, 100.0 + i) for i in range(3)])
+    assert metrics.compute("spot-btc/x", "1h")["basket"] is False
+    assert metrics.equity_series("spot-btc/x")["gross"] == []
+
+
+# ------------------------------------------------------------------ the Trades panel
+
+def test_fills_reach_past_a_long_quiet_stretch(live_dir):
+    """eth-venue-premium had 148 fills and showed "no fills yet": the panel looked for
+    them among the last 200 journal rows, which on an hourly book is eight days."""
+    rows = [rebalance(i, 100.0, traded=(i < 5), side="BUY", filled_qty=0.1,
+                      fill_price=50.0) for i in range(400)]
+    write_strategy(live_dir, "spot-eth/q", journal_rows=rows)
+    out = metrics.fills("spot-eth/q")
+    assert out["total"] == 5 and len(out["fills"]) == 5
+    assert out["fills"][0]["ts"] > out["fills"][-1]["ts"], "newest first"
+    assert out["fills"][0]["side"] == "BUY" and out["fills"][0]["qty"] == 0.1
+    assert out["fills"][0]["price"] == 50.0
+    assert len(metrics.fills("spot-eth/q", limit=2)["fills"]) == 2
+
+
+def test_a_basket_fill_is_summarised_with_its_largest_legs(live_dir):
+    legs = [{"symbol": f"S{k}", "side": "BUY" if k % 2 else "SELL", "qty": k + 1,
+             "price": 10.0, "fill_price": 10.0, "target_weight": 0.01} for k in range(40)]
+    rows = [_row("2026-01-01T00:00:20+00:00", 2500.0, weight=0.1, gross=1.2, net=0.1,
+                 traded=True, turnover_usdt=8200.0, fee=4.1, legs=legs, backfill=True)]
+    write_strategy(live_dir, "sector-etf/b", journal_rows=rows)
+    f = metrics.fills("sector-etf/b", max_legs=5)["fills"][0]
+    assert f["side"] == "REBAL" and f["legs_total"] == 40
+    assert (f["buys"], f["sells"]) == (20, 20)
+    assert [g["symbol"] for g in f["legs"]] == ["S39", "S38", "S37", "S36", "S35"]
+    assert f["legs"][0]["notional"] == 400.0
+    assert f["turnover_usdt"] == 8200.0 and f["backfill"] is True

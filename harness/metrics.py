@@ -109,6 +109,38 @@ def _row_turnover(r: dict) -> float:
     return abs(float(r.get("delta_qty") or 0)) * float(r.get("price") or 0)
 
 
+def _per_bar(seg: list, schedule: str) -> list:
+    """The first row of each schedule bar, in order -- the mark taken at its boundary.
+
+    A daemon that restarts mid-bar rebalances at once, so a continuous market's journal
+    can hold several rows inside one bar -- spot-btc/perp-crowding had six on one day.
+    Treating each row as a bar split that day's return into slices and annualised every
+    slice as a full day, which understated the Sharpe by the square root of the
+    duplication. Statistics are taken per bar; the chart still draws every row.
+    """
+    step = SCHEDULE_SECONDS.get(schedule)
+    if not step:
+        return list(seg)
+    out, last_key = [], None
+    for r in seg:
+        key = _bucket(_ts(r), step)
+        if key != last_key:
+            out.append(r)
+        last_key = key
+    return out
+
+
+def _is_basket(seg: list) -> bool:
+    return any(r.get("gross") is not None for r in seg)
+
+
+def _gross(r: dict) -> float:
+    """Gross exposure of a row: a basket journals it, a single instrument is |weight|."""
+    if r.get("gross") is not None:
+        return abs(float(r["gross"]))
+    return abs(float(r.get("weight") or 0))
+
+
 def _drawdown(equity: list) -> float:
     peak, mdd = equity[0], 0.0
     for v in equity:
@@ -137,14 +169,22 @@ def compute(name: str, schedule: str = "1h") -> dict:
     px = [float(r["price"]) for r in seg if r.get("price")]
     ann = bars_per_year(seg, schedule)
 
-    rets = [eq[i] / eq[i - 1] - 1.0 for i in range(1, len(eq)) if eq[i - 1] > 0]
+    bars = _per_bar(seg, schedule)
+    beq = [float(r["equity"]) for r in bars]
+    rets = [beq[i] / beq[i - 1] - 1.0 for i in range(1, len(beq)) if beq[i - 1] > 0]
     out.update({
         "start": t0.isoformat(), "end": t1.isoformat(), "days": round(days, 2),
         "equity_start": eq[0], "equity_now": eq[-1],
         "total_return_pct": (eq[-1] / eq[0] - 1.0) * 100 if eq[0] else None,
         "maxdd_pct": _drawdown(eq) * 100,
-        "avg_exposure": sum(float(r.get("weight") or 0) for r in seg) / len(seg),
+        "avg_exposure": sum(float(r.get("weight") or 0) for r in bars) / len(bars),
+        # A basket's `weight` is its NET exposure, which for a long/short book sits near
+        # zero however much it holds: cef-discount-reversion read 0.000 fully invested.
+        # Gross is what the backtests quote as exposure for a basket, so it travels too.
+        "basket": _is_basket(seg),
+        "avg_gross": sum(_gross(r) for r in bars) / len(bars),
         "current_weight": float(seg[-1].get("weight") or 0),
+        "current_gross": _gross(seg[-1]),
         "fees_paid": sum(float(r.get("fee") or 0) for r in seg),
         "trades": sum(1 for r in seg if r.get("traded")),
         "errors": sum(1 for r in rows if r.get("event") == "error"),
@@ -189,7 +229,8 @@ def compute(name: str, schedule: str = "1h") -> dict:
 
 
 def _empty_series() -> dict:
-    return {"t": [], "ts": [], "equity": [], "benchmark": [], "weight": [], "trades": [],
+    return {"t": [], "ts": [], "equity": [], "benchmark": [], "weight": [], "gross": [],
+            "trades": [],
             "points_total": 0, "capital_usdt": None, "equity_usdt": None,
             "start": None, "end": None, "mode": None}
 
@@ -248,6 +289,9 @@ def equity_series(name: str, max_points: int = 600) -> dict:
         "equity": [round(float(r["equity"]) / e0 * 100, 4) for r in pts],
         "benchmark": bench,
         "weight": [round(float(r.get("weight") or 0), 4) for r in pts],
+        # A basket's weight is net, so a long/short book plots as a flat line at zero.
+        # Gross alongside it is what shows the book is actually holding something.
+        "gross": [round(_gross(r), 4) for r in pts] if _is_basket(seg) else [],
         "trades": trades,
         # Pre-downsample count, so a chart can draw point markers when the curve is a
         # handful of observations and six rebalances cannot pose as a smooth line.
@@ -258,6 +302,49 @@ def equity_series(name: str, max_points: int = 600) -> dict:
         "end": _ts(seg[-1]).isoformat(),
         "mode": seg[-1].get("mode"),
     }
+
+
+def _leg_notional(leg: dict) -> float:
+    return abs(float(leg.get("qty") or 0)) * float(leg.get("fill_price") or leg.get("price") or 0)
+
+
+def fills(name: str, limit: int = 100, max_legs: int = 25) -> dict:
+    """The most recent fills, newest first, read off the WHOLE journal.
+
+    The Trades panel used to fetch the last 200 journal rows and look for fills among
+    them. On an hourly book 200 rows is eight days, so a strategy that had traded 148
+    times showed "no fills yet" after a quiet week; and it rendered every row as one
+    instrument's side/qty/price, which a basket rebalance does not have -- nine of the
+    desk's books listed their trades as blank lines. A basket fill is summarised here
+    (legs, turnover, gross/net) with its largest legs attached, so a 500-name rebalance
+    does not ship 500 legs per row to a phone.
+    """
+    rows = [r for r in read_journal(name)
+            if r.get("event") == "rebalance" and r.get("traded")]
+    out = []
+    for r in reversed(rows[-limit:] if limit else rows):
+        f = {"ts": r.get("ts"), "weight": r.get("weight"), "equity": r.get("equity"),
+             "fee": r.get("fee"), "turnover_usdt": _row_turnover(r),
+             "mode": r.get("mode"), "backfill": bool(r.get("backfill"))}
+        legs = r.get("legs")
+        if legs is not None:
+            ranked = sorted(legs, key=_leg_notional, reverse=True)
+            f.update({
+                "side": "REBAL", "gross": r.get("gross"), "net": r.get("net"),
+                "legs_total": len(legs),
+                "buys": sum(1 for g in legs if g.get("side") == "BUY"),
+                "sells": sum(1 for g in legs if g.get("side") == "SELL"),
+                "legs": [{"symbol": g.get("symbol"), "side": g.get("side"),
+                          "qty": g.get("qty"), "price": g.get("fill_price") or g.get("price"),
+                          "notional": _leg_notional(g), "target_weight": g.get("target_weight")}
+                         for g in ranked[:max_legs]],
+            })
+        else:
+            f.update({"side": r.get("side"),
+                      "qty": r.get("filled_qty") or r.get("delta_qty"),
+                      "price": r.get("fill_price") or r.get("price")})
+        out.append(f)
+    return {"fills": out, "total": len(rows)}
 
 
 def portfolio_series(books: list, max_points: int = 900) -> dict:
@@ -331,8 +418,9 @@ def _bucket(ts: datetime, step_s: int) -> int:
 def correlation(names: list, schedule_by_name: dict) -> dict:
     """Pairwise correlation of strategy returns, per schedule.
 
-    Every strategy this venue can host is a long-only crypto book, so a wall of
-    0.9s is the expected -- and the point: it says the book is one bet, not five.
+    A wall of 0.9s says the desk is one bet, not five. The venue books are all long-only
+    crypto and expected to show it; the simulated ones span asset classes and go short,
+    so for them a high number is a finding rather than a given.
 
     Only strategies on the SAME schedule are compared. `schedule_by_name` was accepted
     and then ignored, with every series bucketed to the hour regardless: a daily
@@ -350,9 +438,11 @@ def correlation(names: list, schedule_by_name: dict) -> dict:
         seg = current_segment(read_journal(n))
         if len(seg) < 3:
             continue
+        # Bar to bar, from each bar's boundary mark. Row to row, a bar holding a restart
+        # row kept only that row's slice of return under the bucket and dropped the rest.
         by_ts = {}
         prev = None
-        for r in seg:
+        for r in _per_bar(seg, sched):
             e = float(r["equity"])
             if prev is not None and prev > 0:
                 by_ts[_bucket(_ts(r), step_s)] = e / prev - 1.0

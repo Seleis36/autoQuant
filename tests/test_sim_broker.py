@@ -218,3 +218,31 @@ def test_a_wiped_out_short_refuses_to_trade_rather_than_inverting(tmp_path):
 
 def test_a_solvent_book_is_unaffected_by_the_guard(broker):
     assert broker.set_target_weight(0.5)["traded"] is True
+
+
+def _cache(tmp_path, monkeypatch, symbol, days):
+    import pandas as pd
+    monkeypatch.setattr(live_lib, "DATA_DIR", str(tmp_path))
+    idx = pd.date_range("2025-06-01", periods=days, freq="D")
+    pd.DataFrame({"Close": 1.0}, index=idx).to_parquet(live_lib.daily_cache_path(symbol))
+
+
+def test_yahoo_crypto_prints_365_days_a_year(tmp_path, monkeypatch):
+    """Yahoo carries both crypto and equities; the cached series says which this is."""
+    _cache(tmp_path, monkeypatch, "SOL-USD", 500)
+    assert live_lib.YahooQuotes().daily_bars_per_year("SOL-USD") == 365.0
+
+
+def test_yahoo_weekday_series_stays_on_trading_days(tmp_path, monkeypatch):
+    import pandas as pd
+    monkeypatch.setattr(live_lib, "DATA_DIR", str(tmp_path))
+    idx = pd.bdate_range("2025-06-02", periods=300)
+    pd.DataFrame({"Close": 1.0}, index=idx).to_parquet(live_lib.daily_cache_path("SPY"))
+    assert live_lib.YahooQuotes().daily_bars_per_year("SPY") == 252.0
+
+
+def test_yahoo_without_a_cache_falls_back_and_never_downloads(tmp_path, monkeypatch):
+    monkeypatch.setattr(live_lib, "DATA_DIR", str(tmp_path))
+    q = live_lib.YahooQuotes()
+    monkeypatch.setattr(q.md, "daily", lambda *a, **k: pytest.fail("touched the network"))
+    assert q.daily_bars_per_year("NOPE") == 252.0

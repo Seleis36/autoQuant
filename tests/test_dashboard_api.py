@@ -151,3 +151,56 @@ def test_missing_log_is_404_not_400(server, live_dir):
 def test_unknown_path_is_404(server):
     status, _ = get_err(server, "/api/nope")
     assert status == 404
+
+
+def test_reads_under_a_rebound_host_name_are_refused(server):
+    """GETs leak positions and PRs, so DNS rebinding is refused on reads too."""
+    req = urllib.request.Request(server + "/api/state", headers={"Host": "evil.example"})
+    with pytest.raises(urllib.error.HTTPError) as e:
+        urllib.request.urlopen(req, timeout=10)
+    assert e.value.code == 403
+
+
+def test_trades_endpoint_reads_fills_off_the_whole_journal(server, live_dir):
+    rows = [{"ts": f"2026-01-{1 + i // 24:02d}T{i % 24:02d}:00:00+00:00", "event": "rebalance",
+             "equity": 100.0, "weight": 0.0, "traded": i == 0, "side": "BUY",
+             "filled_qty": 1.0, "fill_price": 5.0} for i in range(300)]
+    write_strategy(live_dir, NAME, journal_rows=rows)
+    status, body = get(server, f"/api/trades?strategy={ENCODED}")
+    assert status == 200
+    assert body["total"] == 1 and body["fills"][0]["side"] == "BUY"
+
+
+@pytest.mark.parametrize("q", ["strategy=..%2Fx", f"strategy={ENCODED}&limit=lots"])
+def test_trades_endpoint_validates_its_input(server, q):
+    status, _ = get_err(server, "/api/trades?" + q)
+    assert status == 400
+
+
+def test_stale_live_inputs_ignore_research_files_and_judge_legs_by_their_peers(live_dir):
+    import json as _json
+    (live_dir / "a/basket").mkdir(parents=True)
+    (live_dir / "a/basket/meta.json").write_text(_json.dumps(
+        {"symbols": ["AAA", "BBB", "CCC", "DDD"], "schedule": "1d"}))
+    (live_dir / "a/panelbook").mkdir(parents=True)
+    (live_dir / "a/panelbook/meta.json").write_text(_json.dumps(
+        {"symbols": ["P1", "P2", "P3"], "schedule": "1d"}))
+    (live_dir / "a/one").mkdir(parents=True)
+    (live_dir / "a/one/meta.json").write_text(_json.dumps({"symbol": "TLT", "schedule": "1d"}))
+    ages = {"AAA_d.parquet": 20, "BBB_d.parquet": 22, "CCC_d.parquet": 21,
+            "DDD_d.parquet": 400,                       # a member whose refresh came back empty
+            "P1_d.parquet": 300, "P2_d.parquet": 300, "P3_d.parquet": 300,   # priced elsewhere
+            "TLT_d.parquet": 120, "IDX_IXIC_d.parquet": 1100,                # research only
+            "BTCUSDT_1h_public_live.parquet": 40}
+    out = dashboard.stale_live_inputs(ages)
+    assert out == {"DDD_d.parquet": "a/basket", "TLT_d.parquet": "a/one",
+                   "BTCUSDT_1h_public_live.parquet": "binance cache"}
+
+
+@pytest.mark.parametrize("path", ["/api/log", "/api/journal", "/api/series", "/api/trades"])
+@pytest.mark.parametrize("name", ["../x", "x/..", ".hidden/x"])
+def test_no_read_endpoint_accepts_a_dot_path_component(server, path, name):
+    """`[\\w.-]+` admits "..": only do_action refused it, so the GET endpoints could
+    reach one level above live/."""
+    status, _ = get_err(server, f"{path}?strategy=" + urllib.parse.quote(name, safe=""))
+    assert status == 400

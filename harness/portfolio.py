@@ -164,6 +164,16 @@ class SimPortfolioBroker(LedgerBroker):
             return None
         return min(keys)
 
+    def bars_per_year(self, schedule: str) -> Optional[float]:
+        """The basket's daily bars a year: its slowest leg's, as `bar_key` waits for it.
+
+        The inherited version asked about `self.symbol`, which for a basket is every leg
+        joined by "+" -- a name no quote source can look up.
+        """
+        if schedule == "1d":
+            return min(self.quotes.daily_bars_per_year(s) for s in self.symbols)
+        return None
+
     def position(self, symbol: Optional[str] = None):
         if symbol is None:
             return dict(self._positions)
