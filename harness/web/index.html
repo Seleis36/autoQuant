@@ -156,6 +156,7 @@ details.fill table{margin:6px 0 4px}
 <header>
   <h1>autoQuant <span id="clock"></span></h1>
   <span class="chip" id="c-poller">poller —</span>
+  <span class="chip" id="c-research" style="display:none"></span>
   <span class="chip" id="c-strats">—</span>
   <span class="chip" id="c-account">—</span>
   <span class="chip" id="c-usage" title="">claude —</span>
@@ -199,7 +200,7 @@ details.fill table{margin:6px 0 4px}
       </div>
       <div class="card">
         <h3>Launch research agent</h3>
-        <p class="desc">Runs <span class="mono">/&lt;asset-class&gt;-quant-research</span> headlessly,
+        <p class="desc" id="research-desc">Runs <span class="mono">/&lt;asset-class&gt;-quant-research</span> headlessly,
            uncapped (subscription). It opens a PR; the poller does the rest.</p>
         <div class="row">
           <select id="ac"></select>
@@ -988,6 +989,21 @@ function renderHeader(){
   $('#c-usage').title = (u.disclaimer||'') +
     (u['7d'] ? `\n7d: $${fmt(u['7d'].cost_usd,2)}, ${u['7d'].tokens.msgs} messages` : '');
   $('#poller-toggle').textContent = p.running ? 'Stop poller' : 'Start poller';
+  // Two hosts: this desk trades; agents run on the research host, which syncs back here.
+  const rh = STATE.role==='desk' ? (STATE.research_host||{}) : null, cr = $('#c-research');
+  cr.style.display = rh ? '' : 'none';
+  if(rh){
+    cr.innerHTML = !rh.seen ? 'research host <b class="down">never synced</b>'
+      : `research host <b class="${rh.online?'up':'down'}">${rh.online?'on':'off'}</b>`
+        + ` <span class="dim">${dur(rh.age_s)} ago${(rh.running||[]).length?' · '+rh.running.length+' running':''}`
+        + `${rh.pending_requests?' · '+rh.pending_requests+' queued':''}</span>`;
+    cr.title = rh.seen ? `${rh.host||''} last synced ${dur(rh.age_s)} ago`
+      + (rh.research_today?`; nightly batch ran ${rh.research_today}`:'; no nightly batch yet today')
+      + (rh.disk_free_gb!=null?`; ${fmt(rh.disk_free_gb,0)} GB free`:'') : '';
+    $('#research-desc').innerHTML = 'Queued for the research host: it runs '
+      + '<span class="mono">/&lt;asset-class&gt;-quant-research</span> at its next sync '
+      + '(within minutes when it is on, otherwise at its next start). It opens a PR; the pollers do the rest.';
+  }
   if(g.url){ $('#c-git').href = g.url; $('#c-git').textContent = 'github · '+(g.branch||''); }
 }
 
@@ -995,7 +1011,7 @@ function renderAgents(){
   const rows = (STATE.agents||[]).slice(0,6);
   $('#agents').innerHTML = rows.length ? `<table><tbody>${rows.map(r=>
     `<tr><td><a href="#" data-log="${esc(r.log)}">${esc(r.log)}</a></td>
-     <td class="dim">${esc(r.kind)}</td>
+     <td class="dim">${esc(r.kind)}${r.host==='desktop'?' &middot; desktop':''}</td>
      <td class="dim">${dur((Date.now()/1000)-r.mtime)} ago</td>
      <td>${r.session?`<a href="#" data-transcript="${esc(r.session)}">convo</a>`:''}</td></tr>`).join('')}</tbody></table>`
     : '<span class="dim">no agent runs yet</span>';
@@ -1015,7 +1031,7 @@ function renderSessions(){
     `<tr>
       <td><span style="color:${dot[r.status]||'#888'}">&#9679;</span>
           <span class="mono">${esc((r.id||'').slice(0,8))}</span></td>
-      <td class="dim">${esc(r.kind||'')}</td>
+      <td class="dim">${esc(r.kind||'')}${r.host==='desktop'?' &middot; desktop':''}</td>
       <td>${esc(r.target||'')}</td>
       <td class="dim">${esc(r.status||'')}${r.reason&&r.status!=='done'?' &middot; '+esc(r.reason):''}</td>
       <td class="dim">${r.resumes?('&#8635;'+r.resumes):''}</td>

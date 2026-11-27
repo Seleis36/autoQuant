@@ -59,6 +59,7 @@ PY
 
 resume_one() {
   local uuid="$1"
+  no_agents_on_desk "resuming session $uuid"
   local f="$SL_SESSIONS/$uuid.json"
   [ -f "$f" ] || { echo "no such session: $uuid" >&2; return 1; }
 

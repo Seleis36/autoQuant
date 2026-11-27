@@ -53,6 +53,10 @@ fi
 say "tonight: ${picks:-<nothing>}  (model=${NIGHTLY_MODEL:-launcher default})"
 [ "$DRY" = 1 ] && return 0
 [ -n "$picks" ] || { say "no asset classes found"; return 1; }
+if [ "$(aq_role)" = desk ]; then
+  say "this host is the trading desk (AQ_ROLE=desk): research runs on the research host, nothing launched"
+  return 0
+fi
 
 # ---- guards ------------------------------------------------------------------
 # Keep the CLI current: model aliases resolve to the newest model the CLI knows, so a

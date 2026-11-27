@@ -465,32 +465,147 @@ def refresh_git():
     CACHE.set("git", {"branch": branch, "head": head, "url": url})
 
 
-def transcript_path(reg: dict) -> str:
-    """Where Claude Code wrote this registry entry's conversation."""
+# --------------------------------------------------------------- two hosts
+# On the desk (AQ_ROLE=desk) no agent runs locally: the research host runs them and
+# rsyncs its logs, session registry and transcripts into AQ_REMOTE_DIR/desktop over the
+# tailnet (harness/remote_inbox.sh). Those files were written by another machine, through
+# an unprivileged account, so every path into them is a validated basename and is
+# re-checked to resolve inside that directory before it is opened.
+
+REMOTE_STALE_S = 600       # a research host silent this long is treated as off
+
+
+def aq_role() -> str:
+    r = os.environ.get("AQ_ROLE", "").strip()
+    return r if r in ("desk", "research") else "all"
+
+
+def remote_dir() -> str:
+    return os.environ.get("AQ_REMOTE_DIR") or "/var/lib/autoquant-remote"
+
+
+def _remote(*parts) -> str:
+    return os.path.join(remote_dir(), "desktop", *parts)
+
+
+def _inside(path: str, root: str) -> bool:
+    try:
+        return os.path.commonpath([os.path.realpath(path), os.path.realpath(root)]) \
+            == os.path.realpath(root)
+    except ValueError:
+        return False
+
+
+def research_host() -> dict:
+    """Is the research host up, as far as the desk can tell: when it last synced."""
+    hb = _remote("heartbeat.json")
+    reqs = glob.glob(os.path.join(remote_dir(), "outbox", "requests", "*.json"))
+    if not os.path.isfile(hb) or not _inside(hb, _remote()):
+        return {"seen": False, "online": False, "pending_requests": len(reqs)}
+    d = _read_json(hb) or {}
+    age = max(0.0, time.time() - os.path.getmtime(hb))
+    running = d.get("running") if isinstance(d.get("running"), list) else []
+    return {"seen": True, "online": age < REMOTE_STALE_S, "age_s": round(age),
+            "host": str(d.get("host") or "")[:64],
+            "running": [s for s in running if isinstance(s, str)
+                        and re.fullmatch(SESSION_RE, s)],
+            "research_today": str(d.get("research_today") or "")[:10] or None,
+            "disk_free_gb": d.get("disk_free_gb")
+            if isinstance(d.get("disk_free_gb"), (int, float)) else None,
+            "pending_requests": len(reqs)}
+
+
+def _registry_files():
+    """(path, host) for every session record: this host's, then the research host's.
+    A record present in both is this host's -- the local copy is the live one."""
+    seen = set()
+    for d, host in ((SESSIONS_DIR, "local"), (_remote("sessions"), "desktop")):
+        for f in glob.glob(os.path.join(d, "*.json")):
+            base = os.path.basename(f)
+            if base.endswith(".result.json") or base in seen:
+                continue
+            if not re.fullmatch(SESSION_RE + r"\.json", base) or not _inside(f, d):
+                continue
+            seen.add(base)
+            yield f, host
+
+
+def _registry(sid: str):
+    """(record, host) for one session id, or (None, None)."""
+    for d, host in ((SESSIONS_DIR, "local"), (_remote("sessions"), "desktop")):
+        f = os.path.join(d, sid + ".json")
+        if os.path.isfile(f) and _inside(f, d):
+            reg = _read_json(f)
+            if isinstance(reg, dict):
+                return reg, host
+    return None, None
+
+
+def transcript_path(reg: dict, host: str = "local") -> str:
+    """Where Claude Code wrote this registry entry's conversation. A research-host
+    session's cwd names a path on THAT machine; its transcript is synced flat."""
+    if host == "desktop":
+        return _remote("transcripts", f"{reg.get('id') or ''}.jsonl")
     return transcript.path_for(reg.get("id") or "", reg.get("cwd") or REPO_ROOT)
+
+
+def log_path(fname: str):
+    """A launcher log by basename, here first, then from the research host."""
+    if not re.fullmatch(LOGFILE_RE, fname or ""):
+        return None
+    for d in (LOGS_DIR, _remote("logs")):
+        f = os.path.join(d, fname)
+        if os.path.isfile(f) and _inside(f, d):
+            return f
+    return None
+
+
+def queue_request(kind: str, **payload) -> dict:
+    """Leave a request in the outbox for the research host to act on at its next sync."""
+    rdir = os.path.join(remote_dir(), "outbox", "requests")
+    if not os.path.isdir(rdir):
+        return {"ok": False, "error": "the research-host link is not set up on this desk "
+                                      "(sudo harness/remote_inbox.sh setup)"}
+    now = datetime.now(timezone.utc)
+    rid = now.strftime("%Y%m%dT%H%M%S") + "-" + os.urandom(3).hex()
+    tmp = os.path.join(rdir, f".{rid}.tmp")
+    with open(tmp, "w") as fh:
+        json.dump({"id": rid, "action": kind, "requested_at": now.isoformat(), **payload},
+                  fh)
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, os.path.join(rdir, f"{rid}.json"))
+    h = research_host()
+    when = (f"online, synced {h['age_s']}s ago -- it picks this up within minutes"
+            if h.get("online") else
+            "offline -- it runs when that machine next starts")
+    return {"ok": True, "output": f"queued for the research host ({when}): {kind} {rid}"}
 
 
 def _sessions_by_log() -> dict:
     """Log basename -> session id, so a row in the agent-runs list can open the
     conversation behind it and not only the launcher's log."""
     out = {}
-    for f in glob.glob(os.path.join(SESSIONS_DIR, "*.json")):
-        if f.endswith(".result.json"):
-            continue
+    for f, _host in _registry_files():
         d = _read_json(f) or {}
         if d.get("log") and d.get("id"):
-            out[os.path.basename(d["log"])] = d["id"]
+            out.setdefault(os.path.basename(d["log"]), d["id"])
     return out
 
 
 def refresh_agents():
     by_log = _sessions_by_log()
+    files = {}
+    for d, host in ((LOGS_DIR, "local"), (_remote("logs"), "desktop")):
+        for f in glob.glob(os.path.join(d, "*.log")):
+            base = os.path.basename(f)
+            if base not in files and re.fullmatch(LOGFILE_RE, base) and _inside(f, d):
+                files[base] = (f, host)
     runs = []
-    for f in sorted(glob.glob(os.path.join(LOGS_DIR, "*.log")), key=os.path.getmtime,
-                    reverse=True)[:25]:
-        base = os.path.basename(f)
+    for base, (f, host) in sorted(files.items(), key=lambda kv: os.path.getmtime(kv[1][0]),
+                                  reverse=True)[:25]:
         runs.append({"log": base, "mtime": os.path.getmtime(f),
                      "size": os.path.getsize(f), "session": by_log.get(base),
+                     "host": host,
                      "kind": "deploy" if base.startswith("pr-") else
                              ("research" if base.startswith("research-") else "other")})
     CACHE.set("agents", runs)
@@ -519,15 +634,25 @@ def resolved_model(result_json: str):
 def refresh_sessions():
     """The agent-session registry: what ran, how it ended, what can be resumed."""
     out = []
-    for f in glob.glob(os.path.join(SESSIONS_DIR, "*.json")):
-        if f.endswith(".result.json"):
-            continue
+    rh = None
+    for f, host in _registry_files():
         try:
             d = json.load(open(f))
         except Exception:  # noqa: BLE001
             continue
+        if not isinstance(d, dict):
+            continue
         pid = d.get("pid")
-        if d.get("status") == "running" and pid:
+        if host == "desktop":
+            # Its pid is a process on the other machine -- never probe it here. Trust a
+            # "running" only while that machine is still syncing; a host that went quiet
+            # mid-run was switched off, and its own harness will classify the run (and
+            # sync the verdict) when it comes back.
+            if d.get("status") == "running":
+                rh = rh or research_host()
+                if not rh.get("online"):
+                    d["status"], d["reason"] = "aborted", "host_offline"
+        elif d.get("status") == "running" and pid:
             try:
                 os.kill(int(pid), 0)
             except (OSError, ValueError):
@@ -539,8 +664,9 @@ def refresh_sessions():
                     ("id", "kind", "target", "status", "reason", "launched_at",
                      "ended_at", "log", "model")}
                    | {"resumes": len(d.get("resumes") or []),
+                      "host": host,
                       "model_resolved": resolved_model(f[:-5] + ".result.json"),
-                      "has_transcript": os.path.exists(transcript_path(d))})
+                      "has_transcript": os.path.exists(transcript_path(d, host))})
     out.sort(key=lambda r: r.get("launched_at") or "", reverse=True)
     CACHE.set("sessions", out[:40])
 
@@ -641,6 +767,8 @@ def do_action(body: dict) -> dict:
         arg = str(body.get("session", "")).strip() or "--all"
         if arg != "--all" and not re.fullmatch(r"[0-9a-fA-F-]{36}", arg):
             return {"ok": False, "error": "bad session id"}
+        if aq_role() == "desk":
+            return queue_request("resume", session=arg.lower())
         rc, out, err = sh([RESUME, arg], 120)
         refresh_sessions()
         return {"ok": rc == 0, "output": out or err}
@@ -661,6 +789,11 @@ def do_action(body: dict) -> dict:
         except OSError:
             pass
         refresh_prs()
+        if aq_role() == "desk":
+            # The attempt counter lives with the deployment agent, on the research host.
+            q = queue_request("clear_attempts", pr=int(num))
+            return {"ok": True, "output": f"PR #{num} requeued; "
+                    + (q.get("output") or q.get("error", ""))}
         return {"ok": True, "output": f"PR #{num} requeued"}
     if a == "launch_research":
         ac = body.get("asset_class", "")
@@ -670,11 +803,16 @@ def do_action(body: dict) -> dict:
         if key not in RESEARCH_MODELS:
             return {"ok": False, "error": f"unknown model {key!r}"}
         opt = next(o for o in research_model_options() if o["key"] == key)
+        seed = (body.get("seed") or "")[:500]
+        if aq_role() == "desk":
+            # This desk's CLI version says nothing about the research host's, so the
+            # `unavailable` check below does not apply; that host re-validates.
+            return queue_request("launch_research", asset_class=ac, seed=seed,
+                                 model=opt["id"])
         if opt.get("unavailable"):
             # Caught here rather than at the venue: the agent is detached, so an
             # unsupported model would otherwise surface as a session that died silently.
             return {"ok": False, "error": f"{opt['label']} {opt['unavailable']}"}
-        seed = (body.get("seed") or "")[:500]
         rc, out, err = sh([RESEARCH, ac, seed, "--model", opt["id"]], 60)
         return {"ok": rc == 0, "output": out or err}
     return {"ok": False, "error": f"unknown action {a!r}"}
@@ -782,6 +920,8 @@ class Handler(BaseHTTPRequestHandler):
                 "sessions": CACHE.get("sessions", []),
                 "asset_classes": ASSET_CLASSES,
                 "research_models": research_model_options(),
+                "role": aq_role(),
+                "research_host": research_host() if aq_role() == "desk" else None,
                 "ages": {k: CACHE.age(k) for k in
                          ("prs", "account", "usage", "data", "git", "agents",
                           "sessions")},
@@ -826,8 +966,8 @@ class Handler(BaseHTTPRequestHandler):
                 f = os.path.join(LIVE_DIR, name, "runner.log")
             elif re.fullmatch(LOGFILE_RE, fname or ""):
                 # A bare `*.log` basename: no separator can appear in the character
-                # class, so this cannot escape LOGS_DIR.
-                f = os.path.join(LOGS_DIR, fname)
+                # class, so this cannot escape LOGS_DIR (or the research host's copy).
+                f = log_path(fname) or os.path.join(LOGS_DIR, fname)
             else:
                 return self._send(400, {"error": "bad target"})
             if not os.path.exists(f):
@@ -838,8 +978,11 @@ class Handler(BaseHTTPRequestHandler):
             sid = qs.get("session", "")
             if not re.fullmatch(SESSION_RE, sid or ""):
                 return self._send(400, {"error": "bad session"})
-            reg = _read_json(os.path.join(SESSIONS_DIR, sid + ".json")) or {"id": sid}
-            f = transcript_path(reg)
+            reg, host = _registry(sid)
+            reg, host = reg or {"id": sid}, host or "local"
+            f = transcript_path(reg, host)
+            if host == "desktop" and not _inside(f, _remote("transcripts")):
+                return self._send(400, {"error": "bad session"})
             if not os.path.exists(f):
                 return self._send(404, {"error": "no transcript for this session -- it may "
                                                  "predate the registry or have been cleaned up"})

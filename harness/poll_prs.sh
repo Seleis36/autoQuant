@@ -77,10 +77,22 @@ watchdog() {
 sweep() {
   cd "$REPO" || return 1
 
-  watchdog
+  # Two hosts, two jobs (session_lib.sh, aq_role). The research host trades nothing, so it
+  # has nothing to watch -- restarting "dead" strategies there would double every order.
+  local role; role="$(aq_role)"
+  [ "$role" != research ] && watchdog
 
   if ! gh auth status >/dev/null 2>&1; then
     say "gh is not authenticated -- skipping sweep"; return 1
+  fi
+
+  if [ "$role" = desk ]; then
+    # The desk runs no agents: the research host's poller drains both queues below, and
+    # what its deployment agent merges is started here, deterministically.
+    "$REPO/harness/desk_launch.sh"
+    "$REPO/harness/remote_inbox.sh" publish
+    say "desk sweep done -- PR review and revision run on the research host"
+    return 0
   fi
 
   local n=0

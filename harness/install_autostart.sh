@@ -16,6 +16,16 @@
 set -uo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=/dev/null
+. "$REPO/harness/session_lib.sh"
+# This installs the TRADING desk: every strategy's unit, the dashboard, the watchdog. On a
+# research host that would start a second copy of every book against the same testnet
+# account, so refuse outright there.
+if [ "$(aq_role)" = research ]; then
+  echo "REFUSED: this host is the research host (AQ_ROLE=research) -- it trades nothing." >&2
+  echo "         Its units are installed by harness/research_host/ (see harness/README.md)." >&2
+  exit 5
+fi
 # On a native Linux host there is no Windows side: no logon hook to write, and no D: tick
 # disk -- the tick backfill would download ~330 GB onto the system disk instead.
 IS_WSL=""
@@ -103,8 +113,14 @@ say "started autoquant.target"
 
 # The nightly research batch. Only the timer is enabled; the service it triggers has no
 # [Install] on purpose -- enabling it would also run a research batch at every boot.
-systemctl --user enable --now autoquant-nightly.timer >/dev/null 2>&1 \
-  && say "nightly research timer: $(systemctl --user list-timers autoquant-nightly.timer --no-legend --no-pager | awk '{print $1, $2, $3}')"
+# Not on the desk: research runs on the research host, so the timer stays off here.
+if [ "$(aq_role)" = desk ]; then
+  systemctl --user disable --now autoquant-nightly.timer >/dev/null 2>&1
+  say "nightly research timer: off (AQ_ROLE=desk -- research runs on the research host)"
+else
+  systemctl --user enable --now autoquant-nightly.timer >/dev/null 2>&1 \
+    && say "nightly research timer: $(systemctl --user list-timers autoquant-nightly.timer --no-legend --no-pager | awk '{print $1, $2, $3}')"
+fi
 
 # ---- 2. Windows logon hook -------------------------------------------------
 if [ -z "$IS_WSL" ]; then

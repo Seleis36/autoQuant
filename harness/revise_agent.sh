@@ -23,6 +23,7 @@ STATE="$REPO/harness/state"; LOGS="$REPO/harness/logs"
 mkdir -p "$STATE" "$LOGS"
 
 PR="${1:?usage: revise_agent.sh <pr-number>}"
+no_agents_on_desk "revision agent for PR #$PR"
 # The `opus` alias: the newest Opus the CLI knows (see CLAUDE_BIN in session_lib.sh). The
 # model it resolved to lands in the session's result JSON and on the dashboard.
 MODEL="${REVISE_AGENT_MODEL:-opus}"

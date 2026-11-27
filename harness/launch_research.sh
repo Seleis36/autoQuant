@@ -48,6 +48,7 @@ TIMEOUT="${RESEARCH_AGENT_TIMEOUT:-14400}"
 
 CMD_FILE="$REPO/.claude/commands/${AC}-quant-research.md"
 [ -f "$CMD_FILE" ] || { echo "ERROR: no such asset class '$AC' (${CMD_FILE#"$REPO"/} missing)" >&2; exit 2; }
+no_agents_on_desk "research launch for $AC"
 
 # One global gate for research, deploy and revise agents alike -- they share a single
 # subscription and each one makes work for the others. Research is barred from the last

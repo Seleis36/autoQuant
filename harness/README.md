@@ -110,6 +110,43 @@ ledger and state are copied to `harness/state/backfill/`. The inputs are today's
 the data. Venue books are refused: the testnet never filled those orders, so their outage
 stays a gap. One strategy per process, daemon stopped.
 
+## Two hosts: the desk and the research host
+
+Since Nov 2026 the harness runs on two machines, chosen by `AQ_ROLE` in each one's `.env`:
+
+| | desk (`AQ_ROLE=desk`) | research host (`AQ_ROLE=research`) |
+|---|---|---|
+| Machine | the VPS, always on, small disk, runs as root | desktop-h0g6rel (WSL), on some of the time, tick disk on D: |
+| Trades | every live strategy, systemd units, watchdog | nothing -- never start a runner here |
+| Agents | none: every launcher exits 5 (`no_agents_on_desk`) | research (once a day at most), deploy review, revision |
+| Poller | `desk_launch.sh` + `remote_inbox.sh publish` | the review and revision queues, no watchdog |
+| Dashboard | served here, behind Cloudflare Access | not run |
+
+Unset means the old single host doing both, which is what the tests run as.
+
+**Deploying across the two.** The deployment agent on the research host reviews, writes the
+runner and `meta.json`, validates with `--check`, merges and labels `deployed`. It does not
+start anything. On the desk's next sweep `harness/desk_launch.sh` pulls `main`
+(fast-forward only), reserves `capital_usdt` in `meta.json`'s `book`, enables and starts the
+unit, checks it is RUNNING and labels the PR `vps:launched`. On failure it labels
+`vps:launch-failed` and comments why; remove that label to retry. Only PRs merged after
+`AQ_DESK_SINCE` are considered, because everything older was already running.
+
+**Logs and transcripts come back over rsync, not git** (the repo is public, and transcripts
+contain everything an agent read). The research host pushes over the tailnet as the
+unprivileged user `aqsync`, whose key is pinned to `rrsync -munge /var/lib/autoquant-remote`.
+That user can read and write files in that directory and has no shell. Setup and keys:
+`sudo harness/remote_inbox.sh setup`, `sudo harness/remote_inbox.sh add-key '<pubkey>'`.
+
+    /var/lib/autoquant-remote/desktop/   logs/ sessions/ transcripts/ heartbeat.json   (pushed)
+    /var/lib/autoquant-remote/outbox/    allocations.json desk.json requests/          (pulled)
+
+The dashboard merges the synced registry, logs and transcripts into its own lists. Rows are
+tagged `desktop`. A synced session marked `running` shows as `aborted · host_offline` once the
+heartbeat is older than 10 minutes. The header chip shows whether the research host is on.
+On the desk, **Launch** and **Resume** do not run anything locally. They write a request to
+`outbox/requests/`, and the research host acts on it at its next sync.
+
 ## Running it
 
 ```bash

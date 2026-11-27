@@ -45,6 +45,37 @@ SL_PY_BIN="$SL_REPO/.venv/bin/python"
 [ -x "$SL_PY_BIN" ] || SL_PY_BIN="$(command -v python3)"
 sl_py() { "$SL_PY_BIN" "$@"; }
 
+# --- host role ----------------------------------------------------------------
+# The desk and the research host are two machines (see harness/README.md, "Two hosts"):
+#
+#   desk      always on; trades the live strategies, serves the dashboard, launches what
+#             the research host merged (desk_launch.sh). Runs NO agents -- it is small,
+#             its disk is small, and its user is root, which the CLI refuses to run
+#             --dangerously-skip-permissions as.
+#   research  on only some of the time; runs every agent (research, deploy review,
+#             revision) and trades nothing.
+#   all       unset: the old single-machine behaviour, both jobs on one host.
+#
+# AQ_ROLE in the environment wins, then the repo's .env.
+aq_role() {
+  local r="${AQ_ROLE:-}"
+  if [ -z "$r" ] && [ -f "$SL_REPO/.env" ]; then
+    r="$(sed -n 's/^[[:space:]]*AQ_ROLE[[:space:]]*=[[:space:]]*//p' "$SL_REPO/.env" \
+          | tail -1 | tr -d "\"'[:space:]")"
+  fi
+  case "$r" in desk|research) echo "$r" ;; *) echo all ;; esac
+}
+
+# no_agents_on_desk <what>: exit 5 from the CALLER when this host is the desk. Every
+# launcher calls it before minting a session, so a stray timer, button or hand-run can
+# never start an agent here.
+no_agents_on_desk() {
+  if [ "$(aq_role)" = desk ]; then
+    echo "REFUSED: $1 -- this host is the trading desk (AQ_ROLE=desk); agents run on the research host" >&2
+    exit 5
+  fi
+}
+
 # --- registry ---------------------------------------------------------------
 
 # session_start <kind> <target> <prompt> <model> <log>  -> prints the uuid

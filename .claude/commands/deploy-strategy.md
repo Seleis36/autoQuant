@@ -379,7 +379,10 @@ around:
 ```
 
 Run it from `/home/seleis/autoQuant`, not the worktree: `harness/state/allocations.json` is
-shared, untracked live state and there is only one of it. 2500 USDT is the default ticket. The
+shared, untracked live state and there is only one of it. On the research host
+(`AQ_ROLE=research` in `.env` -- see Phase 7) that file is a copy of the trading desk's,
+refreshed at every sync, so the answer you get is the desk's; the desk reserves the same
+number again, authoritatively, when it starts the strategy. 2500 USDT is the default ticket. The
 `sim` book never refuses. If a `venue` allocation raises `ValueError` the shared pool really is
 oversubscribed — prefer re-routing to `sim` over shrinking the ticket, and only flag the PR
 invalid if the strategy genuinely needs real fills. Whatever number it accepts becomes
@@ -520,12 +523,27 @@ git rev-parse --abbrev-ref HEAD          # expect "main"
   same for `meta.json`). The content matches what `main` tracks, so that agent's own
   `git checkout main` later stays clean.
 
-Then label, register and launch:
+Then label it, and find out where you are running -- that decides who starts the daemon:
 
 ```bash
 gh label create deployed --color 0E8A16 --description "Strategy is running live (paper)" 2>/dev/null
 echo '{"labels":["deployed"]}' | gh api -X POST "repos/$SLUG/issues/$ARGUMENTS/labels" --input -
+grep -E '^AQ_ROLE=' .env || echo "AQ_ROLE unset"
+```
 
+**`AQ_ROLE=research` -- the normal case.** You are on the research host, which trades
+nothing and is switched off at times. **Do not start, enable or `launch_live.sh` anything
+here** -- a daemon on this machine would trade a second copy of the book and die with the
+machine. The trading desk launches it: within one poller sweep (≤ 30 min) its
+`harness/desk_launch.sh` pulls `main`, reserves `capital_usdt` in the `book` your
+`meta.json` names, enables the strategy's systemd unit, starts it, confirms RUNNING, and
+labels the PR `vps:launched` -- or `vps:launch-failed` with a comment quoting the error.
+So `meta.json` is the whole hand-over: `book` and `capital_usdt` must be right, and the
+`--check` in Phase 6 is the last run you get to see. You are done once `deployed` is on.
+
+**`AQ_ROLE` unset -- the old single host.** Register and launch here yourself:
+
+```bash
 # Reboot survival: if the systemd autostart is installed, this strategy needs its own unit
 # enabled, or it runs as a bare setsid process and dies at the next reboot.
 if systemctl --user is-enabled autoquant.target >/dev/null 2>&1; then
@@ -537,17 +555,19 @@ sleep 20 && ./harness/launch_live.sh status <asset-class>/<short-name>
 tail -n 30 live/<asset-class>/<short-name>/runner.log
 ```
 
-`gh pr merge` closes the PR. `launch_live.sh start` hands the strategy to systemd when the unit
-is enabled and otherwise detaches it with `setsid`; either way it keeps running after this
-session ends. Confirm from `status` and the log that it is RUNNING and has completed a
-rebalance — if it died, fix it and restart before you report success. `status` shows `[systemd]`
-when the unit is supervising it; if it does not and the target is enabled, the `enable` above
-did not take.
+`launch_live.sh start` hands the strategy to systemd when the unit is enabled and otherwise
+detaches it with `setsid`; either way it keeps running after this session ends. Confirm from
+`status` and the log that it is RUNNING and has completed a rebalance -- if it died, fix it
+and restart before you report success. `status` shows `[systemd]` when the unit is
+supervising it; if it does not and the target is enabled, the `enable` above did not take.
+
+(`AQ_ROLE=desk` never reaches this command: the desk runs no agents.)
 
 Finally comment on the PR with: the strategy deployed, the venue and symbol used, the
 schedule, the `--check` weight and its agreement with the backtest, the fee assumption and
 how it differs from the research, whether it is trading the funded testnet account or a
-shadow book, and where the log and journal live.
+shadow book, and where the log and journal live. On the research host, say the desk will
+start it and confirm with `vps:launched`; do not claim it is running.
 
 ---
 

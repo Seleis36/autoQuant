@@ -13,6 +13,19 @@ HARNESS_DIR = os.path.join(REPO_ROOT, "harness")
 sys.path.insert(0, HARNESS_DIR)
 
 
+@pytest.fixture(autouse=True)
+def single_host_role(monkeypatch, tmp_path_factory):
+    """Run every test as the old single host, whatever this machine's .env says.
+
+    The repo's .env names the host's role (AQ_ROLE=desk on the trading desk), and
+    `load_env` fills it into os.environ -- so without this a suite run on the desk would
+    quietly test the desk's behaviour everywhere. Tests of a role set it themselves.
+    The remote dir points somewhere empty so nothing reads the real research-host sync.
+    """
+    monkeypatch.setenv("AQ_ROLE", "all")
+    monkeypatch.setenv("AQ_REMOTE_DIR", str(tmp_path_factory.mktemp("no-remote")))
+
+
 @pytest.fixture
 def live_dir(tmp_path, monkeypatch):
     """An isolated `live/` tree, wired into both dashboard and metrics.

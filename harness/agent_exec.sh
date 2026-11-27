@@ -30,6 +30,8 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 MODE="${1:?mode}"; UUID="${2:?uuid}"; LOG="${3:?log}"; TIMEOUT="${4:?timeout}"
 MODEL="${5:?model}"; PROMPT="${6:?prompt}"
+# Backstop: every launcher already refuses on the desk, before minting a session.
+no_agents_on_desk "agent session $UUID"
 JSONF="$SL_SESSIONS/$UUID.result.json"
 
 say() { echo "[$(date -u +%FT%TZ)] $*" >> "$LOG"; }

@@ -24,6 +24,7 @@ LOGS="$REPO/harness/logs"
 mkdir -p "$STATE" "$LOGS"
 
 PR="${1:?usage: deploy_agent.sh <pr-number>}"
+no_agents_on_desk "deployment agent for PR #$PR"
 # The `opus` alias: the newest Opus the CLI knows (see CLAUDE_BIN in session_lib.sh). The
 # model it resolved to lands in the session's result JSON and on the dashboard.
 MODEL="${DEPLOY_AGENT_MODEL:-opus}"
