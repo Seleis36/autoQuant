@@ -1,0 +1,12 @@
+[Unit]
+Description=Start the day's research batch at 01:00 if the PC is on
+
+[Timer]
+OnCalendar=*-*-* 01:00:00
+# Persistent=false: a night the PC was off is not made up; autoquant-research-boot.timer
+# covers the PC being turned on later, and daily.sh's stamp keeps it to one batch a day.
+Persistent=false
+Unit=autoquant-research-daily.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,12 @@
+[Unit]
+Description=Start the day's research batch 10 min after the PC boots
+
+[Timer]
+# A separate timer from the 01:00 one on purpose: a monotonic OnBootSec timer that is
+# started after its point has passed fires at once. install.sh therefore only ENABLES this
+# one (it starts with the next boot); starting it mid-session would launch a batch.
+OnBootSec=10min
+Unit=autoquant-research-daily.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,15 @@
+[Unit]
+Description=autoQuant research host: at most one research batch per day (harness/research_host/daily.sh)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/autoQuant
+ExecStart=%h/autoQuant/harness/research_host/daily.sh
+# The batch waits for its agent (4 h timeout each), so one run can legitimately last hours.
+TimeoutStartSec=14h
+# The agents are detached (setsid) but still in this unit's cgroup: stop only the script.
+KillMode=process
+StandardOutput=append:%h/autoQuant/harness/logs/daily-systemd.log
+StandardError=append:%h/autoQuant/harness/logs/daily-systemd.log

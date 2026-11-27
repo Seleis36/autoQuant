@@ -478,6 +478,10 @@ def fetch_aggtrades(symbol="BTCUSDT", market="um", start=None, end=None, verify=
     hi = pd.Timestamp(end).strftime("%Y-%m") if end else "9999-99"
     todo = []
     for key, size in list_archive(f"{root}/monthly/aggTrades/{symbol}/"):
+        # The listing can hold a zip not named <SYM>-aggTrades-<YYYY-MM>.zip; it crashed
+        # every backfill from Oct 12 2026 on, so skip anything that is not a month file.
+        if "-aggTrades-" not in key:
+            continue
         m = key.rsplit("-aggTrades-", 1)[1][:7]
         if lo <= m <= hi and m not in have:
             todo.append((m, key, size))
