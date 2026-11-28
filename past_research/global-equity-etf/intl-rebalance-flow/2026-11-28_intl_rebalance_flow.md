@@ -139,3 +139,7 @@ CAGR 1.5 %, vol 2.2 %, MaxDD −5.0 %, turnover 33×/yr, average gross 0.07, **m
 
 Code `code/global-equity-etf/intl-rebalance-flow/`: `lib.py`, `01_event_study.py` … `10_figures.py`,
 `strategy.py`. Spec and figures: `alphas/global-equity-etf/intl-rebalance-flow/`.
+
+## Deployment review
+
+PR #29 (2026-11-28): not deployed as a standalone strategy. The PR recommends `trend-flow-blend`, which carries this sleeve unmodified through its `strategy.py`, and that blend is what was deployed (sim book, `live/global-equity-etf/trend-flow-blend/`). A second standalone copy would double the same month-end trade.

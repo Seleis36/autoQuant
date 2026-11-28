@@ -132,3 +132,7 @@ Code `code/global-equity-etf/global-rebalance-pressure/`: `grp_lib.py`, `01_even
 `02_settlement_eras.py`, `03_books.py`, `04_validate.py`, `05_figures.py`, `strategy.py`. Spec and figures
 in `alphas/global-equity-etf/global-rebalance-pressure/`. It uses `next_session_days_left`, added to
 `code/global-equity-etf/shared/trading_calendar.py`.
+
+## Deployment review
+
+PR #29 (2026-11-28): not deployed as a standalone strategy. The PR recommends `trend-flow-blend`, which carries this sleeve unmodified through its `strategy.py`, and that blend is what was deployed (sim book, `live/global-equity-etf/trend-flow-blend/`). A second standalone copy would double the same month-end trade.
