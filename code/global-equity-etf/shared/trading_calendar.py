@@ -31,3 +31,25 @@ def month_end_sessions(index):
     index = pd.DatetimeIndex(index)
     nxt = index[1:].append(future_trading_days(index[-1], 1))
     return index[(nxt.month != index.month) | (nxt.year != index.year)]
+
+
+def next_session_days_left(index, n_future=30):
+    """For each session t in `index`: how many sessions remain in the month AFTER the next
+    session t+1 (0 = t+1 is the last session of its month). The next session of the final
+    date, and the month-end status of every date, come from the NYSE calendar, so a partially
+    observed month never looks finished. Added 2026-11 for the month-end flow sleeves."""
+    index = pd.DatetimeIndex(index)
+    cal = index.append(future_trading_days(index[-1], n_future))
+    nxt = cal[1:]
+    is_me = (nxt.month != cal[:-1].month) | (nxt.year != cal[:-1].year)
+    import numpy as np
+    me = np.append(is_me, False)                       # last calendar entry: unknown, unused
+    # sessions left after each calendar day = count of sessions until the next month-end flag
+    left = np.zeros(len(cal), dtype=int)
+    k = 0
+    for i in range(len(cal) - 1, -1, -1):
+        if me[i]:
+            k = 0
+        left[i] = k
+        k += 1
+    return pd.Series(left[1:len(index) + 1], index=index)
