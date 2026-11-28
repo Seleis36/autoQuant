@@ -7,6 +7,8 @@ Wants=network-online.target
 Type=oneshot
 WorkingDirectory=%h/autoQuant
 ExecStart=%h/autoQuant/harness/nightly_research.sh
+# One asset class per night (the script's default is 2).
+Environment=NIGHTLY_COUNT=1
 # The batch waits for each agent in turn, so a night can legitimately run ~8h.
 TimeoutStartSec=14h
 # The agents are detached (setsid) but still in this unit's cgroup. The default

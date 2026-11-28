@@ -1,0 +1,13 @@
+[Unit]
+Description=autoQuant research host: sync logs, registry and requests with the trading desk
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/autoQuant
+ExecStart=%h/autoQuant/harness/research_host/sync.sh
+TimeoutStartSec=15min
+# A request can launch an agent, which detaches (setsid) but stays in this cgroup. Stop
+# only the sync script when the pass ends, never the agent it started.
+KillMode=process

@@ -147,6 +147,20 @@ heartbeat is older than 10 minutes. The header chip shows whether the research h
 On the desk, **Launch** and **Resume** do not run anything locally. They write a request to
 `outbox/requests/`, and the research host acts on it at its next sync.
 
+**The research host's side** lives in `harness/research_host/` (setup: `PLAN.md` there).
+`install.sh` (refuses unless `AQ_ROLE=research`) installs:
+
+| Unit | Runs |
+|---|---|
+| `autoquant-research-sync.timer` | `sync.sh` every 2 min: reaps orphaned sessions, pulls `allocations.json`, `desk.json` and the requests (`handle_requests.py` validates each one and logs it to `logs/requests.log`), pushes logs, registry and transcripts, then the heartbeat |
+| `autoquant-research-daily.timer`, `autoquant-research-boot.timer` | `daily.sh` at 01:00 and 10 min after boot: one `nightly_research.sh` batch per Paris calendar day (`NIGHTLY_COUNT=1`), stamped in `state/research_host/last_batch` before it starts |
+| `autoquant-poller.service`, `autoquant-ticks.service` | the review/revision queues and the tick disk, hung off `default.target` (not `autoquant.target`, which stays disabled here) |
+
+Off switches: `touch harness/state/research_host/paused` (until removed) or
+`harness/state/research_host/skip-YYYY-MM-DD` (that day). `daily.sh --dry-run` shows what
+the day would run and launches nothing. The boot timer is only enabled, never started by
+hand: an `OnBootSec` timer started after its point has passed fires at once.
+
 ## Running it
 
 ```bash
@@ -205,14 +219,15 @@ All three agents — research, deploy and revise — default to `opus`, overrida
 
 ### Nightly research
 
-`autoquant-nightly.timer` runs `nightly_research.sh` at 01:00 local time: two asset classes
-per night, **one after the other**. Research holds one of the `AGENT_MAX_CONCURRENT` slots and
+`autoquant-nightly.timer` runs `nightly_research.sh` at 01:00 local time: one asset class
+per night (the unit sets `NIGHTLY_COUNT=1`; the script's own default is two, run **one after
+the other**). Research holds one of the `AGENT_MAX_CONCURRENT` slots and
 a second concurrent launch is refused by design, so deploy/revise work can always start.
 Running back to back also spreads the night's usage across the subscription's rolling window.
 
 - **Rotation** — least recently researched first, judged by the newest
   `logs/research-<class>-*.log`. A class you launch by hand counts as its turn; with 11
-  classes and two a night, each comes round about every six days.
+  classes and one a night, each comes round about every eleven days.
 - **Guards** — skips the night when `NIGHTLY_MAX_OPEN_PRS` (4) PRs are already open; launches
   nothing new after `NIGHTLY_DEADLINE_H` (10) hours; each run keeps the 4h agent timeout.
 - **Stranded-work check** — a run the registry calls `done` can still have left its work
